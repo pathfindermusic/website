@@ -1,0 +1,213 @@
+<!DOCTYPE html><html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Ringwood Music Studio — Pathfinder Music Lessons</title>
+<meta name="description" content="Pathfinder Music Lessons Ringwood studio — G3/93a Heatherdale Road, Ringwood VIC 3134. 10 min walk from Heatherdale Station.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --orange: #E8491E; --orange-light: #FF6B45; --orange-dark: #C23A14;
+  --charcoal: #1C1C1E; --charcoal-mid: #2C2C2E; --charcoal-light: #3A3A3C;
+  --white: #FFFFFF; --off-white: #F7F7F7; --light-grey: #EBEBEB;
+  --mid-grey: #999999; --dark-grey: #555555;
+  --border-l: rgba(0,0,0,0.09); --border-d: rgba(255,255,255,0.1);
+  --shadow: 0 2px 16px rgba(0,0,0,0.07); --shadow-h: 0 6px 28px rgba(0,0,0,0.13);
+  --r: 8px; --r-sm: 5px;
+}
+html { scroll-behavior: smooth; }
+body { font-family: 'Inter', sans-serif; background: var(--white); color: var(--charcoal); line-height: 1.6; overflow-x: hidden; }
+/* NAV */
+nav { position: sticky; top: 0; z-index: 100; background: var(--charcoal); padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 66px; border-bottom: 3px solid var(--orange); }
+.logo-img { height: 34px; width: auto; display: block; }
+.nav-links { display: flex; align-items: center; gap: 1.4rem; list-style: none; }
+.nav-links a { color: rgba(255,255,255,0.68); text-decoration: none; font-size: 0.78rem; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; transition: color 0.18s; white-space: nowrap; }
+.nav-links a:hover, .nav-links a.active { color: var(--white); }
+.nav-links a.active { color: var(--orange); }
+.nav-cta { background: var(--orange) !important; color: var(--white) !important; padding: 0.42rem 1rem; border-radius: var(--r-sm); font-weight: 600 !important; white-space: nowrap; }
+.nav-cta:hover { background: var(--orange-light) !important; }
+.nav-toggle { display: none; flex-direction: column; gap: 5px; cursor: pointer; background: none; border: none; padding: 4px; }
+.nav-toggle span { display: block; width: 22px; height: 2px; background: var(--white); border-radius: 2px; }
+/* PAGE HEADER */
+.page-header { position: relative; padding: 4.5rem 2rem 3.5rem; overflow: hidden; background: var(--charcoal); border-bottom: 3px solid var(--orange); }
+.ph-content { position: relative; z-index: 2; max-width: 1100px; margin: 0 auto; }
+.page-header h1 { font-size: clamp(2.25rem, 5.5vw, 3.75rem); font-weight: 800; line-height: 1.05; color: var(--white); margin-bottom: 0.85rem; }
+.page-header p { color: rgba(255,255,255,0.62); font-size: 1rem; max-width: 560px; line-height: 1.7; }
+/* SHARED LAYOUT */
+.container { max-width: 1100px; margin: 0 auto; }
+section { padding: 4.5rem 2rem; }
+.sec-label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--orange); margin-bottom: 0.6rem; }
+.sec-title { font-size: clamp(1.6rem, 3.2vw, 2.4rem); font-weight: 800; line-height: 1.1; margin-bottom: 1.1rem; color: var(--charcoal); }
+.sec-body { color: var(--dark-grey); font-size: 0.975rem; line-height: 1.78; }
+.dark-sec { background: var(--charcoal); }
+.dark-sec .sec-title { color: var(--white); }
+.dark-sec .sec-body { color: rgba(255,255,255,0.6); }
+.off-sec { background: var(--off-white); }
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.875rem; font-weight: 700; padding: 0.75rem 1.6rem; border-radius: var(--r-sm); text-decoration: none; border: none; cursor: pointer; transition: background 0.18s, transform 0.14s, border-color 0.18s; letter-spacing: 0.02em; white-space: nowrap; }
+.btn-orange { background: var(--orange); color: var(--white); }
+.btn-orange:hover { background: var(--orange-light); transform: translateY(-1px); }
+.btn-outline-dark { background: transparent; color: var(--charcoal); border: 2px solid var(--charcoal); }
+.btn-outline-dark:hover { background: var(--charcoal); color: var(--white); }
+.btn-outline-white { background: transparent; color: var(--white); border: 2px solid rgba(255,255,255,0.38); }
+.btn-outline-white:hover { background: rgba(255,255,255,0.1); border-color: var(--white); }
+/* CARDS */
+.card { background: var(--white); border: 1px solid var(--border-l); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
+.card:hover { transform: translateY(-3px); box-shadow: var(--shadow-h); }
+/* FORM */
+.f-grid { display: grid; gap: 0.85rem; }
+.f-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; }
+.f-group { display: flex; flex-direction: column; gap: 0.35rem; }
+.f-group label { font-size: 0.8rem; font-weight: 600; color: var(--charcoal); }
+.f-group input, .f-group select, .f-group textarea { background: var(--off-white); border: 1.5px solid var(--light-grey); border-radius: var(--r-sm); color: var(--charcoal); font-family: 'Inter', sans-serif; font-size: 0.925rem; padding: 0.7rem 0.9rem; width: 100%; transition: border-color 0.18s; -webkit-appearance: none; }
+.f-group input:focus, .f-group select:focus, .f-group textarea:focus { outline: none; border-color: var(--orange); background: var(--white); }
+.f-group textarea { resize: vertical; min-height: 110px; }
+/* FOOTER */
+footer { background: var(--charcoal); padding: 3.5rem 2rem 2rem; border-top: 3px solid var(--orange); }
+.footer-logo { height: 36px; width: auto; margin-bottom: 1rem; display: block; }
+.f-grid-footer { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 3rem; margin-bottom: 2.5rem; }
+.f-desc { font-size: 0.85rem; color: rgba(255,255,255,0.42); line-height: 1.7; }
+.f-col h4 { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.16em; color: var(--orange); margin-bottom: 0.9rem; }
+.f-col ul { list-style: none; display: flex; flex-direction: column; gap: 0.55rem; }
+.f-col ul a { font-size: 0.85rem; color: rgba(255,255,255,0.48); text-decoration: none; transition: color 0.18s; }
+.f-col ul a:hover { color: var(--white); }
+.f-bottom { border-top: 1px solid var(--border-d); padding-top: 1.25rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; color: rgba(255,255,255,0.28); }
+/* RESPONSIVE */
+@media (max-width: 1040px) { .nav-links { gap: 0.9rem; } .nav-links a { font-size: 0.72rem; } }
+@media (max-width: 900px) {
+  .nav-links { display: none; }
+  .nav-links.open { display: flex; flex-direction: column; position: fixed; top: 66px; left: 0; right: 0; background: var(--charcoal-mid); border-bottom: 2px solid var(--orange); padding: 1.5rem 2rem; gap: 1.1rem; z-index: 99; }
+  .nav-links.open a { font-size: 0.95rem; color: var(--white); }
+  .nav-toggle { display: flex; }
+  .f-grid-footer { grid-template-columns: 1fr; gap: 1.75rem; }
+  .f-bottom { flex-direction: column; gap: 0.5rem; text-align: center; }
+  .f-row { grid-template-columns: 1fr; }
+}
+.studio-grid{display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:start;margin-bottom:3.5rem;}
+.studio-body h2{font-size:clamp(1.6rem,3vw,2.25rem);font-weight:800;margin-bottom:1rem;}
+.studio-body p{color:var(--dark-grey);font-size:0.9rem;line-height:1.75;margin-bottom:1rem;}
+.detail-rows{display:flex;flex-direction:column;gap:0.75rem;margin-bottom:1.5rem;}
+.d-row{display:flex;align-items:flex-start;gap:0.85rem;padding:1rem 1.1rem;background:var(--off-white);border:1px solid var(--border-l);border-radius:var(--r-sm);}
+.d-icon{font-size:1rem;flex-shrink:0;margin-top:2px;}
+.d-text{font-size:0.875rem;color:var(--dark-grey);line-height:1.55;}
+.d-text strong{color:var(--charcoal);font-weight:700;display:block;margin-bottom:0.15rem;}
+.d-text a{color:var(--orange);text-decoration:none;}
+.d-text a:hover{text-decoration:underline;}
+.map-wrap{width:100%;aspect-ratio:4/3;background:var(--light-grey);border:1px solid var(--border-l);border-radius:var(--r);overflow:hidden;}
+.map-wrap iframe{width:100%;height:100%;border:none;display:block;}
+.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.1rem;margin-top:2.5rem;}
+.feat{background:var(--off-white);border:1px solid var(--border-l);border-radius:var(--r);padding:1.6rem;}
+.feat-icon{font-size:1.65rem;margin-bottom:0.65rem;}
+.feat h3{font-size:0.95rem;font-weight:700;margin-bottom:0.45rem;}
+.feat p{font-size:0.845rem;color:var(--dark-grey);line-height:1.65;}
+.suburbs-band{background:var(--off-white);border-top:1px solid var(--border-l);padding:4rem 2rem;}
+.suburbs-band h2{font-size:clamp(1.5rem,3vw,1.9rem);font-weight:800;margin-bottom:0.65rem;}
+.suburbs-band p{color:var(--dark-grey);font-size:0.9rem;line-height:1.72;max-width:680px;margin-bottom:1.5rem;}
+.suburb-tags{display:flex;flex-wrap:wrap;gap:0.55rem;margin-bottom:2rem;}
+.s-tag{font-size:0.75rem;font-weight:600;padding:0.28rem 0.75rem;border-radius:3px;background:var(--white);color:var(--charcoal);border:1px solid var(--border-l);}
+@media(max-width:900px){.studio-grid{grid-template-columns:1fr;gap:2.5rem;} .features-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:580px){.features-grid{grid-template-columns:1fr;}}
+</style>
+</head><body>
+<nav>
+  <a href="index.html"><img src="Logo_-_long.png" alt="Pathfinder Music Lessons" class="logo-img"></a>
+  <ul class="nav-links" id="nl">
+    <li><a href="student-concerts.html">Concerts</a></li>
+    <li><a href="teachers.html">Our Teachers</a></li>
+    <li><a href="pricing.html">Pricing</a></li>
+    <li><a href="events.html">Events</a></li>
+    <li><a href="gift-vouchers.html">Gift Vouchers</a></li>
+    <li><a href="student-portal.html">Student Portal</a></li>
+    <li><a href="careers.html">Careers</a></li>
+    <li><a href="ringwood-studio.html">Ringwood Studio</a></li>
+    <li><a href="index.html#contact" class="nav-cta">Book a Lesson</a></li>
+  </ul>
+  <button class="nav-toggle" id="nt" aria-label="Menu"><span></span><span></span><span></span></button>
+</nav>
+<div class="page-header">
+  <div class="ph-content">
+    <p class="sec-label">Our Studios</p>
+    <h1>The Ringwood Music Studio</h1>
+    <p>A peaceful, professional space to learn — until students pull out their instruments and start rocking out.</p>
+  </div>
+</div>
+<section>
+  <div class="container">
+    <div class="studio-grid">
+      <div class="studio-body">
+        <p class="sec-label">Ringwood Studio</p>
+        <h2>Where to Find Us</h2>
+        <p>Our Ringwood teaching studio is located on Heatherdale Road — a 10-minute walk from Heatherdale Station (one stop from Ringwood on the Belgrave/Lilydale line), just off Maroondah Highway. It's a peaceful, quiet space to learn.</p>
+        <p>Most teachers recommend some real performance exposure, which means concerts at our studio, local venues, or for those without an 8pm bedtime, pubs and live music venues around Melbourne.</p>
+        <p>For songwriting and music business students, the studio is fully equipped with a recording and live rig, a selection of microphones, effects, plug-ins and gear for student recording projects.</p>
+        <div style="display:flex;gap:0.9rem;flex-wrap:wrap;margin-top:1.5rem;">
+          <a href="index.html#contact" class="btn btn-orange">Book at Ringwood</a>
+          <a href="index.html#locations" class="btn btn-outline-dark">Both Locations</a>
+        </div>
+      </div>
+      <div>
+        <div class="detail-rows">
+          <div class="d-row"><span class="d-icon">📍</span><div class="d-text"><strong>Address</strong>G3 / 93a Heatherdale Road, Ringwood VIC 3134<br><em style="font-size:0.8rem;opacity:0.7;">Same complex as VicRoads Ringwood Testing Centre</em></div></div>
+          <div class="d-row"><span class="d-icon">🚆</span><div class="d-text"><strong>By Train</strong>10-minute walk from Heatherdale Station (one stop from Ringwood on the Belgrave/Lilydale line)</div></div>
+          <div class="d-row"><span class="d-icon">📞</span><div class="d-text"><strong>Phone</strong><a href="tel:0489930719">0489 930 719</a></div></div>
+          <div class="d-row"><span class="d-icon">✉️</span><div class="d-text"><strong>Email</strong><a href="mailto:ringwood@pathfindermusiclessons.com.au">ringwood@pathfindermusiclessons.com.au</a></div></div>
+        </div>
+        <div class="map-wrap">
+          <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3151.5!2d145.2143558!3d-37.8269541!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMzfCsDQ5JzM3LjAiUyAxNDXCsDEyJzUxLjciRQ!5e0!3m2!1sen!2sau!4v1000000000000" allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Pathfinder Music Lessons Ringwood"></iframe>
+        </div>
+      </div>
+    </div>
+    <div class="features-grid">
+      <div class="feat"><div class="feat-icon">🎙️</div><h3>Recording Rig</h3><p>Fully equipped studio with a live recording setup, microphones, effects and plug-ins available for student recording projects.</p></div>
+      <div class="feat"><div class="feat-icon">🎤</div><h3>Performance Ready</h3><p>Our students perform at studio concerts, local venues and live music spots around Melbourne — real performance experience from day one.</p></div>
+      <div class="feat"><div class="feat-icon">🎵</div><h3>All Instruments</h3><p>Guitar, bass, drums, piano, voice, violin, ukulele and music theory — all taught at the Ringwood studio by our expert team.</p></div>
+    </div>
+  </div>
+</section>
+<div class="suburbs-band">
+  <div class="container">
+    <p class="sec-label">Serving the Eastern Suburbs</p>
+    <h2>Close to Home</h2>
+    <p>If you're in any of the following suburbs, you're probably less than 10 minutes drive from the Ringwood studio. Many students travel further too — get in touch if you're unsure about distance.</p>
+    <div class="suburb-tags">
+      <span class="s-tag">Ringwood</span><span class="s-tag">Ringwood East</span><span class="s-tag">Ringwood North</span>
+      <span class="s-tag">Heathmont</span><span class="s-tag">Croydon</span><span class="s-tag">Park Orchards</span>
+      <span class="s-tag">Mitcham</span><span class="s-tag">Vermont</span><span class="s-tag">Bayswater</span>
+      <span class="s-tag">Boronia</span><span class="s-tag">Nunawading</span><span class="s-tag">Blackburn</span>
+    </div>
+    <a href="index.html#contact" class="btn btn-orange">Book at Ringwood</a>
+  </div>
+</div>
+<footer>
+  <div class="container">
+    <div class="f-grid-footer">
+      <div><img src="Logo_-_long.png" alt="Pathfinder Music Lessons" class="footer-logo"><p class="f-desc">Music lessons for students of all ages in Kilsyth and Ringwood. Guitar, drums, piano, singing, violin and more — from bedroom to stage.</p></div>
+      <div class="f-col"><h4>Pages</h4><ul>
+        <li><a href="student-concerts.html">Student Concerts</a></li>
+        <li><a href="teachers.html">Our Teachers</a></li>
+        <li><a href="pricing.html">Pricing</a></li>
+        <li><a href="events.html">Events</a></li>
+        <li><a href="gift-vouchers.html">Gift Vouchers</a></li>
+        <li><a href="student-portal.html">Student Portal</a></li>
+        <li><a href="careers.html">Careers</a></li>
+        <li><a href="ringwood-studio.html">Ringwood Studio</a></li>
+      </ul></div>
+      <div class="f-col"><h4>Contact</h4><ul>
+        <li><a href="tel:0434198929">Kilsyth: 0434 198 929</a></li>
+        <li><a href="tel:0489930719">Ringwood: 0489 930 719</a></li>
+        <li><a href="mailto:kilsyth@pathfindermusiclessons.com.au">kilsyth@pathfindermusiclessons.com.au</a></li>
+        <li><a href="mailto:ringwood@pathfindermusiclessons.com.au">ringwood@pathfindermusiclessons.com.au</a></li>
+      </ul></div>
+    </div>
+    <div class="f-bottom">
+      <span>© 2026 Pathfinder Music Lessons. All rights reserved.</span>
+      <a href="#top" style="color:var(--orange);text-decoration:none;">Back to top ↑</a>
+    </div>
+  </div>
+</footer>
+<script>
+const nt=document.getElementById("nt"),nl=document.getElementById("nl");
+nt.addEventListener("click",()=>nl.classList.toggle("open"));
+document.querySelectorAll("a[href^=\"#\"]").forEach(a=>a.addEventListener("click",()=>nl.classList.remove("open")));
+</script>
+</body></html>

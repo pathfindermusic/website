@@ -1,0 +1,256 @@
+<!DOCTYPE html><html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Pricing — Pathfinder Music Lessons</title>
+<meta name="description" content="Music lesson pricing at Pathfinder in Kilsyth and Ringwood. Flexible weekly lessons, NDIS funding available.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --orange: #E8491E; --orange-light: #FF6B45; --orange-dark: #C23A14;
+  --charcoal: #1C1C1E; --charcoal-mid: #2C2C2E; --charcoal-light: #3A3A3C;
+  --white: #FFFFFF; --off-white: #F7F7F7; --light-grey: #EBEBEB;
+  --mid-grey: #999999; --dark-grey: #555555;
+  --border-l: rgba(0,0,0,0.09); --border-d: rgba(255,255,255,0.1);
+  --shadow: 0 2px 16px rgba(0,0,0,0.07); --shadow-h: 0 6px 28px rgba(0,0,0,0.13);
+  --r: 8px; --r-sm: 5px;
+}
+html { scroll-behavior: smooth; }
+body { font-family: 'Inter', sans-serif; background: var(--white); color: var(--charcoal); line-height: 1.6; overflow-x: hidden; }
+/* NAV */
+nav { position: sticky; top: 0; z-index: 100; background: var(--charcoal); padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 66px; border-bottom: 3px solid var(--orange); }
+.logo-img { height: 34px; width: auto; display: block; }
+.nav-links { display: flex; align-items: center; gap: 1.4rem; list-style: none; }
+.nav-links a { color: rgba(255,255,255,0.68); text-decoration: none; font-size: 0.78rem; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; transition: color 0.18s; white-space: nowrap; }
+.nav-links a:hover, .nav-links a.active { color: var(--white); }
+.nav-links a.active { color: var(--orange); }
+.nav-cta { background: var(--orange) !important; color: var(--white) !important; padding: 0.42rem 1rem; border-radius: var(--r-sm); font-weight: 600 !important; white-space: nowrap; }
+.nav-cta:hover { background: var(--orange-light) !important; }
+.nav-toggle { display: none; flex-direction: column; gap: 5px; cursor: pointer; background: none; border: none; padding: 4px; }
+.nav-toggle span { display: block; width: 22px; height: 2px; background: var(--white); border-radius: 2px; }
+/* PAGE HEADER */
+.page-header { position: relative; padding: 4.5rem 2rem 3.5rem; overflow: hidden; background: var(--charcoal); border-bottom: 3px solid var(--orange); }
+.ph-content { position: relative; z-index: 2; max-width: 1100px; margin: 0 auto; }
+.page-header h1 { font-size: clamp(2.25rem, 5.5vw, 3.75rem); font-weight: 800; line-height: 1.05; color: var(--white); margin-bottom: 0.85rem; }
+.page-header p { color: rgba(255,255,255,0.62); font-size: 1rem; max-width: 560px; line-height: 1.7; }
+/* SHARED LAYOUT */
+.container { max-width: 1100px; margin: 0 auto; }
+section { padding: 4.5rem 2rem; }
+.sec-label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--orange); margin-bottom: 0.6rem; }
+.sec-title { font-size: clamp(1.6rem, 3.2vw, 2.4rem); font-weight: 800; line-height: 1.1; margin-bottom: 1.1rem; color: var(--charcoal); }
+.sec-body { color: var(--dark-grey); font-size: 0.975rem; line-height: 1.78; }
+.dark-sec { background: var(--charcoal); }
+.dark-sec .sec-title { color: var(--white); }
+.dark-sec .sec-body { color: rgba(255,255,255,0.6); }
+.off-sec { background: var(--off-white); }
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.875rem; font-weight: 700; padding: 0.75rem 1.6rem; border-radius: var(--r-sm); text-decoration: none; border: none; cursor: pointer; transition: background 0.18s, transform 0.14s, border-color 0.18s; letter-spacing: 0.02em; white-space: nowrap; }
+.btn-orange { background: var(--orange); color: var(--white); }
+.btn-orange:hover { background: var(--orange-light); transform: translateY(-1px); }
+.btn-outline-dark { background: transparent; color: var(--charcoal); border: 2px solid var(--charcoal); }
+.btn-outline-dark:hover { background: var(--charcoal); color: var(--white); }
+.btn-outline-white { background: transparent; color: var(--white); border: 2px solid rgba(255,255,255,0.38); }
+.btn-outline-white:hover { background: rgba(255,255,255,0.1); border-color: var(--white); }
+/* CARDS */
+.card { background: var(--white); border: 1px solid var(--border-l); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
+.card:hover { transform: translateY(-3px); box-shadow: var(--shadow-h); }
+/* FORM */
+.f-grid { display: grid; gap: 0.85rem; }
+.f-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; }
+.f-group { display: flex; flex-direction: column; gap: 0.35rem; }
+.f-group label { font-size: 0.8rem; font-weight: 600; color: var(--charcoal); }
+.f-group input, .f-group select, .f-group textarea { background: var(--off-white); border: 1.5px solid var(--light-grey); border-radius: var(--r-sm); color: var(--charcoal); font-family: 'Inter', sans-serif; font-size: 0.925rem; padding: 0.7rem 0.9rem; width: 100%; transition: border-color 0.18s; -webkit-appearance: none; }
+.f-group input:focus, .f-group select:focus, .f-group textarea:focus { outline: none; border-color: var(--orange); background: var(--white); }
+.f-group textarea { resize: vertical; min-height: 110px; }
+/* FOOTER */
+footer { background: var(--charcoal); padding: 3.5rem 2rem 2rem; border-top: 3px solid var(--orange); }
+.footer-logo { height: 36px; width: auto; margin-bottom: 1rem; display: block; }
+.f-grid-footer { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 3rem; margin-bottom: 2.5rem; }
+.f-desc { font-size: 0.85rem; color: rgba(255,255,255,0.42); line-height: 1.7; }
+.f-col h4 { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.16em; color: var(--orange); margin-bottom: 0.9rem; }
+.f-col ul { list-style: none; display: flex; flex-direction: column; gap: 0.55rem; }
+.f-col ul a { font-size: 0.85rem; color: rgba(255,255,255,0.48); text-decoration: none; transition: color 0.18s; }
+.f-col ul a:hover { color: var(--white); }
+.f-bottom { border-top: 1px solid var(--border-d); padding-top: 1.25rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; color: rgba(255,255,255,0.28); }
+/* RESPONSIVE */
+@media (max-width: 1040px) { .nav-links { gap: 0.9rem; } .nav-links a { font-size: 0.72rem; } }
+@media (max-width: 900px) {
+  .nav-links { display: none; }
+  .nav-links.open { display: flex; flex-direction: column; position: fixed; top: 66px; left: 0; right: 0; background: var(--charcoal-mid); border-bottom: 2px solid var(--orange); padding: 1.5rem 2rem; gap: 1.1rem; z-index: 99; }
+  .nav-links.open a { font-size: 0.95rem; color: var(--white); }
+  .nav-toggle { display: flex; }
+  .f-grid-footer { grid-template-columns: 1fr; gap: 1.75rem; }
+  .f-bottom { flex-direction: column; gap: 0.5rem; text-align: center; }
+  .f-row { grid-template-columns: 1fr; }
+}
+.pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.1rem;margin-bottom:3rem;}
+.p-card{background:var(--white);border:1.5px solid var(--border-l);border-radius:var(--r);padding:2rem;position:relative;transition:transform 0.2s,box-shadow 0.2s;}
+.p-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-h);}
+.p-card.featured{border-color:var(--orange);background:var(--off-white);}
+.p-badge{position:absolute;top:-1px;left:50%;transform:translateX(-50%);background:var(--orange);color:var(--white);font-size:0.65rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:0.22rem 0.9rem;border-radius:0 0 5px 5px;white-space:nowrap;}
+.p-type{font-size:0.72rem;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:var(--orange);margin-bottom:0.5rem;}
+.p-title{font-size:1.2rem;font-weight:800;margin-bottom:1.25rem;color:var(--charcoal);}
+.p-price{font-size:2rem;font-weight:800;color:var(--charcoal);line-height:1;margin-bottom:0.3rem;}
+.p-price-note{font-size:0.8rem;color:var(--mid-grey);margin-bottom:1.4rem;padding-bottom:1.4rem;border-bottom:1px solid var(--light-grey);}
+.p-features{list-style:none;display:flex;flex-direction:column;gap:0.6rem;margin-bottom:1.75rem;flex:1;}
+.p-features li{font-size:0.855rem;color:var(--dark-grey);display:flex;align-items:flex-start;gap:0.55rem;line-height:1.5;}
+.p-features li::before{content:'✓';color:var(--orange);font-weight:700;flex-shrink:0;margin-top:1px;}
+.flex-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.1rem;margin-bottom:3rem;}
+.flex-item{background:var(--off-white);border:1px solid var(--border-l);border-radius:var(--r);padding:1.6rem;}
+.flex-icon{font-size:1.6rem;margin-bottom:0.65rem;}
+.flex-item h3{font-size:0.95rem;font-weight:700;margin-bottom:0.45rem;}
+.flex-item p{font-size:0.845rem;color:var(--dark-grey);line-height:1.65;}
+.ndis-band{background:var(--charcoal);border-radius:var(--r);padding:2.25rem;display:flex;align-items:center;justify-content:space-between;gap:2rem;flex-wrap:wrap;margin-bottom:3.5rem;border-left:4px solid var(--orange);}
+.ndis-band h3{font-size:1.1rem;font-weight:800;color:var(--orange);margin-bottom:0.5rem;}
+.ndis-band p{font-size:0.875rem;color:rgba(255,255,255,0.62);max-width:520px;line-height:1.65;}
+.enquiry-grid{display:grid;grid-template-columns:1fr 1.55fr;gap:4rem;align-items:start;}
+.enquiry-info h2{font-size:clamp(1.5rem,2.8vw,2rem);font-weight:800;margin-bottom:0.85rem;}
+.enquiry-info p{color:var(--dark-grey);line-height:1.72;margin-bottom:1.5rem;}
+.ph-row{display:flex;align-items:center;gap:0.85rem;padding:0.85rem 1rem;background:var(--off-white);border:1px solid var(--border-l);border-radius:var(--r-sm);margin-bottom:0.6rem;}
+.ph-icon{width:34px;height:34px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;font-size:0.9rem;flex-shrink:0;}
+.ph-lbl{font-size:0.67rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--mid-grey);font-weight:600;}
+.ph-row a{color:var(--charcoal);text-decoration:none;font-weight:700;font-size:0.9rem;}
+.form-box{background:var(--off-white);border:1px solid var(--border-l);border-radius:var(--r);padding:2rem;}
+.form-box h3{font-size:1.05rem;font-weight:700;margin-bottom:1.25rem;}
+@media(max-width:900px){.pricing-grid,.flex-grid{grid-template-columns:1fr;max-width:420px;} .ndis-band{flex-direction:column;} .enquiry-grid{grid-template-columns:1fr;gap:2rem;}}
+</style>
+</head><body>
+<nav>
+  <a href="index.html"><img src="Logo_-_long.png" alt="Pathfinder Music Lessons" class="logo-img"></a>
+  <ul class="nav-links" id="nl">
+    <li><a href="student-concerts.html">Concerts</a></li>
+    <li><a href="teachers.html">Our Teachers</a></li>
+    <li><a href="pricing.html">Pricing</a></li>
+    <li><a href="events.html">Events</a></li>
+    <li><a href="gift-vouchers.html">Gift Vouchers</a></li>
+    <li><a href="student-portal.html">Student Portal</a></li>
+    <li><a href="careers.html">Careers</a></li>
+    <li><a href="ringwood-studio.html">Ringwood Studio</a></li>
+    <li><a href="index.html#contact" class="nav-cta">Book a Lesson</a></li>
+  </ul>
+  <button class="nav-toggle" id="nt" aria-label="Menu"><span></span><span></span><span></span></button>
+</nav>
+<div class="page-header">
+  <div class="ph-content">
+    <p class="sec-label">Lesson Options</p>
+    <h1>Music Lesson Pricing</h1>
+    <p>We've got a few different lesson options to suit every student. The best way to find out what's right for you is to get in touch — we'll recommend the best fit.</p>
+  </div>
+</div>
+<section>
+  <div class="container">
+    <p class="sec-label" style="text-align:center;">Choose Your Format</p>
+    <h2 class="sec-title" style="text-align:center;margin-bottom:0.5rem;">Lessons Built Around You</h2>
+    <p class="sec-body" style="text-align:center;max-width:580px;margin:0 auto 2.75rem;">Most students pay weekly and our notice period for pauses and cancellations is just 4 weeks — flexible and low-commitment to get started.</p>
+    <div class="pricing-grid">
+      <div class="p-card">
+        <div class="p-type">Individual</div><div class="p-title">30-Minute Lesson</div>
+        <div class="p-price">Get in touch</div><div class="p-price-note">for current pricing</div>
+        <ul class="p-features"><li>One-on-one with your teacher</li><li>Perfect for beginners and younger students</li><li>Focused, personalised curriculum</li><li>Weekly recurring booking</li><li>All instruments &amp; skill levels</li></ul>
+        <a href="#enquiry" class="btn btn-outline-dark" style="width:100%;justify-content:center;">Get Pricing</a>
+      </div>
+      <div class="p-card featured">
+        <div class="p-badge">Most Popular</div>
+        <div class="p-type">Individual</div><div class="p-title">45-Minute Lesson</div>
+        <div class="p-price">Get in touch</div><div class="p-price-note">for current pricing</div>
+        <ul class="p-features"><li>One-on-one with your teacher</li><li>The sweet spot for most students</li><li>Enough time to warm up, learn &amp; review</li><li>Personalised to your goals</li><li>Weekly recurring booking</li><li>All instruments &amp; skill levels</li></ul>
+        <a href="#enquiry" class="btn btn-orange" style="width:100%;justify-content:center;">Get Pricing</a>
+      </div>
+      <div class="p-card">
+        <div class="p-type">Individual</div><div class="p-title">60-Minute Lesson</div>
+        <div class="p-price">Get in touch</div><div class="p-price-note">for current pricing</div>
+        <ul class="p-features"><li>One-on-one with your teacher</li><li>Ideal for advanced &amp; adult students</li><li>Deep dive into technique, theory &amp; performance</li><li>Great for exam or performance prep</li><li>Weekly recurring booking</li></ul>
+        <a href="#enquiry" class="btn btn-outline-dark" style="width:100%;justify-content:center;">Get Pricing</a>
+      </div>
+    </div>
+    <div class="flex-grid">
+      <div class="flex-item"><div class="flex-icon">📅</div><h3>Weekly Lessons</h3><p>Most students pay weekly, keeping things simple and consistent. Regular lessons are the fastest path to real progress.</p></div>
+      <div class="flex-item"><div class="flex-icon">⏸️</div><h3>Flexible Pausing</h3><p>Life happens. Our notice period for pauses and cancellations is just 4 weeks, so you're never locked in long-term.</p></div>
+      <div class="flex-item"><div class="flex-icon">👥</div><h3>Group Lessons</h3><p>We also run group guitar lessons for adults and beginners. Great value and a lot of fun — ask us about availability.</p></div>
+    </div>
+    <div class="ndis-band">
+      <div><h3>NDIS Funding Available</h3><p>You may be eligible for NDIS funding to cover your music lessons. Just let us know when you enquire and we'll help you get set up.</p></div>
+      <a href="#enquiry" class="btn btn-orange">Ask About NDIS</a>
+    </div>
+    <div id="enquiry">
+      <div class="enquiry-grid">
+        <div class="enquiry-info">
+          <p class="sec-label">Get the Details</p>
+          <h2>Want More Info on Pricing?</h2>
+          <p>Fill in your details and we'll get back to you with current pricing and recommendations for your situation.</p>
+          <div class="ph-row"><div class="ph-icon">📞</div><div><div class="ph-lbl">Kilsyth</div><a href="tel:0434198929">0434 198 929</a></div></div>
+          <div class="ph-row"><div class="ph-icon">📞</div><div><div class="ph-lbl">Ringwood</div><a href="tel:0489930719">0489 930 719</a></div></div>
+        </div>
+        <div class="form-box"><h3>Send us an enquiry</h3><form class="f-grid" id="wf" action="https://crm.zoho.com.au/crm/WebToLeadForm" name="WebToLeads91714000000316579" method="POST" onsubmit="return zCheck()" accept-charset="UTF-8">
+  <input type="text" style="display:none" name="xnQsjsdp" value="5388bc8620ddc90ab57f1a429b337fdbe2801100e17741a6c0c90eb766e1b5d4">
+  <input type="hidden" name="zc_gad" value="">
+  <input type="text" style="display:none" name="xmIwtLD" value="eaf16dc70a09e92c213c4dc29d8e844e438f57368f810051dab8ef214bb2511254837ef5fe138ee6ba90409faa12c59c">
+  <input type="text" style="display:none" name="actionType" value="TGVhZHM=">
+  <input type="text" style="display:none" name="returnURL" value="https://pathfindermusiclessons.com.au/thank-you-evaluation-lesson">
+  <input type="hidden" name="Lead Source" value="Website">
+  <input type="hidden" name="LEADCF5" value="Prospective Student">
+  <div class="f-row">
+    <div class="f-group"><label>Student First Name *</label><input type="text" name="First Name" maxlength="40" required placeholder="e.g. Jamie"></div>
+    <div class="f-group"><label>Student Last Name *</label><input type="text" name="Last Name" maxlength="80" required placeholder="e.g. Smith"></div>
+  </div>
+  <div class="f-row">
+    <div class="f-group"><label>Your Name</label><input type="text" name="LEADCF7" maxlength="255" placeholder="Parent / guardian"></div>
+    <div class="f-group"><label>Phone *</label><input type="tel" name="Phone" maxlength="30" required placeholder="0400 000 000"></div>
+  </div>
+  <div class="f-group"><label>Email *</label><input type="email" ftype="email" name="Email" maxlength="100" required placeholder="your@email.com"></div>
+  <div class="f-row">
+    <div class="f-group"><label>Preferred Studio *</label>
+      <select name="LEADCF6" required><option value="-None-">— Select —</option><option value="Kilsyth">Kilsyth</option><option value="Ringwood">Ringwood</option></select>
+    </div>
+    <div class="f-group"><label>Instrument *</label>
+      <select name="LEADCF1" required><option value="-None-">— Select —</option><option value="Guitar">Guitar</option><option value="Bass">Bass</option><option value="Drums">Drums</option><option value="Piano / Keyboard">Piano / Keyboard</option><option value="Voice">Voice / Singing</option><option value="Violin">Violin</option><option value="Ukulele">Ukulele</option><option value="Music Theory">Music Theory</option><option value="Other">Other</option></select>
+    </div>
+  </div>
+  <div class="f-group"><label>How can we help? *</label><textarea name="Description" required placeholder="Tell us about yourself — experience level, goals, availability..."></textarea></div>
+  <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+  <div class="g-recaptcha" data-sitekey="6LesMcUqAAAAANK8aA2rRHVg0TcEZlVu-yAu9qNL" data-callback="zRC" captcha-verified="false" id="zCap" style="margin-bottom:0.5rem;transform:scale(0.94);transform-origin:0 0;"></div>
+  <div id="zCapErr" style="font-size:0.82rem;color:var(--orange);margin-bottom:0.5rem;display:none;">Please complete the CAPTCHA above.</div>
+  <button type="submit" class="btn btn-orange" style="width:100%;justify-content:center;">Send Enquiry</button>
+</form>
+<script>
+function zRC(){var e=document.getElementById("zCap");if(e)e.setAttribute("captcha-verified","true");var r=document.getElementById("zCapErr");if(r)r.style.display="none";}
+function zCheck(){var f=["First Name","Last Name","Email","Phone","Description","LEADCF1","LEADCF6"],l=["Student First Name","Student Last Name","Email","Phone","How can we help?","Instrument","Preferred Studio"],fm=document.forms["WebToLeads91714000000316579"];for(var i=0;i<f.length;i++){var fd=fm[f[i]];if(!fd)continue;var v=(fd.value||"").trim();if(v===""||v==="-None-"){alert(l[i]+" cannot be empty");fd.focus();return false;}}var ef=fm.querySelectorAll("[ftype=email]");for(var i=0;i<ef.length;i++){var v=ef[i].value.trim();if(v.length>0){var at=v.indexOf("@"),dt=v.lastIndexOf(".");if(at<1||dt<at+2||dt+2>=v.length){alert("Please enter a valid email address.");ef[i].focus();return false;}}}var rc=document.getElementById("zCap");if(rc&&rc.getAttribute("captcha-verified")!=="true"){document.getElementById("zCapErr").style.display="block";rc.scrollIntoView({behavior:"smooth",block:"center"});return false;}return true;}
+(function(){var s=document.createElement("script");s.src="https://crm.zohopublic.com.au/crm/WebFormAnalyticsServeServlet?rid=ae130b6ddb8663a68a7e6d04111fcd359b139591cc6b2255abf2ac8e80edc4de169cdbf73113a7940f67047549ea49b9gid8ea5def843e68a9039a07a34cbda782650568d1529e486ea09344cfb69232c2agid74bc567ff74d6deaa244c5fea6a2c02f65293eef5b0e330624b79c9d9e4a4037gid49867367a20c31e75cada0e7064657d435211252f2300435246a722e3c772414&tw=3a8ee09805f26a3973cbceb3bf49acc343ab6b63d21a0f9d5ab00064bc9a7a01";document.body.appendChild(s);})();
+</script></div>
+      </div>
+    </div>
+  </div>
+</section>
+<footer>
+  <div class="container">
+    <div class="f-grid-footer">
+      <div><img src="Logo_-_long.png" alt="Pathfinder Music Lessons" class="footer-logo"><p class="f-desc">Music lessons for students of all ages in Kilsyth and Ringwood. Guitar, drums, piano, singing, violin and more — from bedroom to stage.</p></div>
+      <div class="f-col"><h4>Pages</h4><ul>
+        <li><a href="student-concerts.html">Student Concerts</a></li>
+        <li><a href="teachers.html">Our Teachers</a></li>
+        <li><a href="pricing.html">Pricing</a></li>
+        <li><a href="events.html">Events</a></li>
+        <li><a href="gift-vouchers.html">Gift Vouchers</a></li>
+        <li><a href="student-portal.html">Student Portal</a></li>
+        <li><a href="careers.html">Careers</a></li>
+        <li><a href="ringwood-studio.html">Ringwood Studio</a></li>
+      </ul></div>
+      <div class="f-col"><h4>Contact</h4><ul>
+        <li><a href="tel:0434198929">Kilsyth: 0434 198 929</a></li>
+        <li><a href="tel:0489930719">Ringwood: 0489 930 719</a></li>
+        <li><a href="mailto:kilsyth@pathfindermusiclessons.com.au">kilsyth@pathfindermusiclessons.com.au</a></li>
+        <li><a href="mailto:ringwood@pathfindermusiclessons.com.au">ringwood@pathfindermusiclessons.com.au</a></li>
+      </ul></div>
+    </div>
+    <div class="f-bottom">
+      <span>© 2026 Pathfinder Music Lessons. All rights reserved.</span>
+      <a href="#top" style="color:var(--orange);text-decoration:none;">Back to top ↑</a>
+    </div>
+  </div>
+</footer>
+<script>
+const nt=document.getElementById("nt"),nl=document.getElementById("nl");
+nt.addEventListener("click",()=>nl.classList.toggle("open"));
+document.querySelectorAll("a[href^=\"#\"]").forEach(a=>a.addEventListener("click",()=>nl.classList.remove("open")));
+</script>
+</body></html>

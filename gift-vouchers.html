@@ -1,0 +1,341 @@
+<!DOCTYPE html><html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Music Lesson Gift Vouchers — Pathfinder Music Lessons</title>
+<meta name="description" content="Guitar lesson gift vouchers are the perfect way to treat someone special to an experience they'll love, and a skill that will bring them joy for years to come.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --orange: #E8491E; --orange-light: #FF6B45; --orange-dark: #C23A14;
+  --charcoal: #1C1C1E; --charcoal-mid: #2C2C2E; --charcoal-light: #3A3A3C;
+  --white: #FFFFFF; --off-white: #F7F7F7; --light-grey: #EBEBEB;
+  --mid-grey: #999999; --dark-grey: #555555;
+  --border-l: rgba(0,0,0,0.09); --border-d: rgba(255,255,255,0.1);
+  --shadow: 0 2px 16px rgba(0,0,0,0.07); --shadow-h: 0 6px 28px rgba(0,0,0,0.13);
+  --r: 8px; --r-sm: 5px;
+}
+html { scroll-behavior: smooth; }
+body { font-family: 'Inter', sans-serif; background: var(--white); color: var(--charcoal); line-height: 1.6; overflow-x: hidden; }
+/* NAV */
+nav { position: sticky; top: 0; z-index: 100; background: var(--charcoal); padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 66px; border-bottom: 3px solid var(--orange); }
+.logo-img { height: 34px; width: auto; display: block; }
+.nav-links { display: flex; align-items: center; gap: 1.4rem; list-style: none; }
+.nav-links a { color: rgba(255,255,255,0.68); text-decoration: none; font-size: 0.78rem; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; transition: color 0.18s; white-space: nowrap; }
+.nav-links a:hover, .nav-links a.active { color: var(--white); }
+.nav-links a.active { color: var(--orange); }
+.nav-cta { background: var(--orange) !important; color: var(--white) !important; padding: 0.42rem 1rem; border-radius: var(--r-sm); font-weight: 600 !important; white-space: nowrap; }
+.nav-cta:hover { background: var(--orange-light) !important; }
+.nav-toggle { display: none; flex-direction: column; gap: 5px; cursor: pointer; background: none; border: none; padding: 4px; }
+.nav-toggle span { display: block; width: 22px; height: 2px; background: var(--white); border-radius: 2px; }
+/* PAGE HEADER */
+.page-header { position: relative; padding: 4.5rem 2rem 3.5rem; overflow: hidden; background: var(--charcoal); border-bottom: 3px solid var(--orange); }
+.ph-content { position: relative; z-index: 2; max-width: 1100px; margin: 0 auto; }
+.page-header h1 { font-size: clamp(2.25rem, 5.5vw, 3.75rem); font-weight: 800; line-height: 1.05; color: var(--white); margin-bottom: 0.85rem; }
+.page-header p { color: rgba(255,255,255,0.62); font-size: 1rem; max-width: 560px; line-height: 1.7; }
+/* SHARED LAYOUT */
+.container { max-width: 1100px; margin: 0 auto; }
+section { padding: 4.5rem 2rem; }
+.sec-label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--orange); margin-bottom: 0.6rem; }
+.sec-title { font-size: clamp(1.6rem, 3.2vw, 2.4rem); font-weight: 800; line-height: 1.1; margin-bottom: 1.1rem; color: var(--charcoal); }
+.sec-body { color: var(--dark-grey); font-size: 0.975rem; line-height: 1.78; }
+.dark-sec { background: var(--charcoal); }
+.dark-sec .sec-title { color: var(--white); }
+.dark-sec .sec-body { color: rgba(255,255,255,0.6); }
+.off-sec { background: var(--off-white); }
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.875rem; font-weight: 700; padding: 0.75rem 1.6rem; border-radius: var(--r-sm); text-decoration: none; border: none; cursor: pointer; transition: background 0.18s, transform 0.14s, border-color 0.18s; letter-spacing: 0.02em; white-space: nowrap; }
+.btn-orange { background: var(--orange); color: var(--white); }
+.btn-orange:hover { background: var(--orange-light); transform: translateY(-1px); }
+.btn-outline-dark { background: transparent; color: var(--charcoal); border: 2px solid var(--charcoal); }
+.btn-outline-dark:hover { background: var(--charcoal); color: var(--white); }
+.btn-outline-white { background: transparent; color: var(--white); border: 2px solid rgba(255,255,255,0.38); }
+.btn-outline-white:hover { background: rgba(255,255,255,0.1); border-color: var(--white); }
+/* CARDS */
+.card { background: var(--white); border: 1px solid var(--border-l); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
+.card:hover { transform: translateY(-3px); box-shadow: var(--shadow-h); }
+/* FORM */
+.f-grid { display: grid; gap: 0.85rem; }
+.f-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; }
+.f-group { display: flex; flex-direction: column; gap: 0.35rem; }
+.f-group label { font-size: 0.8rem; font-weight: 600; color: var(--charcoal); }
+.f-group input, .f-group select, .f-group textarea { background: var(--off-white); border: 1.5px solid var(--light-grey); border-radius: var(--r-sm); color: var(--charcoal); font-family: 'Inter', sans-serif; font-size: 0.925rem; padding: 0.7rem 0.9rem; width: 100%; transition: border-color 0.18s; -webkit-appearance: none; }
+.f-group input:focus, .f-group select:focus, .f-group textarea:focus { outline: none; border-color: var(--orange); background: var(--white); }
+.f-group textarea { resize: vertical; min-height: 110px; }
+/* FOOTER */
+footer { background: var(--charcoal); padding: 3.5rem 2rem 2rem; border-top: 3px solid var(--orange); }
+.footer-logo { height: 36px; width: auto; margin-bottom: 1rem; display: block; }
+.f-grid-footer { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 3rem; margin-bottom: 2.5rem; }
+.f-desc { font-size: 0.85rem; color: rgba(255,255,255,0.42); line-height: 1.7; }
+.f-col h4 { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.16em; color: var(--orange); margin-bottom: 0.9rem; }
+.f-col ul { list-style: none; display: flex; flex-direction: column; gap: 0.55rem; }
+.f-col ul a { font-size: 0.85rem; color: rgba(255,255,255,0.48); text-decoration: none; transition: color 0.18s; }
+.f-col ul a:hover { color: var(--white); }
+.f-bottom { border-top: 1px solid var(--border-d); padding-top: 1.25rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; color: rgba(255,255,255,0.28); }
+/* RESPONSIVE */
+@media (max-width: 1040px) { .nav-links { gap: 0.9rem; } .nav-links a { font-size: 0.72rem; } }
+@media (max-width: 900px) {
+  .nav-links { display: none; }
+  .nav-links.open { display: flex; flex-direction: column; position: fixed; top: 66px; left: 0; right: 0; background: var(--charcoal-mid); border-bottom: 2px solid var(--orange); padding: 1.5rem 2rem; gap: 1.1rem; z-index: 99; }
+  .nav-links.open a { font-size: 0.95rem; color: var(--white); }
+  .nav-toggle { display: flex; }
+  .f-grid-footer { grid-template-columns: 1fr; gap: 1.75rem; }
+  .f-bottom { flex-direction: column; gap: 0.5rem; text-align: center; }
+  .f-row { grid-template-columns: 1fr; }
+}
+/* PAGE-SPECIFIC */
+.intro-grid{display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:center;margin-bottom:4rem;}
+.intro-grid img.banner{width:100%;border-radius:var(--r);display:block;}
+.learns-list{list-style:none;display:flex;flex-direction:column;gap:0.6rem;margin:1.1rem 0 1.5rem;}
+.learns-list li{display:flex;align-items:flex-start;gap:0.6rem;font-size:0.9rem;color:var(--dark-grey);line-height:1.5;}
+.learns-list li::before{content:'✓';color:var(--orange);font-weight:700;flex-shrink:0;margin-top:1px;}
+/* VOUCHER CARDS */
+.vouchers-section{background:var(--off-white);border-top:1px solid var(--border-l);padding:4.5rem 2rem;}
+.vouchers-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:2.75rem;}
+.voucher-card{background:var(--white);border:1.5px solid var(--border-l);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column;transition:transform 0.2s,box-shadow 0.2s;}
+.voucher-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-h);}
+.voucher-card.featured{border-color:var(--orange);}
+.voucher-top{background:var(--charcoal);padding:1.75rem 2rem;position:relative;}
+.voucher-card.featured .voucher-top{background:var(--orange);}
+.v-badge{position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,0.2);color:var(--white);font-size:0.65rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:0.2rem 0.65rem;border-radius:3px;}
+.v-title{font-size:1.25rem;font-weight:800;color:var(--white);margin-bottom:0.35rem;}
+.v-subtitle{font-size:0.8rem;color:rgba(255,255,255,0.65);}
+.v-price{font-size:2.5rem;font-weight:800;color:var(--white);line-height:1;margin-top:0.85rem;}
+.v-price span{font-size:1rem;font-weight:500;opacity:0.75;}
+.voucher-body{padding:1.75rem 2rem;flex:1;display:flex;flex-direction:column;}
+.v-features{list-style:none;display:flex;flex-direction:column;gap:0.55rem;margin-bottom:1.5rem;flex:1;}
+.v-features li{font-size:0.87rem;color:var(--dark-grey);display:flex;align-items:flex-start;gap:0.55rem;line-height:1.5;}
+.v-features li::before{content:'✓';color:var(--orange);font-weight:700;flex-shrink:0;margin-top:1px;}
+/* eWay button overrides — ensure buttons fill the card bottom */
+.v-pay{margin-top:auto;}
+.v-pay script{display:block;width:100%;}
+/* HOW TO ORDER */
+.order-section{padding:4.5rem 2rem;}
+.order-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.1rem;margin-top:2.5rem;}
+.order-step{background:var(--off-white);border:1px solid var(--border-l);border-radius:var(--r);padding:1.6rem;}
+.order-n{font-size:2.25rem;font-weight:800;color:var(--light-grey);line-height:1;margin-bottom:0.65rem;}
+.order-step h3{font-size:0.95rem;font-weight:700;margin-bottom:0.45rem;}
+.order-step p{font-size:0.845rem;color:var(--dark-grey);line-height:1.65;}
+.order-step a{color:var(--orange);text-decoration:none;}
+.order-step a:hover{text-decoration:underline;}
+/* TEACHERS */
+.teachers-band{background:var(--charcoal);border-top:3px solid var(--orange);padding:4rem 2rem;}
+.teachers-inner{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:3.5rem;align-items:center;}
+.teachers-inner h2{font-size:clamp(1.4rem,3vw,1.9rem);font-weight:800;color:var(--white);margin-bottom:0.75rem;}
+.teachers-inner p{color:rgba(255,255,255,0.58);font-size:0.875rem;line-height:1.75;margin-bottom:1.25rem;}
+.creds-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.85rem;}
+.cred{background:rgba(255,255,255,0.05);border:1px solid var(--border-d);border-radius:var(--r-sm);padding:1rem;text-align:center;}
+.cred-icon{font-size:1.4rem;margin-bottom:0.35rem;}
+.cred strong{display:block;font-size:0.8rem;font-weight:700;color:var(--white);}
+.cred span{font-size:0.73rem;color:rgba(255,255,255,0.42);}
+@media(max-width:900px){
+  .intro-grid,.teachers-inner{grid-template-columns:1fr;gap:2rem;}
+  .vouchers-grid{grid-template-columns:1fr;max-width:480px;}
+  .order-grid{grid-template-columns:1fr;}
+}
+</style>
+</head><body>
+<nav>
+  <a href="index.html"><img src="Logo_-_long.png" alt="Pathfinder Music Lessons" class="logo-img"></a>
+  <ul class="nav-links" id="nl">
+    <li><a href="student-concerts.html">Concerts</a></li>
+    <li><a href="teachers.html">Our Teachers</a></li>
+    <li><a href="pricing.html">Pricing</a></li>
+    <li><a href="events.html">Events</a></li>
+    <li><a href="gift-vouchers.html">Gift Vouchers</a></li>
+    <li><a href="student-portal.html">Student Portal</a></li>
+    <li><a href="careers.html">Careers</a></li>
+    <li><a href="ringwood-studio.html">Ringwood Studio</a></li>
+    <li><a href="index.html#contact" class="nav-cta">Book a Lesson</a></li>
+  </ul>
+  <button class="nav-toggle" id="nt" aria-label="Menu"><span></span><span></span><span></span></button>
+</nav>
+
+<div class="page-header">
+  <div class="ph-content">
+    <img src="Logo_-_long.png" alt="Pathfinder Music Lessons" style="height:48px;width:auto;margin-bottom:1.75rem;display:block;">
+    <p class="sec-label">The Gift That Lasts a Lifetime</p>
+    <h1>Music Lesson Gift Vouchers</h1>
+    <p>Treat someone special to an experience they'll love — and a skill that will bring them joy for years to come.</p>
+  </div>
+</div>
+
+<!-- INTRO -->
+<section>
+  <div class="container">
+    <div class="intro-grid">
+      <div>
+        <p class="sec-label">Give Them the Stage</p>
+        <h2 class="sec-title">The Perfect Gift for Any Music Lover</h2>
+        <p class="sec-body">Music lesson gift vouchers are the perfect way to not only treat someone special to an experience they'll love, but to teach them a skill that will bring them joy for years to come.</p>
+        <p class="sec-body" style="margin-top:0.75rem;">In these lessons, your lucky gift recipient will:</p>
+        <ul class="learns-list">
+          <li>Play songs they love — from the very first lesson</li>
+          <li>Learn the fundamentals of playing an instrument or singing</li>
+          <li>Grow their confidence in a friendly, expert environment</li>
+          <li>Realise their dream of learning to play music!</li>
+        </ul>
+        <p class="sec-body">These lessons take place at Pathfinder Music Lessons, located in Kilsyth &amp; Ringwood, Victoria.</p>
+      </div>
+      <div>
+        <img src="collage-student-gradings-banner2.webp" alt="Pathfinder Music Lessons students with their Guitar Mastery Awards" class="banner">
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- VOUCHER PURCHASE -->
+<div class="vouchers-section">
+  <div class="container">
+    <p class="sec-label">Purchase Online</p>
+    <h2 class="sec-title">Choose Your Voucher</h2>
+    <p class="sec-body">Select a voucher below and pay securely online via eWay. Your voucher will be emailed to you once payment is confirmed.</p>
+    <div class="vouchers-grid">
+
+      <!-- 5-LESSON VOUCHER -->
+      <div class="voucher-card">
+        <div class="voucher-top">
+          <div class="v-title">5-Lesson Voucher</div>
+          <div class="v-subtitle">One-on-one music lessons · Kilsyth or Ringwood</div>
+          <div class="v-price">$240 <span>AUD</span></div>
+        </div>
+        <div class="voucher-body">
+          <ul class="v-features">
+            <li>5 x one-on-one lessons with an expert Pathfinder teacher</li>
+            <li>Any instrument — guitar, drums, piano, voice, violin &amp; more</li>
+            <li>Suitable for all ages and experience levels</li>
+            <li>Redeemable at Kilsyth or Ringwood studio</li>
+            <li>Recipient books at a time that suits them</li>
+          </ul>
+          <div class="v-pay">
+            <script src="https://secure.ewaypayments.com/scripts/eCrypt.js"
+              class="eway-paynow-button"
+              data-publicapikey="epk-7A965C79-0371-424B-8499-23463D938D5C"
+              data-amount="24000"
+              data-label="Buy Now — $240"
+              data-invoicedescription="Voucher for 5 Music Lessons"
+              data-currency="AUD"
+              data-allowedit="true">
+            </script>
+          </div>
+        </div>
+      </div>
+
+      <!-- 10-LESSON VOUCHER -->
+      <div class="voucher-card featured">
+        <div class="voucher-top">
+          <div class="v-badge">Best Value</div>
+          <div class="v-title">10-Lesson Voucher</div>
+          <div class="v-subtitle">One-on-one music lessons · Kilsyth or Ringwood</div>
+          <div class="v-price">$456 <span>AUD</span></div>
+        </div>
+        <div class="voucher-body">
+          <ul class="v-features">
+            <li>10 x one-on-one lessons with an expert Pathfinder teacher</li>
+            <li>Any instrument — guitar, drums, piano, voice, violin &amp; more</li>
+            <li>Suitable for all ages and experience levels</li>
+            <li>Redeemable at Kilsyth or Ringwood studio</li>
+            <li>Recipient books at a time that suits them</li>
+            <li>Save $24 compared to two 5-lesson vouchers</li>
+          </ul>
+          <div class="v-pay">
+            <script src="https://secure.ewaypayments.com/scripts/eCrypt.js"
+              class="eway-paynow-button"
+              data-publicapikey="epk-7A965C79-0371-424B-8499-23463D938D5C"
+              data-amount="45600"
+              data-label="Buy Now — $456"
+              data-invoicedescription="Voucher for 10 Music Lessons"
+              data-currency="AUD"
+              data-allowedit="true">
+            </script>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <p style="font-size:0.8rem;color:var(--mid-grey);margin-top:1.25rem;text-align:center;">🔒 Payments processed securely via eWay. Your card details are never stored on our servers.</p>
+  </div>
+</div>
+
+<!-- HOW TO ORDER (phone alternative) -->
+<section class="order-section">
+  <div class="container">
+    <p class="sec-label">Prefer to Order by Phone?</p>
+    <h2 class="sec-title">We're Happy to Help</h2>
+    <p class="sec-body">You're also welcome to call or email us directly and we'll arrange your voucher over the phone.</p>
+    <div class="order-grid">
+      <div class="order-step">
+        <div class="order-n">01</div>
+        <h3>Call or Email Us</h3>
+        <p>
+          <a href="tel:0434198929">Kilsyth: 0434 198 929</a><br>
+          <a href="tel:0489930719">Ringwood: 0489 930 719</a><br><br>
+          <a href="mailto:kilsyth@pathfindermusiclessons.com.au">kilsyth@pathfindermusiclessons.com.au</a><br>
+          <a href="mailto:ringwood@pathfindermusiclessons.com.au">ringwood@pathfindermusiclessons.com.au</a>
+        </p>
+      </div>
+      <div class="order-step">
+        <div class="order-n">02</div>
+        <h3>We'll Prepare Your Voucher</h3>
+        <p>We'll create a personalised voucher for your recipient and arrange payment. Simple, quick, and no hassle.</p>
+      </div>
+      <div class="order-step">
+        <div class="order-n">03</div>
+        <h3>They Book Their Lesson</h3>
+        <p>Your gift recipient redeems the voucher by booking a time with our team. We'll look after them from their very first note.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ABOUT TEACHERS -->
+<div class="teachers-band">
+  <div class="teachers-inner">
+    <div>
+      <p class="sec-label" style="color:rgba(255,255,255,0.55);">About the Teachers</p>
+      <h2>Expert Teachers, Real Results</h2>
+      <p>All of the teachers at Pathfinder Music Lessons have undertaken tertiary music qualifications (and hold valid Working with Children checks) and work professionally as performing musicians and teachers.</p>
+      <p>Passionate about giving musicians the ultimate learning experience that is fun, thorough and exciting, the Pathfinder team have helped thousands of new musicians reach their musical goals.</p>
+      <a href="teachers.html" class="btn btn-outline-white">Meet the Team</a>
+    </div>
+    <div class="creds-grid">
+      <div class="cred"><div class="cred-icon">🎓</div><strong>Tertiary Qualified</strong><span>Recognised music qualifications</span></div>
+      <div class="cred"><div class="cred-icon">✅</div><strong>WWC Certified</strong><span>Working with Children checks</span></div>
+      <div class="cred"><div class="cred-icon">🎸</div><strong>Pro Performers</strong><span>Active gigging musicians</span></div>
+      <div class="cred"><div class="cred-icon">❤️</div><strong>Thousands Taught</strong><span>Students guided to goals</span></div>
+    </div>
+  </div>
+</div>
+<footer>
+  <div class="container">
+    <div class="f-grid-footer">
+      <div><img src="Logo_-_long.png" alt="Pathfinder Music Lessons" class="footer-logo"><p class="f-desc">Music lessons for students of all ages in Kilsyth and Ringwood. Guitar, drums, piano, singing, violin and more — from bedroom to stage.</p></div>
+      <div class="f-col"><h4>Pages</h4><ul>
+        <li><a href="student-concerts.html">Student Concerts</a></li>
+        <li><a href="teachers.html">Our Teachers</a></li>
+        <li><a href="pricing.html">Pricing</a></li>
+        <li><a href="events.html">Events</a></li>
+        <li><a href="gift-vouchers.html">Gift Vouchers</a></li>
+        <li><a href="student-portal.html">Student Portal</a></li>
+        <li><a href="careers.html">Careers</a></li>
+        <li><a href="ringwood-studio.html">Ringwood Studio</a></li>
+      </ul></div>
+      <div class="f-col"><h4>Contact</h4><ul>
+        <li><a href="tel:0434198929">Kilsyth: 0434 198 929</a></li>
+        <li><a href="tel:0489930719">Ringwood: 0489 930 719</a></li>
+        <li><a href="mailto:kilsyth@pathfindermusiclessons.com.au">kilsyth@pathfindermusiclessons.com.au</a></li>
+        <li><a href="mailto:ringwood@pathfindermusiclessons.com.au">ringwood@pathfindermusiclessons.com.au</a></li>
+      </ul></div>
+    </div>
+    <div class="f-bottom">
+      <span>© 2026 Pathfinder Music Lessons. All rights reserved.</span>
+      <a href="#top" style="color:var(--orange);text-decoration:none;">Back to top ↑</a>
+    </div>
+  </div>
+</footer>
+<script>
+const nt=document.getElementById("nt"),nl=document.getElementById("nl");
+nt.addEventListener("click",()=>nl.classList.toggle("open"));
+document.querySelectorAll("a[href^=\"#\"]").forEach(a=>a.addEventListener("click",()=>nl.classList.remove("open")));
+</script>
+</body></html>

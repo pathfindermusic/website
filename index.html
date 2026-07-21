@@ -1,0 +1,367 @@
+<!DOCTYPE html><html lang="en" id="top">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Pathfinder Music Lessons | Kilsyth &amp; Ringwood</title>
+<meta name="description" content="Music lessons for students of all ages in Kilsyth and Ringwood. Guitar, drums, piano, singing, violin and more — from bedroom to stage.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --orange: #E8491E; --orange-light: #FF6B45; --orange-dark: #C23A14;
+  --charcoal: #1C1C1E; --charcoal-mid: #2C2C2E; --charcoal-light: #3A3A3C;
+  --white: #FFFFFF; --off-white: #F7F7F7; --light-grey: #EBEBEB;
+  --mid-grey: #999999; --dark-grey: #555555;
+  --border-l: rgba(0,0,0,0.09); --border-d: rgba(255,255,255,0.1);
+  --shadow: 0 2px 16px rgba(0,0,0,0.07); --shadow-h: 0 6px 28px rgba(0,0,0,0.13);
+  --r: 8px; --r-sm: 5px;
+}
+html { scroll-behavior: smooth; }
+body { font-family: 'Inter', sans-serif; background: var(--white); color: var(--charcoal); line-height: 1.6; overflow-x: hidden; }
+/* NAV */
+nav { position: sticky; top: 0; z-index: 100; background: var(--charcoal); padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 66px; border-bottom: 3px solid var(--orange); }
+.logo-img { height: 34px; width: auto; display: block; }
+.nav-links { display: flex; align-items: center; gap: 1.4rem; list-style: none; }
+.nav-links a { color: rgba(255,255,255,0.68); text-decoration: none; font-size: 0.78rem; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; transition: color 0.18s; white-space: nowrap; }
+.nav-links a:hover, .nav-links a.active { color: var(--white); }
+.nav-links a.active { color: var(--orange); }
+.nav-cta { background: var(--orange) !important; color: var(--white) !important; padding: 0.42rem 1rem; border-radius: var(--r-sm); font-weight: 600 !important; white-space: nowrap; }
+.nav-cta:hover { background: var(--orange-light) !important; }
+.nav-toggle { display: none; flex-direction: column; gap: 5px; cursor: pointer; background: none; border: none; padding: 4px; }
+.nav-toggle span { display: block; width: 22px; height: 2px; background: var(--white); border-radius: 2px; }
+/* PAGE HEADER */
+.page-header { position: relative; padding: 4.5rem 2rem 3.5rem; overflow: hidden; background: var(--charcoal); border-bottom: 3px solid var(--orange); }
+.ph-content { position: relative; z-index: 2; max-width: 1100px; margin: 0 auto; }
+.page-header h1 { font-size: clamp(2.25rem, 5.5vw, 3.75rem); font-weight: 800; line-height: 1.05; color: var(--white); margin-bottom: 0.85rem; }
+.page-header p { color: rgba(255,255,255,0.62); font-size: 1rem; max-width: 560px; line-height: 1.7; }
+/* SHARED LAYOUT */
+.container { max-width: 1100px; margin: 0 auto; }
+section { padding: 4.5rem 2rem; }
+.sec-label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--orange); margin-bottom: 0.6rem; }
+.sec-title { font-size: clamp(1.6rem, 3.2vw, 2.4rem); font-weight: 800; line-height: 1.1; margin-bottom: 1.1rem; color: var(--charcoal); }
+.sec-body { color: var(--dark-grey); font-size: 0.975rem; line-height: 1.78; }
+.dark-sec { background: var(--charcoal); }
+.dark-sec .sec-title { color: var(--white); }
+.dark-sec .sec-body { color: rgba(255,255,255,0.6); }
+.off-sec { background: var(--off-white); }
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.875rem; font-weight: 700; padding: 0.75rem 1.6rem; border-radius: var(--r-sm); text-decoration: none; border: none; cursor: pointer; transition: background 0.18s, transform 0.14s, border-color 0.18s; letter-spacing: 0.02em; white-space: nowrap; }
+.btn-orange { background: var(--orange); color: var(--white); }
+.btn-orange:hover { background: var(--orange-light); transform: translateY(-1px); }
+.btn-outline-dark { background: transparent; color: var(--charcoal); border: 2px solid var(--charcoal); }
+.btn-outline-dark:hover { background: var(--charcoal); color: var(--white); }
+.btn-outline-white { background: transparent; color: var(--white); border: 2px solid rgba(255,255,255,0.38); }
+.btn-outline-white:hover { background: rgba(255,255,255,0.1); border-color: var(--white); }
+/* CARDS */
+.card { background: var(--white); border: 1px solid var(--border-l); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
+.card:hover { transform: translateY(-3px); box-shadow: var(--shadow-h); }
+/* FORM */
+.f-grid { display: grid; gap: 0.85rem; }
+.f-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; }
+.f-group { display: flex; flex-direction: column; gap: 0.35rem; }
+.f-group label { font-size: 0.8rem; font-weight: 600; color: var(--charcoal); }
+.f-group input, .f-group select, .f-group textarea { background: var(--off-white); border: 1.5px solid var(--light-grey); border-radius: var(--r-sm); color: var(--charcoal); font-family: 'Inter', sans-serif; font-size: 0.925rem; padding: 0.7rem 0.9rem; width: 100%; transition: border-color 0.18s; -webkit-appearance: none; }
+.f-group input:focus, .f-group select:focus, .f-group textarea:focus { outline: none; border-color: var(--orange); background: var(--white); }
+.f-group textarea { resize: vertical; min-height: 110px; }
+/* FOOTER */
+footer { background: var(--charcoal); padding: 3.5rem 2rem 2rem; border-top: 3px solid var(--orange); }
+.footer-logo { height: 36px; width: auto; margin-bottom: 1rem; display: block; }
+.f-grid-footer { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 3rem; margin-bottom: 2.5rem; }
+.f-desc { font-size: 0.85rem; color: rgba(255,255,255,0.42); line-height: 1.7; }
+.f-col h4 { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.16em; color: var(--orange); margin-bottom: 0.9rem; }
+.f-col ul { list-style: none; display: flex; flex-direction: column; gap: 0.55rem; }
+.f-col ul a { font-size: 0.85rem; color: rgba(255,255,255,0.48); text-decoration: none; transition: color 0.18s; }
+.f-col ul a:hover { color: var(--white); }
+.f-bottom { border-top: 1px solid var(--border-d); padding-top: 1.25rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; color: rgba(255,255,255,0.28); }
+/* RESPONSIVE */
+@media (max-width: 1040px) { .nav-links { gap: 0.9rem; } .nav-links a { font-size: 0.72rem; } }
+@media (max-width: 900px) {
+  .nav-links { display: none; }
+  .nav-links.open { display: flex; flex-direction: column; position: fixed; top: 66px; left: 0; right: 0; background: var(--charcoal-mid); border-bottom: 2px solid var(--orange); padding: 1.5rem 2rem; gap: 1.1rem; z-index: 99; }
+  .nav-links.open a { font-size: 0.95rem; color: var(--white); }
+  .nav-toggle { display: flex; }
+  .f-grid-footer { grid-template-columns: 1fr; gap: 1.75rem; }
+  .f-bottom { flex-direction: column; gap: 0.5rem; text-align: center; }
+  .f-row { grid-template-columns: 1fr; }
+}
+/* HERO */
+.hero{position:relative;min-height:88vh;display:flex;align-items:center;padding:5rem 2rem 4rem;overflow:hidden;}
+.hero-bg{position:absolute;inset:0;background-image:url('PathfinderMusicBackground.png');background-size:cover;background-position:center top;}
+.hero-ov{position:absolute;inset:0;background:linear-gradient(100deg,rgba(28,28,30,0.93) 45%,rgba(28,28,30,0.55) 100%);}
+.hero-content{position:relative;z-index:2;max-width:660px;}
+.hero-kicker{font-size:0.75rem;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:var(--orange);margin-bottom:1.1rem;display:flex;align-items:center;gap:0.65rem;}
+.hero-kicker::before{content:'';display:block;width:26px;height:2px;background:var(--orange);}
+.hero h1{font-size:clamp(2.6rem,6.5vw,4.75rem);font-weight:800;line-height:1.04;color:var(--white);margin-bottom:1.4rem;}
+.hero h1 em{font-style:normal;color:var(--orange);}
+.hero-sub{font-size:1.05rem;color:rgba(255,255,255,0.68);max-width:490px;margin-bottom:2.25rem;line-height:1.72;}
+.hero-btns{display:flex;gap:0.9rem;flex-wrap:wrap;}
+.hero-tags{position:absolute;bottom:2rem;right:2rem;display:flex;gap:0.45rem;flex-wrap:wrap;justify-content:flex-end;z-index:2;max-width:280px;}
+.hero-tag{font-size:0.68rem;font-weight:600;color:rgba(255,255,255,0.55);background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.13);padding:0.22rem 0.6rem;border-radius:3px;letter-spacing:0.04em;text-transform:uppercase;}
+/* STATS */
+.stats{background:var(--orange);padding:1.75rem 2rem;}
+.stats-inner{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);}
+.stat{text-align:center;padding:0.5rem 1rem;}
+.stat-n{font-size:1.85rem;font-weight:800;color:var(--white);line-height:1;}
+.stat-l{font-size:0.73rem;font-weight:600;color:rgba(255,255,255,0.78);text-transform:uppercase;letter-spacing:0.06em;margin-top:0.2rem;}
+/* ABOUT */
+.about-grid{display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:start;}
+.chips{display:flex;flex-wrap:wrap;gap:0.45rem;margin-top:1.1rem;}
+.chip{font-size:0.75rem;font-weight:600;padding:0.28rem 0.75rem;border-radius:4px;background:var(--light-grey);color:var(--charcoal);border:1px solid var(--border-l);}
+.quote-block{background:var(--charcoal);border-radius:var(--r);padding:1.6rem;border-left:3px solid var(--orange);margin-bottom:1.1rem;}
+.quote-block p{font-size:1rem;font-weight:700;color:var(--white);line-height:1.5;}
+.quote-block small{font-size:0.85rem;color:rgba(255,255,255,0.52);margin-top:0.45rem;display:block;line-height:1.6;}
+.info-mini{display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;}
+.info-box{background:var(--off-white);border:1px solid var(--border-l);border-radius:var(--r);padding:1rem;text-align:center;}
+.info-n{font-size:1.25rem;font-weight:800;color:var(--orange);line-height:1;}
+.info-l{font-size:0.72rem;color:var(--mid-grey);font-weight:500;margin-top:0.2rem;}
+/* STEPS */
+.steps-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1.1rem;margin-top:2.75rem;}
+.step{background:var(--white);border:1px solid var(--border-l);border-radius:var(--r);padding:1.6rem;box-shadow:var(--shadow);position:relative;overflow:hidden;transition:transform 0.2s,box-shadow 0.2s;}
+.step:hover{transform:translateY(-3px);box-shadow:var(--shadow-h);}
+.step::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--orange);}
+.step-n{font-size:2.25rem;font-weight:800;color:var(--light-grey);line-height:1;margin-bottom:0.65rem;}
+.step h3{font-size:0.975rem;font-weight:700;margin-bottom:0.55rem;}
+.step p{font-size:0.85rem;color:var(--dark-grey);line-height:1.65;}
+/* OPTIONS */
+.opts-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.1rem;margin-top:2.75rem;}
+.opt{background:var(--white);border:1.5px solid var(--border-l);border-radius:var(--r);padding:1.75rem;position:relative;transition:transform 0.2s,box-shadow 0.2s;}
+.opt:hover{transform:translateY(-3px);box-shadow:var(--shadow-h);}
+.opt.best{border-color:var(--orange);background:var(--off-white);}
+.opt-badge{position:absolute;top:-1px;left:50%;transform:translateX(-50%);background:var(--orange);color:var(--white);font-size:0.65rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:0.22rem 0.9rem;border-radius:0 0 5px 5px;white-space:nowrap;}
+.opt-icon{font-size:1.85rem;margin-bottom:0.85rem;}
+.opt h3{font-size:1rem;font-weight:700;margin-bottom:0.55rem;}
+.opt p{font-size:0.85rem;color:var(--dark-grey);line-height:1.65;}
+/* LOCATIONS */
+.locs-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.1rem;margin-top:2.75rem;}
+.loc-card{background:var(--charcoal-mid);border:1px solid var(--border-d);border-radius:var(--r);padding:2rem;position:relative;overflow:hidden;}
+.loc-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--orange);}
+.loc-name{font-size:1.25rem;font-weight:800;color:var(--white);margin-bottom:1.1rem;}
+.loc-row{display:flex;align-items:flex-start;gap:0.7rem;margin-bottom:0.7rem;font-size:0.875rem;color:rgba(255,255,255,0.58);}
+.loc-row a{color:rgba(255,255,255,0.82);text-decoration:none;transition:color 0.18s;}
+.loc-row a:hover{color:var(--orange);}
+/* CONTACT */
+.contact-grid{display:grid;grid-template-columns:1fr 1.55fr;gap:4rem;align-items:start;}
+.contact-info h2{font-size:clamp(1.6rem,3vw,2.1rem);font-weight:800;color:var(--white);margin-bottom:0.85rem;}
+.contact-info p{color:rgba(255,255,255,0.58);line-height:1.72;margin-bottom:1.75rem;}
+.ph-row{display:flex;align-items:center;gap:0.85rem;padding:0.9rem 1.1rem;background:rgba(255,255,255,0.055);border:1px solid var(--border-d);border-radius:var(--r-sm);margin-bottom:0.65rem;}
+.ph-icon{width:36px;height:36px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;font-size:0.95rem;flex-shrink:0;}
+.ph-lbl{font-size:0.68rem;text-transform:uppercase;letter-spacing:0.12em;color:rgba(255,255,255,0.42);font-weight:600;}
+.ph-row a{color:var(--white);text-decoration:none;font-weight:700;font-size:0.925rem;}
+.form-box{background:var(--white);border-radius:var(--r);padding:2.1rem;box-shadow:var(--shadow);}
+.form-box h3{font-size:1.1rem;font-weight:700;color:var(--charcoal);margin-bottom:1.35rem;}
+@media(max-width:900px){
+  .about-grid,.contact-grid,.locs-grid{grid-template-columns:1fr;gap:2rem;}
+  .steps-grid{grid-template-columns:1fr 1fr;}
+  .opts-grid{grid-template-columns:1fr;}
+  .hero-tags{display:none;}
+  .stats-inner{grid-template-columns:1fr 1fr;}
+  .info-mini{grid-template-columns:1fr 1fr;}
+}
+@media(max-width:600px){.steps-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<nav>
+  <a href="index.html"><img src="Logo_-_long.png" alt="Pathfinder Music Lessons" class="logo-img"></a>
+  <ul class="nav-links" id="nl">
+    <li><a href="student-concerts.html">Concerts</a></li>
+    <li><a href="teachers.html">Our Teachers</a></li>
+    <li><a href="pricing.html">Pricing</a></li>
+    <li><a href="events.html">Events</a></li>
+    <li><a href="gift-vouchers.html">Gift Vouchers</a></li>
+    <li><a href="student-portal.html">Student Portal</a></li>
+    <li><a href="careers.html">Careers</a></li>
+    <li><a href="ringwood-studio.html">Ringwood Studio</a></li>
+    <li><a href="index.html#contact" class="nav-cta">Book a Lesson</a></li>
+  </ul>
+  <button class="nav-toggle" id="nt" aria-label="Menu"><span></span><span></span><span></span></button>
+</nav>
+
+<section class="hero" id="top">
+  <div class="hero-bg"></div><div class="hero-ov"></div>
+  <div class="hero-content">
+    <p class="hero-kicker">Kilsyth &amp; Ringwood — Est. 2016</p>
+    <h1>Find Your Path<br>to <em>Music Mastery</em></h1>
+    <p class="hero-sub">Learn to sing or play an instrument with expert, passionate teachers who get you results — fast. From bedroom to stage, we'll help you get there.</p>
+    <div class="hero-btns">
+      <a href="#contact" class="btn btn-orange">Book Your First Lesson</a>
+      <a href="teachers.html" class="btn btn-outline-white">Meet Our Teachers</a>
+    </div>
+  </div>
+  <div class="hero-tags">
+    <span class="hero-tag">Guitar</span><span class="hero-tag">Drums</span><span class="hero-tag">Piano</span>
+    <span class="hero-tag">Voice</span><span class="hero-tag">Violin</span><span class="hero-tag">Bass</span><span class="hero-tag">Ukulele</span>
+  </div>
+</section>
+
+<div class="stats"><div class="stats-inner">
+  <div class="stat"><div class="stat-n">2</div><div class="stat-l">Studios</div></div>
+  <div class="stat"><div class="stat-n">8+</div><div class="stat-l">Instruments</div></div>
+  <div class="stat"><div class="stat-n">All Ages</div><div class="stat-l">Welcome</div></div>
+  <div class="stat"><div class="stat-n">1000s</div><div class="stat-l">Students Guided</div></div>
+</div></div>
+
+<section id="about">
+  <div class="container">
+    <div class="about-grid">
+      <div>
+        <p class="sec-label">Who We Are</p>
+        <h2 class="sec-title">Music Lessons in Kilsyth &amp; Ringwood</h2>
+        <p class="sec-body">Whether you want to learn guitar, piano, drums, singing, violin, or something in between — we're here to help you achieve your goals. Our teachers are all experienced performers, composers, and all-round music lovers who have collectively guided thousands of musicians to their musical goals.</p>
+        <p class="sec-body" style="margin-top:0.7rem;">Pathfinder Music Lessons exists to keep the local music community passionate and always learning.</p>
+        <div class="chips">
+          <span class="chip">Guitar</span><span class="chip">Bass</span><span class="chip">Drums</span><span class="chip">Piano</span>
+          <span class="chip">Voice / Singing</span><span class="chip">Violin</span><span class="chip">Ukulele</span><span class="chip">Music Theory</span>
+        </div>
+      </div>
+      <div>
+        <div class="quote-block">
+          <p>"From bedroom to stage — we'll help you get there."</p>
+          <small>Whether you're a total beginner or an experienced player wanting to level up, our structured, personalised approach gets you results you can hear.</small>
+        </div>
+        <div class="info-mini">
+          <div class="info-box"><div class="info-n">Mon–Sat</div><div class="info-l">Open</div></div>
+          <div class="info-box"><div class="info-n">4 wks</div><div class="info-l">Notice to pause</div></div>
+          <div class="info-box"><div class="info-n">NDIS</div><div class="info-l">Funding ok</div></div>
+          <div class="info-box"><div class="info-n">30–60</div><div class="info-l">Min lessons</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="off-sec" id="lessons">
+  <div class="container">
+    <p class="sec-label">Your Journey</p>
+    <h2 class="sec-title">How You'll Progress</h2>
+    <div class="steps-grid">
+      <div class="step"><div class="step-n">01</div><h3>Learn the Basics</h3><p>Follow clear, structured lessons to grow your knowledge. Our expert teachers show you the proven path to mastering your instrument.</p></div>
+      <div class="step"><div class="step-n">02</div><h3>Apply Your Skills</h3><p>Put new skills into practice in a fun, supportive environment. Play with other musicians, pick up pro tips, and make lasting friendships.</p></div>
+      <div class="step"><div class="step-n">03</div><h3>Play Your Songs</h3><p>Play your favourite songs using the skills you've built. Once you're truly playing music you love, you'll never want to stop.</p></div>
+      <div class="step"><div class="step-n">04</div><h3>Master Music</h3><p>Create and record your own music, teach others, and perform in public — whether in a band or as a soloist. The stage is yours.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <p class="sec-label">Why Pathfinder</p>
+    <h2 class="sec-title">How Do You Want to Learn?</h2>
+    <p class="sec-body">At this point, you've got 3 choices. Only one of them actually gets you to where you want to be.</p>
+    <div class="opts-grid">
+      <div class="opt"><div class="opt-icon">😵</div><h3>1. Teach Yourself</h3><p>YouTube videos. Free tabs. Beginner books. This is how most people first try — and most find it overwhelming and slow. Without a clear path, progress stalls fast.</p></div>
+      <div class="opt"><div class="opt-icon">🎓</div><h3>2. Casual Teacher</h3><p>A poorly organised, unstructured lesson every other week might technically be lessons — but you can't expect mastery to come from that.</p></div>
+      <div class="opt best"><div class="opt-badge">Best Choice</div><div class="opt-icon">🎸</div><h3>3. Pathfinder</h3><p>Expert teachers with structured lessons built for you. Make rapid progress, meet great musicians, and actually have fun doing it. This is the only way to go.</p></div>
+    </div>
+    <div style="margin-top:2.25rem;text-align:center;"><a href="#contact" class="btn btn-orange">Start Your Journey</a></div>
+  </div>
+</section>
+
+<section class="dark-sec" id="locations">
+  <div class="container">
+    <p class="sec-label">Where to Find Us</p>
+    <h2 class="sec-title">Two Studios, One Community</h2>
+    <div class="locs-grid">
+      <div class="loc-card">
+        <div class="loc-name">Kilsyth Studio</div>
+        <div class="loc-row">📍 <span>20 Collins Place, Kilsyth VIC 3137<br><em style="font-size:0.8rem;opacity:0.65;">Opposite Kilsyth Primary, next to Dolcetti Coffee</em></span></div>
+        <div class="loc-row">📞 <a href="tel:0434198929">0434 198 929</a></div>
+        <div class="loc-row">✉️ <a href="mailto:kilsyth@pathfindermusiclessons.com.au">kilsyth@pathfindermusiclessons.com.au</a></div>
+        <div style="margin-top:1.4rem;"><a href="#contact" class="btn btn-outline-white">Book at Kilsyth</a></div>
+      </div>
+      <div class="loc-card">
+        <div class="loc-name">Ringwood Studio</div>
+        <div class="loc-row">📍 <span>G3 / 93a Heatherdale Road, Ringwood VIC 3134<br><em style="font-size:0.8rem;opacity:0.65;">Same complex as VicRoads Ringwood Testing Centre</em></span></div>
+        <div class="loc-row">📞 <a href="tel:0489930719">0489 930 719</a></div>
+        <div class="loc-row">✉️ <a href="mailto:ringwood@pathfindermusiclessons.com.au">ringwood@pathfindermusiclessons.com.au</a></div>
+        <div style="margin-top:1.4rem;"><a href="#contact" class="btn btn-outline-white">Book at Ringwood</a></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="dark-sec" id="contact">
+  <div class="container">
+    <div class="contact-grid">
+      <div class="contact-info">
+        <p class="sec-label">Ready to Begin?</p>
+        <h2>Book Your First Lesson</h2>
+        <p>Fill in your details and we'll be in touch to answer any questions and get your first lesson sorted.</p>
+        <div class="ph-row"><div class="ph-icon">📞</div><div><div class="ph-lbl">Kilsyth</div><a href="tel:0434198929">0434 198 929</a></div></div>
+        <div class="ph-row"><div class="ph-icon">📞</div><div><div class="ph-lbl">Ringwood</div><a href="tel:0489930719">0489 930 719</a></div></div>
+      </div>
+      <div class="form-box">
+        <h3>Send us an enquiry</h3>
+        <form class="f-grid" id="wf" action="https://crm.zoho.com.au/crm/WebToLeadForm" name="WebToLeads91714000000316579" method="POST" onsubmit="return zCheck()" accept-charset="UTF-8">
+  <input type="text" style="display:none" name="xnQsjsdp" value="5388bc8620ddc90ab57f1a429b337fdbe2801100e17741a6c0c90eb766e1b5d4">
+  <input type="hidden" name="zc_gad" value="">
+  <input type="text" style="display:none" name="xmIwtLD" value="eaf16dc70a09e92c213c4dc29d8e844e438f57368f810051dab8ef214bb2511254837ef5fe138ee6ba90409faa12c59c">
+  <input type="text" style="display:none" name="actionType" value="TGVhZHM=">
+  <input type="text" style="display:none" name="returnURL" value="https://pathfindermusiclessons.com.au/thank-you-evaluation-lesson">
+  <input type="hidden" name="Lead Source" value="Website">
+  <input type="hidden" name="LEADCF5" value="Prospective Student">
+  <div class="f-row">
+    <div class="f-group"><label>Student First Name *</label><input type="text" name="First Name" maxlength="40" required placeholder="e.g. Jamie"></div>
+    <div class="f-group"><label>Student Last Name *</label><input type="text" name="Last Name" maxlength="80" required placeholder="e.g. Smith"></div>
+  </div>
+  <div class="f-row">
+    <div class="f-group"><label>Your Name</label><input type="text" name="LEADCF7" maxlength="255" placeholder="Parent / guardian"></div>
+    <div class="f-group"><label>Phone *</label><input type="tel" name="Phone" maxlength="30" required placeholder="0400 000 000"></div>
+  </div>
+  <div class="f-group"><label>Email *</label><input type="email" ftype="email" name="Email" maxlength="100" required placeholder="your@email.com"></div>
+  <div class="f-row">
+    <div class="f-group"><label>Preferred Studio *</label>
+      <select name="LEADCF6" required><option value="-None-">— Select —</option><option value="Kilsyth">Kilsyth</option><option value="Ringwood">Ringwood</option></select>
+    </div>
+    <div class="f-group"><label>Instrument *</label>
+      <select name="LEADCF1" required><option value="-None-">— Select —</option><option value="Guitar">Guitar</option><option value="Bass">Bass</option><option value="Drums">Drums</option><option value="Piano / Keyboard">Piano / Keyboard</option><option value="Voice">Voice / Singing</option><option value="Violin">Violin</option><option value="Ukulele">Ukulele</option><option value="Music Theory">Music Theory</option><option value="Other">Other</option></select>
+    </div>
+  </div>
+  <div class="f-group"><label>How can we help? *</label><textarea name="Description" required placeholder="Tell us about yourself — experience level, goals, availability..."></textarea></div>
+  <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+  <div class="g-recaptcha" data-sitekey="6LesMcUqAAAAANK8aA2rRHVg0TcEZlVu-yAu9qNL" data-callback="zRC" captcha-verified="false" id="zCap" style="margin-bottom:0.5rem;transform:scale(0.94);transform-origin:0 0;"></div>
+  <div id="zCapErr" style="font-size:0.82rem;color:var(--orange);margin-bottom:0.5rem;display:none;">Please complete the CAPTCHA above.</div>
+  <button type="submit" class="btn btn-orange" style="width:100%;justify-content:center;">Send Enquiry</button>
+</form>
+<script>
+function zRC(){var e=document.getElementById("zCap");if(e)e.setAttribute("captcha-verified","true");var r=document.getElementById("zCapErr");if(r)r.style.display="none";}
+function zCheck(){var f=["First Name","Last Name","Email","Phone","Description","LEADCF1","LEADCF6"],l=["Student First Name","Student Last Name","Email","Phone","How can we help?","Instrument","Preferred Studio"],fm=document.forms["WebToLeads91714000000316579"];for(var i=0;i<f.length;i++){var fd=fm[f[i]];if(!fd)continue;var v=(fd.value||"").trim();if(v===""||v==="-None-"){alert(l[i]+" cannot be empty");fd.focus();return false;}}var ef=fm.querySelectorAll("[ftype=email]");for(var i=0;i<ef.length;i++){var v=ef[i].value.trim();if(v.length>0){var at=v.indexOf("@"),dt=v.lastIndexOf(".");if(at<1||dt<at+2||dt+2>=v.length){alert("Please enter a valid email address.");ef[i].focus();return false;}}}var rc=document.getElementById("zCap");if(rc&&rc.getAttribute("captcha-verified")!=="true"){document.getElementById("zCapErr").style.display="block";rc.scrollIntoView({behavior:"smooth",block:"center"});return false;}return true;}
+(function(){var s=document.createElement("script");s.src="https://crm.zohopublic.com.au/crm/WebFormAnalyticsServeServlet?rid=ae130b6ddb8663a68a7e6d04111fcd359b139591cc6b2255abf2ac8e80edc4de169cdbf73113a7940f67047549ea49b9gid8ea5def843e68a9039a07a34cbda782650568d1529e486ea09344cfb69232c2agid74bc567ff74d6deaa244c5fea6a2c02f65293eef5b0e330624b79c9d9e4a4037gid49867367a20c31e75cada0e7064657d435211252f2300435246a722e3c772414&tw=3a8ee09805f26a3973cbceb3bf49acc343ab6b63d21a0f9d5ab00064bc9a7a01";document.body.appendChild(s);})();
+</script>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div class="f-grid-footer">
+      <div><img src="Logo_-_long.png" alt="Pathfinder Music Lessons" class="footer-logo"><p class="f-desc">Music lessons for students of all ages in Kilsyth and Ringwood. Guitar, drums, piano, singing, violin and more — from bedroom to stage.</p></div>
+      <div class="f-col"><h4>Pages</h4><ul>
+        <li><a href="student-concerts.html">Student Concerts</a></li>
+        <li><a href="teachers.html">Our Teachers</a></li>
+        <li><a href="pricing.html">Pricing</a></li>
+        <li><a href="events.html">Events</a></li>
+        <li><a href="gift-vouchers.html">Gift Vouchers</a></li>
+        <li><a href="student-portal.html">Student Portal</a></li>
+        <li><a href="careers.html">Careers</a></li>
+        <li><a href="ringwood-studio.html">Ringwood Studio</a></li>
+      </ul></div>
+      <div class="f-col"><h4>Contact</h4><ul>
+        <li><a href="tel:0434198929">Kilsyth: 0434 198 929</a></li>
+        <li><a href="tel:0489930719">Ringwood: 0489 930 719</a></li>
+        <li><a href="mailto:kilsyth@pathfindermusiclessons.com.au">kilsyth@pathfindermusiclessons.com.au</a></li>
+        <li><a href="mailto:ringwood@pathfindermusiclessons.com.au">ringwood@pathfindermusiclessons.com.au</a></li>
+      </ul></div>
+    </div>
+    <div class="f-bottom">
+      <span>© 2026 Pathfinder Music Lessons. All rights reserved.</span>
+      <a href="#top" style="color:var(--orange);text-decoration:none;">Back to top ↑</a>
+    </div>
+  </div>
+</footer>
+<script>
+const nt=document.getElementById("nt"),nl=document.getElementById("nl");
+nt.addEventListener("click",()=>nl.classList.toggle("open"));
+document.querySelectorAll("a[href^=\"#\"]").forEach(a=>a.addEventListener("click",()=>nl.classList.remove("open")));
+</script>
+</body></html>
