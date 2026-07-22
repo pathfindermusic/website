@@ -1,7 +1,7 @@
 <!DOCTYPE html><html lang="en">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Events, Workshops &amp; Masterclasses — Pathfinder Music Lessons</title>
-<meta name="description" content="Upcoming events, workshops and masterclasses at Pathfinder Music Lessons in Kilsyth and Ringwood.">
+<title>Music Studios at Pathfinder Music Lessons</title>
+<meta name="description" content="Pathfinder Music Lessons Studios">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -83,30 +83,30 @@ footer { background: var(--charcoal); padding: 3.5rem 2rem 2rem; border-top: 3px
   .f-bottom { flex-direction: column; gap: 0.5rem; text-align: center; }
   .f-row { grid-template-columns: 1fr; }
 }
-.event-types{display:grid;grid-template-columns:1fr 1fr;gap:1.1rem;margin-bottom:2.75rem;}
-.etype{background:var(--off-white);border:1px solid var(--border-l);border-radius:var(--r);padding:2rem;}
-.etype-icon{font-size:2rem;margin-bottom:0.85rem;}
-.etype h3{font-size:1rem;font-weight:700;margin-bottom:0.5rem;}
-.etype p{font-size:0.855rem;color:var(--dark-grey);line-height:1.65;}
-.empty-state{border:2px dashed var(--light-grey);border-radius:var(--r);padding:3.5rem 2rem;text-align:center;margin-bottom:2.75rem;}
-.empty-icon{font-size:2.75rem;margin-bottom:1.25rem;opacity:0.5;}
-.empty-state h2{font-size:1.4rem;font-weight:800;margin-bottom:0.65rem;}
-.empty-state p{color:var(--dark-grey);font-size:0.9rem;max-width:420px;margin:0 auto 1.5rem;line-height:1.7;}
-.past-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.1rem;margin-top:2rem;}
-.past-card{background:var(--off-white);border:1px solid var(--border-l);border-radius:var(--r);padding:1.4rem;opacity:0.8;}
-.past-badge{display:inline-block;font-size:0.65rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:0.18rem 0.55rem;border:1px solid var(--border-l);border-radius:3px;color:var(--mid-grey);margin-bottom:0.65rem;}
-.past-card h4{font-size:0.92rem;font-weight:700;margin-bottom:0.4rem;}
-.past-card p{font-size:0.83rem;color:var(--dark-grey);line-height:1.6;}
-.notify-band{background:var(--charcoal);padding:4rem 2rem;border-top:3px solid var(--orange);}
-.notify-inner{max-width:520px;margin:0 auto;text-align:center;}
-.notify-inner h2{font-size:clamp(1.5rem,3vw,1.9rem);font-weight:800;color:var(--white);margin-bottom:0.65rem;}
-.notify-inner p{color:rgba(255,255,255,0.58);font-size:0.9rem;margin-bottom:1.75rem;line-height:1.7;}
-.notify-form{display:flex;gap:0.7rem;}
-.notify-form input{flex:1;background:rgba(255,255,255,0.08);border:1.5px solid rgba(255,255,255,0.18);border-radius:var(--r-sm);color:var(--white);font-family:'Inter',sans-serif;font-size:0.9rem;padding:0.72rem 1rem;transition:border-color 0.18s;}
-.notify-form input:focus{outline:none;border-color:var(--orange);}
-.notify-form input::placeholder{color:rgba(255,255,255,0.4);}
-.notify-success{display:none;margin-top:1rem;color:var(--orange);font-size:0.875rem;}
-@media(max-width:900px){.event-types,.past-grid{grid-template-columns:1fr;} .notify-form{flex-direction:column;}}
+.studio-grid{display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:start;margin-bottom:3.5rem;}
+.studio-body h2{font-size:clamp(1.6rem,3vw,2.25rem);font-weight:800;margin-bottom:1rem;}
+.studio-body p{color:var(--dark-grey);font-size:0.9rem;line-height:1.75;margin-bottom:1rem;}
+.detail-rows{display:flex;flex-direction:column;gap:0.75rem;margin-bottom:1.5rem;}
+.d-row{display:flex;align-items:flex-start;gap:0.85rem;padding:1rem 1.1rem;background:var(--off-white);border:1px solid var(--border-l);border-radius:var(--r-sm);}
+.d-icon{font-size:1rem;flex-shrink:0;margin-top:2px;}
+.d-text{font-size:0.875rem;color:var(--dark-grey);line-height:1.55;}
+.d-text strong{color:var(--charcoal);font-weight:700;display:block;margin-bottom:0.15rem;}
+.d-text a{color:var(--orange);text-decoration:none;}
+.d-text a:hover{text-decoration:underline;}
+.map-wrap{width:100%;aspect-ratio:4/3;background:var(--light-grey);border:1px solid var(--border-l);border-radius:var(--r);overflow:hidden;}
+.map-wrap iframe{width:100%;height:100%;border:none;display:block;}
+.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.1rem;margin-top:2.5rem;}
+.feat{background:var(--off-white);border:1px solid var(--border-l);border-radius:var(--r);padding:1.6rem;}
+.feat-icon{font-size:1.65rem;margin-bottom:0.65rem;}
+.feat h3{font-size:0.95rem;font-weight:700;margin-bottom:0.45rem;}
+.feat p{font-size:0.845rem;color:var(--dark-grey);line-height:1.65;}
+.suburbs-band{background:var(--off-white);border-top:1px solid var(--border-l);padding:4rem 2rem;}
+.suburbs-band h2{font-size:clamp(1.5rem,3vw,1.9rem);font-weight:800;margin-bottom:0.65rem;}
+.suburbs-band p{color:var(--dark-grey);font-size:0.9rem;line-height:1.72;max-width:680px;margin-bottom:1.5rem;}
+.suburb-tags{display:flex;flex-wrap:wrap;gap:0.55rem;margin-bottom:2rem;}
+.s-tag{font-size:0.75rem;font-weight:600;padding:0.28rem 0.75rem;border-radius:3px;background:var(--white);color:var(--charcoal);border:1px solid var(--border-l);}
+@media(max-width:900px){.studio-grid{grid-template-columns:1fr;gap:2.5rem;} .features-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:580px){.features-grid{grid-template-columns:1fr;}}
 </style>
 </head><body>
 <nav>
@@ -126,47 +126,64 @@ footer { background: var(--charcoal); padding: 3.5rem 2rem 2rem; border-top: 3px
 </nav>
 <div class="page-header">
   <div class="ph-content">
-    <p class="sec-label">Live at Pathfinder</p>
-    <h1>Events, Workshops &amp; Masterclasses</h1>
-    <p>Student concerts every 6 months, plus special workshops and masterclasses throughout the year. Ticket links are posted here as soon as they're announced.</p>
+    <p class="sec-label">Our Studios</p>
+    <h1>Music Lessons in Ringwood and Kilsyth Studios</h1>
+    <p>A peaceful, professional space to learn — until students pull out their instruments and start rocking out.</p>
   </div>
 </div>
+<div class="suburbs-band">
+  <div class="container">
+    <p class="sec-label">Serving the Eastern Suburbs</p>
+    <h2>Close to Home</h2>
+    <p>If you're in any of the following suburbs, you're probably less than 10 minutes drive from our Studios. Many students travel further too — get in touch if you're unsure about distance.</p>
+    <div class="suburb-tags">
+      <span class="s-tag">Ringwood</span><span class="s-tag">Ringwood East</span><span class="s-tag">Ringwood North</span>
+      <span class="s-tag">Heathmont</span><span class="s-tag">Croydon</span><span class="s-tag">Park Orchards</span>
+      <span class="s-tag">Mitcham</span><span class="s-tag">Vermont</span><span class="s-tag">Bayswater</span>
+      <span class="s-tag">Boronia</span><span class="s-tag">Nunawading</span><span class="s-tag">Blackburn</span>
+      <span class="s-tag">Montrose</span><span class="s-tag">Mooroolbark</span><span class="s-tag">Mt Evelyn</span>
+      <span class="s-tag">Lilydale</span><span class="s-tag">Kalorama</span><span class="s-tag">Kilsyth South</span>
+    </div>
+    <a href="index.html#contact" class="btn btn-orange">Book a Lesson</a>
+  </div>
 <section>
   <div class="container">
-    <div class="event-types">
-      <div class="etype"><div class="etype-icon">🎤</div><h3>Student Concerts</h3><p>Held every 6 months, our student concerts are a chance for musicians of all levels to perform on stage in front of a real audience — a milestone moment and a lot of fun for everyone involved.</p></div>
-      <div class="etype"><div class="etype-icon">🎸</div><h3>Workshops &amp; Masterclasses</h3><p>We host special workshops and masterclasses on technique, theory, recording, songwriting and more — run by our teachers and visiting professionals. Open to students and the wider community.</p></div>
-    </div>
-    <div class="empty-state">
-      <div class="empty-icon">🎟️</div>
-      <h2>No Events Scheduled Yet</h2>
-      <p>We'll post ticket links for our next student concert and any upcoming workshops as soon as they're announced. Check back soon, or leave your email below and we'll let you know directly.</p>
-      <a href="#notify" class="btn btn-orange">Notify Me</a>
-    </div>
-    <div>
-      <p class="sec-label">What We've Done Before</p>
-      <h2 class="sec-title" style="margin-bottom:0.4rem;">Past Events</h2>
-      <p class="sec-body">A taste of the kinds of events we run throughout the year.</p>
-      <div class="past-grid">
-        <div class="past-card"><span class="past-badge">Past Event</span><h4>Student Concert — Winter 2025</h4><p>Kilsyth studio students performed original songs and covers across guitar, drums, piano and vocals. A sell-out crowd of family and friends.</p></div>
-        <div class="past-card"><span class="past-badge">Past Event</span><h4>Guitar Technique Workshop</h4><p>An afternoon masterclass on fingerstyle technique and music theory with Luke — open to students of all levels.</p></div>
-        <div class="past-card"><span class="past-badge">Past Event</span><h4>Student Concert — Summer 2024</h4><p>Our Ringwood students hit the stage for the first time, with performances ranging from beginners through to our most advanced players.</p></div>
+    <h2>Where to Find Us</h2>
+    <div class="studio-grid">
+      <div>
+        <p class="sec-label">Ringwood Studio</p>
+        <div class="detail-rows">
+          <div class="d-row"><span class="d-icon">📍</span><div class="d-text"><strong>Address</strong>G3 / 93a Heatherdale Road, Ringwood VIC 3134<br><em style="font-size:0.8rem;opacity:0.7;">Same complex as VicRoads Ringwood Testing Centre</em></div></div>
+          <div class="d-row"><span class="d-icon">🚆</span><div class="d-text"><strong>By Train</strong>10-minute walk from Heatherdale Station (one stop from Ringwood on the Belgrave/Lilydale line)</div></div>
+          <div class="d-row"><span class="d-icon">📞</span><div class="d-text"><strong>Phone</strong><a href="tel:0489930719">0489 930 719</a></div></div>
+          <div class="d-row"><span class="d-icon">✉️</span><div class="d-text"><strong>Email</strong><a href="mailto:ringwood@pathfindermusiclessons.com.au">ringwood@pathfindermusiclessons.com.au</a></div></div>
+        </div>
+        <div class="map-wrap">
+          <iframe width="100%" height="650px" frameborder="0" style="border:0" src="https://www.google.com/maps/embed/v1/place?key=AIzaSyB2NIWI3Tv9iDPrlnowr_0ZqZWoAQydKJU&q=93a%20Heatherdale%20Road%2C%20Ringwood%20VIC%2C%20Australia&maptype=roadmap" allowfullscreen></iframe>
+          <!--<iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3151.5!2d145.2143558!3d-37.8269541!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMzfCsDQ5JzM3LjAiUyAxNDXCsDEyJzUxLjciRQ!5e0!3m2!1sen!2sau!4v1000000000000" allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Pathfinder Music Lessons Ringwood"></iframe>-->
+        </div>
       </div>
+      <div>
+        <p class="sec-label">Kilsyth Studio</p>
+        <div class="detail-rows">
+          <div class="d-row"><span class="d-icon">📍</span><div class="d-text"><strong>Address</strong>20 Collins Place, Kilsyth VIC 3137<br><em style="font-size:0.8rem;opacity:0.7;">In the well-known Kilsyth shopping complex</em></div></div>
+          <div class="d-row"><span class="d-icon">🚆</span><div class="d-text"><strong>By Bus</strong>1-minute walk from the Mt Dandenong Rd/Liverpool Rd stop of Bus 690</div></div>
+          <div class="d-row"><span class="d-icon">📞</span><div class="d-text"><strong>Phone</strong><a href="tel:0434198929">0434 198 929</a></div></div>
+          <div class="d-row"><span class="d-icon">✉️</span><div class="d-text"><strong>Email</strong><a href="mailto:kilsyth@pathfindermusiclessons.com.au">kilsyth@pathfindermusiclessons.com.au</a></div></div>
+        </div>
+        <div class="map-wrap">
+          <iframe width="100%" height="650px" frameborder="0" style="border:0" src="https://www.google.com/maps/embed/v1/place?key=AIzaSyB2NIWI3Tv9iDPrlnowr_0ZqZWoAQydKJU&q=20%20Collins%20Place%2C%20Kilsyth%20VIC%2C%20Australia&maptype=roadmap" allowfullscreen></iframe>
+          <!--<iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3151.5!2d145.2143558!3d-37.8269541!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMzfCsDQ5JzM3LjAiUyAxNDXCsDEyJzUxLjciRQ!5e0!3m2!1sen!2sau!4v1000000000000" allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Pathfinder Music Lessons Ringwood"></iframe>-->
+        </div>
+      </div>      
     </div>
+    <div class="features-grid">
+      <div class="feat"><div class="feat-icon">🎙️</div><h3>Recording Rig</h3><p>Fully equipped studio with a live recording setup, microphones, effects and plug-ins available for student recording projects.</p></div>
+      <div class="feat"><div class="feat-icon">🎤</div><h3>Performance Ready</h3><p>Our students perform at studio concerts, local venues and live music spots around Melbourne — real performance experience from day one.</p></div>
+      <div class="feat"><div class="feat-icon">🎵</div><h3>All Instruments</h3><p>Guitar, bass, drums, piano, voice, violin, ukulele and music theory — all taught at the Ringwood studio by our expert team.</p></div>
+    </div>    
   </div>
 </section>
-<div class="notify-band" id="notify">
-  <div class="notify-inner">
-    <p class="sec-label" style="text-align:center;margin-bottom:0.6rem;">Stay in the Loop</p>
-    <h2>Get Notified About Events</h2>
-    <p>Drop your email and we'll let you know when the next concert or workshop is announced. No spam, just gig dates.</p>
-    <form class="notify-form" onsubmit="handleNotify(event)">
-      <input type="email" placeholder="your@email.com" required>
-      <button type="submit" class="btn btn-orange">Notify Me</button>
-    </form>
-    <div class="notify-success" id="nSuccess">Done! We'll be in touch when the next event is announced.</div>
-  </div>
-</div>
 <footer>
   <div class="container">
     <div class="f-grid-footer">
@@ -199,5 +216,4 @@ const nt=document.getElementById("nt"),nl=document.getElementById("nl");
 nt.addEventListener("click",()=>nl.classList.toggle("open"));
 document.querySelectorAll("a[href^=\"#\"]").forEach(a=>a.addEventListener("click",()=>nl.classList.remove("open")));
 </script>
-<script>function handleNotify(e){e.preventDefault();document.getElementById('nSuccess').style.display='block';e.target.reset();}</script>
 </body></html>

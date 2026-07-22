@@ -83,7 +83,7 @@ footer { background: var(--charcoal); padding: 3.5rem 2rem 2rem; border-top: 3px
   .f-bottom { flex-direction: column; gap: 0.5rem; text-align: center; }
   .f-row { grid-template-columns: 1fr; }
 }
-.pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.1rem;margin-bottom:3rem;}
+.pricing-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.1rem;margin-bottom:3rem;max-width:720px;}
 .p-card{background:var(--white);border:1.5px solid var(--border-l);border-radius:var(--r);padding:2rem;position:relative;transition:transform 0.2s,box-shadow 0.2s;}
 .p-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-h);}
 .p-card.featured{border-color:var(--orange);background:var(--off-white);}
@@ -118,14 +118,14 @@ footer { background: var(--charcoal); padding: 3.5rem 2rem 2rem; border-top: 3px
 <nav>
   <a href="index.html"><img src="Logo_-_long.png" alt="Pathfinder Music Lessons" class="logo-img"></a>
   <ul class="nav-links" id="nl">
-    <li><a href="student-concerts.html">Concerts</a></li>
     <li><a href="teachers.html">Our Teachers</a></li>
     <li><a href="pricing.html">Pricing</a></li>
-    <li><a href="events.html">Events</a></li>
     <li><a href="gift-vouchers.html">Gift Vouchers</a></li>
+    <li><a href="events.html">Events</a></li>
+    <li><a href="student-concerts.html">Student Concerts</a></li>
     <li><a href="student-portal.html">Student Portal</a></li>
     <li><a href="careers.html">Careers</a></li>
-    <li><a href="ringwood-studio.html">Ringwood Studio</a></li>
+    <li><a href="studios.html">Studios</a></li>
     <li><a href="index.html#contact" class="nav-cta">Book a Lesson</a></li>
   </ul>
   <button class="nav-toggle" id="nt" aria-label="Menu"><span></span><span></span><span></span></button>
@@ -143,17 +143,11 @@ footer { background: var(--charcoal); padding: 3.5rem 2rem 2rem; border-top: 3px
     <h2 class="sec-title" style="text-align:center;margin-bottom:0.5rem;">Lessons Built Around You</h2>
     <p class="sec-body" style="text-align:center;max-width:580px;margin:0 auto 2.75rem;">Most students pay weekly and our notice period for pauses and cancellations is just 4 weeks — flexible and low-commitment to get started.</p>
     <div class="pricing-grid">
-      <div class="p-card">
+      <div class="p-card featured">
+        <div class="p-badge">Most Popular</div>
         <div class="p-type">Individual</div><div class="p-title">30-Minute Lesson</div>
         <div class="p-price">Get in touch</div><div class="p-price-note">for current pricing</div>
         <ul class="p-features"><li>One-on-one with your teacher</li><li>Perfect for beginners and younger students</li><li>Focused, personalised curriculum</li><li>Weekly recurring booking</li><li>All instruments &amp; skill levels</li></ul>
-        <a href="#enquiry" class="btn btn-outline-dark" style="width:100%;justify-content:center;">Get Pricing</a>
-      </div>
-      <div class="p-card featured">
-        <div class="p-badge">Most Popular</div>
-        <div class="p-type">Individual</div><div class="p-title">45-Minute Lesson</div>
-        <div class="p-price">Get in touch</div><div class="p-price-note">for current pricing</div>
-        <ul class="p-features"><li>One-on-one with your teacher</li><li>The sweet spot for most students</li><li>Enough time to warm up, learn &amp; review</li><li>Personalised to your goals</li><li>Weekly recurring booking</li><li>All instruments &amp; skill levels</li></ul>
         <a href="#enquiry" class="btn btn-orange" style="width:100%;justify-content:center;">Get Pricing</a>
       </div>
       <div class="p-card">
@@ -226,14 +220,14 @@ function zCheck(){var f=["First Name","Last Name","Email","Phone","Description",
     <div class="f-grid-footer">
       <div><img src="Logo_-_long.png" alt="Pathfinder Music Lessons" class="footer-logo"><p class="f-desc">Music lessons for students of all ages in Kilsyth and Ringwood. Guitar, drums, piano, singing, violin and more — from bedroom to stage.</p></div>
       <div class="f-col"><h4>Pages</h4><ul>
-        <li><a href="student-concerts.html">Student Concerts</a></li>
         <li><a href="teachers.html">Our Teachers</a></li>
         <li><a href="pricing.html">Pricing</a></li>
-        <li><a href="events.html">Events</a></li>
         <li><a href="gift-vouchers.html">Gift Vouchers</a></li>
+        <li><a href="events.html">Events</a></li>
+        <li><a href="student-concerts.html">Student Concerts</a></li>
         <li><a href="student-portal.html">Student Portal</a></li>
         <li><a href="careers.html">Careers</a></li>
-        <li><a href="ringwood-studio.html">Ringwood Studio</a></li>
+        <li><a href="studios.html">Studios</a></li>
       </ul></div>
       <div class="f-col"><h4>Contact</h4><ul>
         <li><a href="tel:0434198929">Kilsyth: 0434 198 929</a></li>

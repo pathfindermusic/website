@@ -1,7 +1,7 @@
 <!DOCTYPE html><html lang="en">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Events, Workshops &amp; Masterclasses — Pathfinder Music Lessons</title>
-<meta name="description" content="Upcoming events, workshops and masterclasses at Pathfinder Music Lessons in Kilsyth and Ringwood.">
+<title>Thank You — Pathfinder Music Lessons</title>
+<meta name="description" content="Thanks for getting in touch! We'll be in touch shortly to get you started with your music lessons at Pathfinder in Kilsyth and Ringwood.">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -83,32 +83,104 @@ footer { background: var(--charcoal); padding: 3.5rem 2rem 2rem; border-top: 3px
   .f-bottom { flex-direction: column; gap: 0.5rem; text-align: center; }
   .f-row { grid-template-columns: 1fr; }
 }
-.event-types{display:grid;grid-template-columns:1fr 1fr;gap:1.1rem;margin-bottom:2.75rem;}
-.etype{background:var(--off-white);border:1px solid var(--border-l);border-radius:var(--r);padding:2rem;}
-.etype-icon{font-size:2rem;margin-bottom:0.85rem;}
-.etype h3{font-size:1rem;font-weight:700;margin-bottom:0.5rem;}
-.etype p{font-size:0.855rem;color:var(--dark-grey);line-height:1.65;}
-.empty-state{border:2px dashed var(--light-grey);border-radius:var(--r);padding:3.5rem 2rem;text-align:center;margin-bottom:2.75rem;}
-.empty-icon{font-size:2.75rem;margin-bottom:1.25rem;opacity:0.5;}
-.empty-state h2{font-size:1.4rem;font-weight:800;margin-bottom:0.65rem;}
-.empty-state p{color:var(--dark-grey);font-size:0.9rem;max-width:420px;margin:0 auto 1.5rem;line-height:1.7;}
-.past-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.1rem;margin-top:2rem;}
-.past-card{background:var(--off-white);border:1px solid var(--border-l);border-radius:var(--r);padding:1.4rem;opacity:0.8;}
-.past-badge{display:inline-block;font-size:0.65rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:0.18rem 0.55rem;border:1px solid var(--border-l);border-radius:3px;color:var(--mid-grey);margin-bottom:0.65rem;}
-.past-card h4{font-size:0.92rem;font-weight:700;margin-bottom:0.4rem;}
-.past-card p{font-size:0.83rem;color:var(--dark-grey);line-height:1.6;}
-.notify-band{background:var(--charcoal);padding:4rem 2rem;border-top:3px solid var(--orange);}
-.notify-inner{max-width:520px;margin:0 auto;text-align:center;}
-.notify-inner h2{font-size:clamp(1.5rem,3vw,1.9rem);font-weight:800;color:var(--white);margin-bottom:0.65rem;}
-.notify-inner p{color:rgba(255,255,255,0.58);font-size:0.9rem;margin-bottom:1.75rem;line-height:1.7;}
-.notify-form{display:flex;gap:0.7rem;}
-.notify-form input{flex:1;background:rgba(255,255,255,0.08);border:1.5px solid rgba(255,255,255,0.18);border-radius:var(--r-sm);color:var(--white);font-family:'Inter',sans-serif;font-size:0.9rem;padding:0.72rem 1rem;transition:border-color 0.18s;}
-.notify-form input:focus{outline:none;border-color:var(--orange);}
-.notify-form input::placeholder{color:rgba(255,255,255,0.4);}
-.notify-success{display:none;margin-top:1rem;color:var(--orange);font-size:0.875rem;}
-@media(max-width:900px){.event-types,.past-grid{grid-template-columns:1fr;} .notify-form{flex-direction:column;}}
+.thankyou-wrap {
+  min-height: calc(100vh - 66px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  background: var(--off-white);
+}
+.thankyou-card {
+  width: 100%;
+  max-width: 560px;
+  background: var(--white);
+  border: 1px solid var(--border-l);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  text-align: center;
+}
+.thankyou-top {
+  background: var(--orange);
+  padding: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.thankyou-top img {
+  height: 36px;
+  width: auto;
+  filter: brightness(0) invert(1);
+}
+.thankyou-body {
+  padding: 2.5rem 2rem;
+}
+.thankyou-icon {
+  font-size: 3.5rem;
+  margin-bottom: 1.25rem;
+  display: block;
+}
+.thankyou-body h1 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--charcoal);
+  line-height: 1.2;
+  margin-bottom: 1rem;
+}
+.thankyou-body p {
+  font-size: 0.95rem;
+  color: var(--dark-grey);
+  line-height: 1.72;
+  margin-bottom: 0.75rem;
+}
+.thankyou-body p a {
+  color: var(--orange);
+  text-decoration: none;
+  font-weight: 600;
+}
+.thankyou-body p a:hover { text-decoration: underline; }
+.thankyou-divider {
+  height: 1px;
+  background: var(--light-grey);
+  margin: 1.75rem 0;
+}
+.next-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.75rem;
+  text-align: left;
+}
+.next-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: var(--off-white);
+  border: 1px solid var(--border-l);
+  border-radius: var(--r-sm);
+  font-size: 0.875rem;
+  color: var(--dark-grey);
+  line-height: 1.5;
+}
+.next-step-num {
+  width: 24px;
+  height: 24px;
+  background: var(--orange);
+  color: var(--white);
+  border-radius: 50%;
+  font-size: 0.72rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
 </style>
-</head><body>
+</head>
+<body>
 <nav>
   <a href="index.html"><img src="Logo_-_long.png" alt="Pathfinder Music Lessons" class="logo-img"></a>
   <ul class="nav-links" id="nl">
@@ -124,49 +196,33 @@ footer { background: var(--charcoal); padding: 3.5rem 2rem 2rem; border-top: 3px
   </ul>
   <button class="nav-toggle" id="nt" aria-label="Menu"><span></span><span></span><span></span></button>
 </nav>
-<div class="page-header">
-  <div class="ph-content">
-    <p class="sec-label">Live at Pathfinder</p>
-    <h1>Events, Workshops &amp; Masterclasses</h1>
-    <p>Student concerts every 6 months, plus special workshops and masterclasses throughout the year. Ticket links are posted here as soon as they're announced.</p>
-  </div>
-</div>
-<section>
-  <div class="container">
-    <div class="event-types">
-      <div class="etype"><div class="etype-icon">🎤</div><h3>Student Concerts</h3><p>Held every 6 months, our student concerts are a chance for musicians of all levels to perform on stage in front of a real audience — a milestone moment and a lot of fun for everyone involved.</p></div>
-      <div class="etype"><div class="etype-icon">🎸</div><h3>Workshops &amp; Masterclasses</h3><p>We host special workshops and masterclasses on technique, theory, recording, songwriting and more — run by our teachers and visiting professionals. Open to students and the wider community.</p></div>
+
+<div class="thankyou-wrap">
+  <div class="thankyou-card">
+    <div class="thankyou-top">
+      <img src="Logo_-_long.png" alt="Pathfinder Music Lessons">
     </div>
-    <div class="empty-state">
-      <div class="empty-icon">🎟️</div>
-      <h2>No Events Scheduled Yet</h2>
-      <p>We'll post ticket links for our next student concert and any upcoming workshops as soon as they're announced. Check back soon, or leave your email below and we'll let you know directly.</p>
-      <a href="#notify" class="btn btn-orange">Notify Me</a>
-    </div>
-    <div>
-      <p class="sec-label">What We've Done Before</p>
-      <h2 class="sec-title" style="margin-bottom:0.4rem;">Past Events</h2>
-      <p class="sec-body">A taste of the kinds of events we run throughout the year.</p>
-      <div class="past-grid">
-        <div class="past-card"><span class="past-badge">Past Event</span><h4>Student Concert — Winter 2025</h4><p>Kilsyth studio students performed original songs and covers across guitar, drums, piano and vocals. A sell-out crowd of family and friends.</p></div>
-        <div class="past-card"><span class="past-badge">Past Event</span><h4>Guitar Technique Workshop</h4><p>An afternoon masterclass on fingerstyle technique and music theory with Luke — open to students of all levels.</p></div>
-        <div class="past-card"><span class="past-badge">Past Event</span><h4>Student Concert — Summer 2024</h4><p>Our Ringwood students hit the stage for the first time, with performances ranging from beginners through to our most advanced players.</p></div>
+    <div class="thankyou-body">
+      <span class="thankyou-icon">🎉</span>
+      <h1>Thanks! We'll be in touch shortly to get you started.</h1>
+      <p>You should have received a payment receipt in an email to your nominated address by now, please keep it for your records.</p>
+      <p>One of our team will be in contact with you very soon to answer any questions and get your first lesson organised.</p>
+      <p>If you just can't wait to get started, feel free to give us a call directly:</p>
+      <p>
+        <strong>Kilsyth:</strong> <a href="tel:0434198929">0434 198 929</a><br>
+        <strong>Ringwood:</strong> <a href="tel:0489930719">0489 930 719</a>
+      </p>
+      <div class="thankyou-divider"></div>
+      <div class="next-steps">
+        <div class="next-step"><div class="next-step-num">1</div><span>We'll discuss your plan and match you with the right teacher for your goals and instrument.</span></div>
+        <div class="next-step"><div class="next-step-num">2</div><span>We'll be in touch to confirm your lesson time, location, and answer any questions you have.</span></div>
+        <div class="next-step"><div class="next-step-num">3</div><span>You'll have your first lesson and begin your path to music mastery — from bedroom to stage!</span></div>
       </div>
+      <a href="index.html" class="btn btn-orange" style="width:100%;justify-content:center;">Back to Home</a>
     </div>
   </div>
-</section>
-<div class="notify-band" id="notify">
-  <div class="notify-inner">
-    <p class="sec-label" style="text-align:center;margin-bottom:0.6rem;">Stay in the Loop</p>
-    <h2>Get Notified About Events</h2>
-    <p>Drop your email and we'll let you know when the next concert or workshop is announced. No spam, just gig dates.</p>
-    <form class="notify-form" onsubmit="handleNotify(event)">
-      <input type="email" placeholder="your@email.com" required>
-      <button type="submit" class="btn btn-orange">Notify Me</button>
-    </form>
-    <div class="notify-success" id="nSuccess">Done! We'll be in touch when the next event is announced.</div>
-  </div>
 </div>
+
 <footer>
   <div class="container">
     <div class="f-grid-footer">
@@ -199,5 +255,4 @@ const nt=document.getElementById("nt"),nl=document.getElementById("nl");
 nt.addEventListener("click",()=>nl.classList.toggle("open"));
 document.querySelectorAll("a[href^=\"#\"]").forEach(a=>a.addEventListener("click",()=>nl.classList.remove("open")));
 </script>
-<script>function handleNotify(e){e.preventDefault();document.getElementById('nSuccess').style.display='block';e.target.reset();}</script>
 </body></html>
