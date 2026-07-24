@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Lessons — Pathfinder Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/portal.css">
+  <style>
+    .day-block { margin-bottom: 1.25rem; }
+
+    .lesson-row-student {
+      display: grid;
+      grid-template-columns: 90px 1fr auto;
+      gap: 1rem;
+      align-items: start;
+      padding: 0.9rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.12s;
+    }
+    .lesson-row-student:last-child { border-bottom: none; }
+    .lesson-row-student:hover { background: var(--off-white); }
+    .lesson-row-student.cancelled { opacity: 0.45; }
+
+    .note-box {
+      background: var(--off-white);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--orange);
+      border-radius: var(--r-sm);
+      padding: 0.85rem 1rem;
+      font-size: 0.875rem;
+      line-height: 1.68;
+      color: var(--dark-grey);
+      margin-top: 0.6rem;
+    }
+
+    .note-date {
+      font-size: 0.72rem;
+      color: var(--mid-grey);
+      margin-bottom: 0.35rem;
+    }
+
+    /* Attendance history */
+    .att-history-row {
+      display: grid;
+      grid-template-columns: 110px 1fr 1fr auto;
+      gap: 1rem;
+      align-items: center;
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.845rem;
+    }
+    .att-history-row:last-child { border-bottom: none; }
+    .att-history-row:hover { background: var(--off-white); }
+
+    /* Skill level display */
+    .skill-bar-wrap {
+      background: var(--light-grey);
+      border-radius: 20px;
+      height: 6px;
+      flex: 1;
+      margin: 0 0.75rem;
+    }
+    .skill-bar {
+      height: 6px;
+      border-radius: 20px;
+      background: var(--orange);
+      transition: width 0.4s ease;
+    }
+    .skill-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 0.65rem;
+      font-size: 0.845rem;
+    }
+    .skill-instrument {
+      min-width: 100px;
+      color: var(--dark-grey);
+    }
+    .skill-level-label {
+      font-size: 0.78rem;
+      color: var(--mid-grey);
+      min-width: 110px;
+      text-align: right;
+    }
+
+    /* Tab navigation */
+    .tab-nav {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 1.5rem;
+    }
+    .tab-btn {
+      padding: 0.65rem 1.25rem;
+      font-size: 0.845rem;
+      font-weight: 500;
+      color: var(--mid-grey);
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: 'Inter', sans-serif;
+    }
+    .tab-btn:hover { color: var(--charcoal); }
+    .tab-btn.active {
+      color: var(--orange);
+      border-bottom-color: var(--orange);
+      font-weight: 600;
+    }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+  </style>
+</head>
+<body>
+
+<div class="portal-shell">
+
+  <!-- TOP NAV -->
+  <nav class="topnav">
+    <a href="#" class="topnav-logo">
+      <img src="../Logo_-_long.png" alt="Pathfinder Music Lessons">
+    </a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">Student</span>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">My Portal</div>
+    <button class="nav-item active" onclick="switchTab('schedule')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      My Lessons
+    </button>
+    <button class="nav-item" onclick="switchTab('notes')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Practice Notes
+    </button>
+    <button class="nav-item" onclick="switchTab('attendance')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Attendance
+    </button>
+    <button class="nav-item" onclick="switchTab('progress')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      My Progress
+    </button>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+
+    <!-- Stats row -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-card-top">
+          <span class="stat-label">Next lesson</span>
+          <div class="stat-icon">📅</div>
+        </div>
+        <div class="stat-value" style="font-size:1.1rem;line-height:1.3;" id="statNext">–</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-top">
+          <span class="stat-label">This week</span>
+          <div class="stat-icon">🎵</div>
+        </div>
+        <div class="stat-value" id="statWeek">–</div>
+        <div class="stat-sub">lessons scheduled</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-top">
+          <span class="stat-label">Attendance rate</span>
+          <div class="stat-icon">✅</div>
+        </div>
+        <div class="stat-value" id="statAttRate">–</div>
+        <div class="stat-sub" id="statAttSub">last 10 lessons</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-top">
+          <span class="stat-label">Unread notes</span>
+          <div class="stat-icon">📝</div>
+        </div>
+        <div class="stat-value" id="statNotes">–</div>
+        <div class="stat-sub">new since last visit</div>
+      </div>
+    </div>
+
+    <!-- TAB NAV -->
+    <div class="tab-nav">
+      <button class="tab-btn active" id="tab-schedule"   onclick="switchTab('schedule')">My Lessons</button>
+      <button class="tab-btn"        id="tab-notes"      onclick="switchTab('notes')">Practice Notes</button>
+      <button class="tab-btn"        id="tab-attendance" onclick="switchTab('attendance')">Attendance</button>
+      <button class="tab-btn"        id="tab-progress"   onclick="switchTab('progress')">My Progress</button>
+    </div>
+
+    <!-- ======== TAB: SCHEDULE ======== -->
+    <div class="tab-panel active" id="panel-schedule">
+      <div class="page-header" style="margin-bottom:1rem;">
+        <div>
+          <div class="page-title">My Lessons</div>
+          <div class="page-sub" id="weekRangeLabel">Loading…</div>
+        </div>
+        <div class="week-nav">
+          <button class="week-nav-btn" onclick="prevWeek()">‹</button>
+          <button class="btn btn-ghost btn-sm" onclick="goToday()">Today</button>
+          <button class="week-nav-btn" onclick="nextWeek()">›</button>
+        </div>
+      </div>
+      <div id="scheduleWrap">
+        <div class="loading"><div class="spinner"></div> Loading your lessons…</div>
+      </div>
+    </div>
+
+    <!-- ======== TAB: NOTES ======== -->
+    <div class="tab-panel" id="panel-notes">
+      <div class="page-header" style="margin-bottom:1rem;">
+        <div class="page-title">Practice Notes</div>
+      </div>
+      <div id="notesWrap">
+        <div class="loading"><div class="spinner"></div> Loading notes…</div>
+      </div>
+    </div>
+
+    <!-- ======== TAB: ATTENDANCE ======== -->
+    <div class="tab-panel" id="panel-attendance">
+      <div class="page-header" style="margin-bottom:1rem;">
+        <div class="page-title">Attendance History</div>
+      </div>
+      <div id="attendanceWrap">
+        <div class="loading"><div class="spinner"></div> Loading attendance…</div>
+      </div>
+    </div>
+
+    <!-- ======== TAB: PROGRESS ======== -->
+    <div class="tab-panel" id="panel-progress">
+      <div class="page-header" style="margin-bottom:1rem;">
+        <div class="page-title">My Progress</div>
+        <div class="page-sub">Skill levels updated by your teacher after each lesson</div>
+      </div>
+      <div id="progressWrap">
+        <div class="loading"><div class="spinner"></div> Loading progress…</div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div id="toastWrap" class="toast-wrap"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script>
+
+let currentProfile = null;
+let studentRecord   = null;
+let weekStart       = getWeekStart(new Date());
+let tabsLoaded      = { schedule: false, notes: false, attendance: false, progress: false };
+
+// ---- Init ----
+(async () => {
+  currentProfile = await requireAuth(['student']);
+  if (!currentProfile) return;
+
+  renderTopNavUser(currentProfile);
+  if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
+
+  // Get student record
+  const { data: s } = await db.from('students').select('*').eq('user_id', currentProfile.id).single();
+  studentRecord = s;
+
+  await Promise.all([loadStats(), loadSchedule()]);
+  tabsLoaded.schedule = true;
+})();
+
+// ---- Tab switching ----
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+  document.getElementById(`tab-${tab}`).classList.add('active');
+  document.getElementById(`panel-${tab}`).classList.add('active');
+
+  // Mark sidebar item active
+  const sidebarBtns = document.querySelectorAll('.nav-item');
+  const tabOrder    = ['schedule','notes','attendance','progress'];
+  const idx         = tabOrder.indexOf(tab);
+  if (sidebarBtns[idx]) sidebarBtns[idx].classList.add('active');
+
+  if (!tabsLoaded[tab]) {
+    if (tab === 'notes')      { loadNotes();      tabsLoaded.notes = true; }
+    if (tab === 'attendance') { loadAttendance(); tabsLoaded.attendance = true; }
+    if (tab === 'progress')   { loadProgress();   tabsLoaded.progress = true; }
+  }
+}
+
+// ---- Stats ----
+async function loadStats() {
+  if (!studentRecord) return;
+  const today  = toISODate(new Date());
+  const wEnd   = toISODate(new Date(weekStart.getTime() + 6 * 86400000));
+  const wStart = toISODate(weekStart);
+
+  // Next lesson
+  const { data: nextLesson } = await db
+    .from('schedule_view')
+    .select('date, start_time, instrument, teacher_name')
+    .eq('student_id', studentRecord.id)
+    .gte('date', today)
+    .neq('occurrence_status', 'cancelled')
+    .order('date').order('start_time')
+    .limit(1);
+
+  if (nextLesson && nextLesson.length > 0) {
+    const n = nextLesson[0];
+    document.getElementById('statNext').textContent =
+      `${formatShortDate(new Date(n.date))} · ${formatTime(n.start_time)}`;
+  } else {
+    document.getElementById('statNext').textContent = 'None scheduled';
+  }
+
+  // This week
+  const { count: weekCount } = await db
+    .from('schedule_view')
+    .select('occurrence_id', { count: 'exact' })
+    .eq('student_id', studentRecord.id)
+    .gte('date', wStart).lte('date', wEnd)
+    .neq('occurrence_status','cancelled');
+  document.getElementById('statWeek').textContent = weekCount ?? '–';
+
+  // Attendance rate (last 10 lessons)
+  const { data: recent } = await db
+    .from('schedule_view')
+    .select('attendance_status')
+    .eq('student_id', studentRecord.id)
+    .lt('date', today)
+    .neq('occurrence_status','cancelled')
+    .order('date', { ascending: false })
+    .limit(10);
+
+  if (recent && recent.length > 0) {
+    const present = recent.filter(r => r.attendance_status === 'present').length;
+    const rate    = Math.round((present / recent.length) * 100);
+    document.getElementById('statAttRate').textContent = `${rate}%`;
+    document.getElementById('statAttSub').textContent  = `last ${recent.length} lessons`;
+  }
+
+  // Unread notes — notes created in last 7 days
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const { count: noteCount } = await db
+    .from('lesson_notes')
+    .select('id', { count: 'exact' })
+    .gte('created_at', sevenDaysAgo.toISOString())
+    .in('lesson_occurrence_id',
+      (await db.from('schedule_view').select('occurrence_id').eq('student_id', studentRecord.id))
+        .data?.map(r => r.occurrence_id) ?? []
+    );
+  document.getElementById('statNotes').textContent = noteCount ?? '0';
+}
+
+// ---- Week navigation ----
+function prevWeek() { weekStart = new Date(weekStart.getTime() - 7 * 86400000); loadSchedule(); }
+function nextWeek() { weekStart = new Date(weekStart.getTime() + 7 * 86400000); loadSchedule(); }
+function goToday()  { weekStart = getWeekStart(new Date()); loadSchedule(); }
+
+// ---- Schedule tab ----
+async function loadSchedule() {
+  if (!studentRecord) return;
+  const wrap   = document.getElementById('scheduleWrap');
+  const days   = getWeekDays(weekStart);
+  const wStart = toISODate(days[0]);
+  const wEnd   = toISODate(days[days.length - 1]);
+
+  document.getElementById('weekRangeLabel').textContent =
+    `${formatShortDate(days[0])} – ${formatShortDate(days[days.length - 1])}`;
+
+  wrap.innerHTML = `<div class="loading"><div class="spinner"></div> Loading…</div>`;
+
+  const { data, error } = await db
+    .from('schedule_view')
+    .select('*')
+    .eq('student_id', studentRecord.id)
+    .gte('date', wStart)
+    .lte('date', wEnd)
+    .order('date').order('start_time');
+
+  if (error) {
+    wrap.innerHTML = `<div class="empty-state"><p style="color:#dc2626;">${error.message}</p></div>`;
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    wrap.innerHTML = `<div class="card"><div class="empty-state">
+      <div class="empty-state-icon">🎵</div>
+      <h3>No lessons this week</h3>
+      <p>Try navigating to another week or contact your studio if something looks wrong.</p>
+    </div></div>`;
+    return;
+  }
+
+  // Group by date
+  const byDate = {};
+  days.forEach(d => byDate[toISODate(d)] = []);
+  data.forEach(r => { const k = toISODate(new Date(r.date)); if (byDate[k]) byDate[k].push(r); });
+
+  const today = toISODate(new Date());
+  let html = '';
+
+  days.forEach(d => {
+    const key     = toISODate(d);
+    const lessons = byDate[key];
+    if (!lessons || lessons.length === 0) return;
+
+    const isToday = key === today;
+
+    html += `<div class="day-block card">
+      <div class="card-header">
+        <div style="font-size:0.78rem;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:${isToday ? 'var(--orange)' : 'var(--mid-grey)'};">
+          ${formatShortDate(d).toUpperCase()}
+          ${isToday ? '<span class="pill pill-scheduled" style="margin-left:0.5rem;font-size:0.65rem;">Today</span>' : ''}
+        </div>
+      </div>`;
+
+    lessons.forEach(l => {
+      const isCancelled = l.occurrence_status === 'cancelled';
+      html += `<div class="lesson-row-student ${isCancelled ? 'cancelled' : ''}">
+        <div>
+          <div class="time-cell">${formatTime(l.start_time)}</div>
+          <div class="duration-label">${formatDuration(l.duration_mins)}</div>
+        </div>
+        <div>
+          <div class="lesson-name">${l.instrument}</div>
+          <div class="lesson-meta">with ${l.teacher_name} · ${l.studio_name}</div>
+          ${l.is_online ? `<div class="mt-1"><span class="pill pill-online">Online lesson</span></div>` : ''}
+          ${isCancelled ? `<div class="mt-1"><span class="pill pill-cancelled">Cancelled</span></div>` : ''}
+          ${l.note_text ? `
+            <div class="note-box">
+              <div class="note-date">Practice note from ${l.teacher_name}</div>
+              ${l.note_text}
+              ${l.drive_link ? `<div style="margin-top:0.5rem;"><a href="${l.drive_link}" target="_blank" class="text-orange" style="font-size:0.82rem;text-decoration:none;">📁 View shared file</a></div>` : ''}
+            </div>` : ''}
+        </div>
+        <div>
+          ${attendancePill(l.attendance_status)}
+          ${l.is_online && l.virtual_room_link ? `
+            <div class="mt-1">
+              <a href="${l.virtual_room_link}" target="_blank" class="btn btn-secondary btn-sm">Join online</a>
+            </div>` : ''}
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+
+  wrap.innerHTML = html;
+}
+
+// ---- Notes tab ----
+async function loadNotes() {
+  if (!studentRecord) return;
+  const wrap = document.getElementById('notesWrap');
+  wrap.innerHTML = `<div class="loading"><div class="spinner"></div> Loading…</div>`;
+
+  const { data, error } = await db
+    .from('schedule_view')
+    .select('*')
+    .eq('student_id', studentRecord.id)
+    .not('note_text', 'is', null)
+    .order('date', { ascending: false })
+    .limit(50);
+
+  if (error || !data || data.length === 0) {
+    wrap.innerHTML = `<div class="card"><div class="empty-state">
+      <div class="empty-state-icon">📝</div>
+      <h3>No practice notes yet</h3>
+      <p>Your teacher's notes will appear here after each lesson.</p>
+    </div></div>`;
+    return;
+  }
+
+  let html = `<div class="card">`;
+  data.forEach((l, i) => {
+    html += `
+      <div style="padding:1.1rem 1.25rem;${i < data.length-1 ? 'border-bottom:1px solid var(--border);' : ''}">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;flex-wrap:wrap;gap:0.5rem;">
+          <div>
+            <span class="font-bold">${l.instrument}</span>
+            <span class="text-muted text-sm"> · with ${l.teacher_name}</span>
+          </div>
+          <div class="text-sm text-muted">${formatLongDate(new Date(l.date))}</div>
+        </div>
+        <div class="note-box" style="margin-top:0;">
+          ${l.note_text}
+          ${l.drive_link ? `<div style="margin-top:0.5rem;"><a href="${l.drive_link}" target="_blank" class="text-orange" style="font-size:0.82rem;text-decoration:none;">📁 View shared file</a></div>` : ''}
+        </div>
+      </div>`;
+  });
+  html += `</div>`;
+  wrap.innerHTML = html;
+}
+
+// ---- Attendance tab ----
+async function loadAttendance() {
+  if (!studentRecord) return;
+  const wrap = document.getElementById('attendanceWrap');
+  wrap.innerHTML = `<div class="loading"><div class="spinner"></div> Loading…</div>`;
+
+  const { data, error } = await db
+    .from('schedule_view')
+    .select('*')
+    .eq('student_id', studentRecord.id)
+    .lt('date', toISODate(new Date()))
+    .neq('occurrence_status', 'scheduled')
+    .order('date', { ascending: false })
+    .limit(60);
+
+  if (error || !data || data.length === 0) {
+    wrap.innerHTML = `<div class="card"><div class="empty-state">
+      <div class="empty-state-icon">✅</div>
+      <h3>No attendance records yet</h3>
+      <p>Your lesson attendance history will appear here.</p>
+    </div></div>`;
+    return;
+  }
+
+  // Summary
+  const present  = data.filter(r => r.attendance_status === 'present').length;
+  const total    = data.filter(r => r.attendance_status).length;
+  const rate     = total > 0 ? Math.round((present / total) * 100) : 0;
+
+  let html = `
+    <div class="stats-row" style="grid-template-columns:repeat(3,1fr);margin-bottom:1.25rem;">
+      <div class="stat-card"><div class="stat-card-top"><span class="stat-label">Lessons attended</span></div><div class="stat-value">${present}</div></div>
+      <div class="stat-card"><div class="stat-card-top"><span class="stat-label">Total recorded</span></div><div class="stat-value">${total}</div></div>
+      <div class="stat-card"><div class="stat-card-top"><span class="stat-label">Attendance rate</span></div><div class="stat-value">${rate}%</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Recent lessons</span></div>
+      <div style="overflow-x:auto;">
+        <div style="min-width:500px;">`;
+
+  data.forEach(l => {
+    html += `
+      <div class="att-history-row">
+        <div class="text-sm font-bold">${formatShortDate(new Date(l.date))}</div>
+        <div class="lesson-instrument">${l.instrument}</div>
+        <div class="lesson-meta">with ${l.teacher_name}</div>
+        <div>${attendancePill(l.attendance_status)}</div>
+      </div>`;
+  });
+
+  html += `</div></div></div>`;
+  wrap.innerHTML = html;
+}
+
+// ---- Progress tab ----
+async function loadProgress() {
+  if (!studentRecord) return;
+  const wrap = document.getElementById('progressWrap');
+  wrap.innerHTML = `<div class="loading"><div class="spinner"></div> Loading…</div>`;
+
+  const { data, error } = await db
+    .from('student_instruments')
+    .select('instrument, skill_level')
+    .eq('student_id', studentRecord.id)
+    .order('instrument');
+
+  if (error || !data || data.length === 0) {
+    wrap.innerHTML = `<div class="card"><div class="empty-state">
+      <div class="empty-state-icon">🎸</div>
+      <h3>No instruments on file yet</h3>
+      <p>Your teacher will update your skill levels after your lessons.</p>
+    </div></div>`;
+    return;
+  }
+
+  let html = `<div class="card"><div class="card-header"><span class="card-title">Instrument skill levels</span></div><div class="card-body">`;
+
+  data.forEach(item => {
+    const pct = Math.round((item.skill_level / 8) * 100);
+    const band = item.skill_level <= 3 ? 'Beginner' : item.skill_level <= 6 ? 'Intermediate' : 'Advanced';
+    const bandColour = item.skill_level <= 3 ? '#2563eb' : item.skill_level <= 6 ? '#d97706' : '#16a34a';
+
+    html += `
+      <div class="skill-row">
+        <div class="skill-instrument">${item.instrument}</div>
+        <div class="skill-bar-wrap"><div class="skill-bar" style="width:${pct}%;background:${bandColour};"></div></div>
+        <div class="skill-level-label">
+          <span style="color:${bandColour};font-weight:600;">${band}</span>
+          <span class="text-muted"> (${item.skill_level}/8)</span>
+        </div>
+      </div>`;
+  });
+
+  html += `
+    <div style="margin-top:1.25rem;padding-top:1.25rem;border-top:1px solid var(--border);">
+      <div class="text-sm text-muted" style="margin-bottom:0.5rem;">Scale guide</div>
+      <div style="display:flex;gap:1.25rem;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:0.4rem;font-size:0.78rem;"><span style="width:10px;height:10px;border-radius:50%;background:#2563eb;display:inline-block;"></span> Beginner (0–3)</div>
+        <div style="display:flex;align-items:center;gap:0.4rem;font-size:0.78rem;"><span style="width:10px;height:10px;border-radius:50%;background:#d97706;display:inline-block;"></span> Intermediate (4–6)</div>
+        <div style="display:flex;align-items:center;gap:0.4rem;font-size:0.78rem;"><span style="width:10px;height:10px;border-radius:50%;background:#16a34a;display:inline-block;"></span> Advanced (7–8)</div>
+      </div>
+    </div>
+  </div></div>`;
+
+  wrap.innerHTML = html;
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+</script>
+</body>
+</html>

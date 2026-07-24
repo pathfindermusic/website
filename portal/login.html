@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In — Pathfinder Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/portal.css">
+  <style>
+    body {
+      background: var(--charcoal);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+
+    .login-wrap {
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .login-logo {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .login-logo img {
+      height: 38px;
+      width: auto;
+    }
+
+    .login-card {
+      background: var(--white);
+      border-radius: var(--r);
+      box-shadow: 0 8px 40px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+
+    .login-top {
+      background: var(--orange);
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .login-top h1 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--white);
+    }
+
+    .login-top p {
+      font-size: 0.82rem;
+      color: rgba(255,255,255,0.8);
+      margin-top: 0.25rem;
+    }
+
+    .login-body {
+      padding: 1.75rem;
+    }
+
+    .login-error {
+      background: #fee2e2;
+      border: 1px solid #fca5a5;
+      border-radius: var(--r-sm);
+      padding: 0.7rem 0.9rem;
+      font-size: 0.82rem;
+      color: #dc2626;
+      margin-bottom: 1rem;
+      display: none;
+    }
+
+    .forgot-link {
+      font-size: 0.78rem;
+      color: var(--orange);
+      text-decoration: none;
+      float: right;
+      margin-top: -0.6rem;
+      margin-bottom: 0.9rem;
+    }
+    .forgot-link:hover { text-decoration: underline; }
+
+    .login-btn {
+      width: 100%;
+      justify-content: center;
+      padding: 0.75rem;
+      font-size: 0.925rem;
+      margin-top: 0.5rem;
+    }
+
+    .login-footer {
+      text-align: center;
+      padding: 1rem 1.75rem 1.5rem;
+      font-size: 0.78rem;
+      color: var(--mid-grey);
+      border-top: 1px solid var(--border);
+    }
+
+    .login-footer a {
+      color: var(--orange);
+      text-decoration: none;
+    }
+
+    /* Reset password view */
+    .reset-view { display: none; }
+    .reset-success {
+      background: #dcfce7;
+      border: 1px solid #86efac;
+      border-radius: var(--r-sm);
+      padding: 0.7rem 0.9rem;
+      font-size: 0.82rem;
+      color: #16a34a;
+      margin-bottom: 1rem;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<div class="login-wrap">
+  <div class="login-logo">
+    <img src="../Logo_-_long.png" alt="Pathfinder Music Lessons">
+  </div>
+
+  <div class="login-card">
+    <div class="login-top">
+      <h1>Student Portal</h1>
+      <p>Sign in to access your lessons and notes</p>
+    </div>
+
+    <!-- SIGN IN VIEW -->
+    <div class="login-body" id="signinView">
+      <div class="login-error" id="loginError"></div>
+
+      <div class="form-group">
+        <label class="form-label" for="email">Email address</label>
+        <input class="form-input" type="email" id="email" placeholder="your@email.com" autocomplete="email" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <input class="form-input" type="password" id="password" placeholder="••••••••" autocomplete="current-password" required>
+      </div>
+
+      <a href="#" class="forgot-link" id="forgotLink">Forgot password?</a>
+
+      <div class="form-group" style="margin-top:0.25rem;">
+        <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.82rem;color:var(--dark-grey);cursor:pointer;">
+          <input type="checkbox" id="rememberMe" style="width:14px;height:14px;accent-color:var(--orange);">
+          Remember me for 7 days
+        </label>
+      </div>
+
+      <button class="btn btn-primary login-btn" id="loginBtn" onclick="handleLogin()">
+        Sign In
+      </button>
+    </div>
+
+    <!-- RESET PASSWORD VIEW -->
+    <div class="login-body reset-view" id="resetView">
+      <p style="font-size:0.85rem;color:var(--dark-grey);margin-bottom:1rem;line-height:1.6;">
+        Enter your email address and we'll send you a link to reset your password.
+      </p>
+      <div class="reset-success" id="resetSuccess">
+        Check your inbox — a reset link is on its way.
+      </div>
+      <div class="login-error" id="resetError"></div>
+      <div class="form-group">
+        <label class="form-label" for="resetEmail">Email address</label>
+        <input class="form-input" type="email" id="resetEmail" placeholder="your@email.com">
+      </div>
+      <button class="btn btn-primary login-btn" onclick="handleReset()">Send Reset Link</button>
+      <button class="btn btn-ghost login-btn" style="margin-top:0.5rem;" onclick="showSignIn()">Back to Sign In</button>
+    </div>
+
+    <div class="login-footer">
+      <a href="https://pathfindermusiclessons.com.au" target="_blank">← Back to website</a>
+    </div>
+  </div>
+</div>
+
+<div id="toastWrap" class="toast-wrap"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script>
+  // If already logged in, redirect to correct dashboard
+  (async () => {
+    const session = await getSession();
+    if (session) {
+      const profile = await getProfile();
+      if (profile) redirectByRole(profile.role);
+    }
+  })();
+
+  function redirectByRole(role) {
+    const map = {
+      superuser: 'dashboard-admin.html',
+      admin:     'dashboard-admin.html',
+      teacher:   'dashboard-teacher.html',
+      student:   'dashboard-student.html',
+    };
+    window.location.href = map[role] ?? 'login.html';
+  }
+
+  async function handleLogin() {
+    const email    = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const remember = document.getElementById('rememberMe').checked;
+    const btn      = document.getElementById('loginBtn');
+    const errorEl  = document.getElementById('loginError');
+
+    if (!email || !password) {
+      showError(errorEl, 'Please enter your email and password.');
+      return;
+    }
+
+    btn.textContent = 'Signing in…';
+    btn.disabled = true;
+    errorEl.style.display = 'none';
+
+    const { data, error } = await db.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      showError(errorEl, 'Incorrect email or password. Please try again.');
+      btn.textContent = 'Sign In';
+      btn.disabled = false;
+      return;
+    }
+
+    // Set session persistence based on remember me
+    // Supabase defaults to localStorage which persists — no extra work needed for "remember me"
+    // For non-remember, we'd use session storage — keep simple for now
+
+    const profile = await getProfile();
+    if (!profile) {
+      showError(errorEl, 'Account not fully set up. Please contact your studio admin.');
+      btn.textContent = 'Sign In';
+      btn.disabled = false;
+      return;
+    }
+
+    redirectByRole(profile.role);
+  }
+
+  async function handleReset() {
+    const email    = document.getElementById('resetEmail').value.trim();
+    const errorEl  = document.getElementById('resetError');
+    const successEl = document.getElementById('resetSuccess');
+
+    if (!email) {
+      showError(errorEl, 'Please enter your email address.');
+      return;
+    }
+
+    const { error } = await db.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/portal/reset-password.html`,
+    });
+
+    if (error) {
+      showError(errorEl, 'Something went wrong. Please try again.');
+    } else {
+      successEl.style.display = 'block';
+      errorEl.style.display   = 'none';
+    }
+  }
+
+  function showError(el, msg) {
+    el.textContent    = msg;
+    el.style.display  = 'block';
+  }
+
+  function showSignIn() {
+    document.getElementById('signinView').style.display = 'block';
+    document.getElementById('resetView').style.display  = 'none';
+  }
+
+  document.getElementById('forgotLink').addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('signinView').style.display = 'none';
+    document.getElementById('resetView').style.display  = 'block';
+  });
+
+  // Allow Enter key to submit
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const resetVisible = document.getElementById('resetView').style.display === 'block';
+      if (resetVisible) handleReset();
+      else handleLogin();
+    }
+  });
+</script>
+</body>
+</html>
