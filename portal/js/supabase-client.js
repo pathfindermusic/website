@@ -4,7 +4,7 @@
 // Supabase Dashboard → Project Settings → API
 // ============================================================
 
-const SUPABASE_URL  = 'https://oxuyzcjgxmohpqyijpip.supabase.co/rest/v1/';   // e.g. https://xxxxxxxxxxxx.supabase.co -- It's the API URL Supabase Dashboard → Project Settings → Data API
+const SUPABASE_URL  = 'https://oxuyzcjgxmohpqyijpip.supabase.co';   // e.g. https://xxxxxxxxxxxx.supabase.co -- It's the API URL Supabase Dashboard → Project Settings → Data API
 const SUPABASE_ANON = 'sb_publishable_JeqxxJ5Jw4MzdBjAXwfOAg_jMxHMc_O';      // Publishable API Key generated for pathfinder_student_portal role in Supabase Dashboard → Project Settings → API Key
 
 // Load Supabase via CDN (included in each HTML page's <head>)
