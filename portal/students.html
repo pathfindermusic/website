@@ -404,24 +404,48 @@ async function loadStudios() {
 
 // ---- Load students ----
 async function loadStudents() {
-  // Fetch students with instruments and teacher assignments
+  // Fetch students base records only
   const { data: studentData, error } = await db
     .from('students')
-    .select('id, status, user_id, studio_id, student_instruments(instrument, skill_level), student_teachers(teacher_id, instrument)')
+    .select('id, status, user_id, studio_id')
     .order('id');
 
-  if (error) { showToast('Error loading students', 'error'); return; }
+  if (error) { showToast('Error loading students: ' + error.message, 'error'); return; }
 
-  // Fetch profiles for all student user_ids
+  const studentIds = (studentData ?? []).map(s => s.id);
+
+  // Fetch profiles, instruments and teacher assignments separately
   const userIds = (studentData ?? []).map(s => s.user_id);
-  const { data: profileData } = userIds.length > 0
-    ? await db.from('profiles').select('*').in('id', userIds)
-    : { data: [] };
+
+  const [profileRes, instrRes, assignRes] = await Promise.all([
+    userIds.length > 0
+      ? db.from('profiles').select('*').in('id', userIds)
+      : Promise.resolve({ data: [] }),
+    studentIds.length > 0
+      ? db.from('student_instruments').select('student_id, instrument, skill_level').in('student_id', studentIds)
+      : Promise.resolve({ data: [] }),
+    studentIds.length > 0
+      ? db.from('student_teachers').select('student_id, teacher_id, instrument').in('student_id', studentIds)
+      : Promise.resolve({ data: [] }),
+  ]);
+
   const profileMap = {};
-  (profileData ?? []).forEach(p => { profileMap[p.id] = p; });
+  (profileRes.data ?? []).forEach(p => { profileMap[p.id] = p; });
+
+  const instrMap = {};
+  (instrRes.data ?? []).forEach(i => {
+    if (!instrMap[i.student_id]) instrMap[i.student_id] = [];
+    instrMap[i.student_id].push(i);
+  });
+
+  const assignMap = {};
+  (assignRes.data ?? []).forEach(a => {
+    if (!assignMap[a.student_id]) assignMap[a.student_id] = [];
+    assignMap[a.student_id].push(a);
+  });
 
   // Fetch teacher profiles for display
-  const teacherIds = [...new Set((studentData ?? []).flatMap(s => (s.student_teachers ?? []).map(t => t.teacher_id)))];
+  const teacherIds = [...new Set((assignRes.data ?? []).map(a => a.teacher_id))];
   const { data: teacherData } = teacherIds.length > 0
     ? await db.from('teachers').select('id, user_id').in('id', teacherIds)
     : { data: [] };
@@ -438,8 +462,9 @@ async function loadStudents() {
   // Merge everything
   allStudents = (studentData ?? []).map(s => ({
     ...s,
-    profiles: profileMap[s.user_id] ?? null,
-    student_teachers: (s.student_teachers ?? []).map(st => ({
+    profiles:            profileMap[s.user_id] ?? null,
+    student_instruments: instrMap[s.id] ?? [],
+    student_teachers:    (assignMap[s.id] ?? []).map(st => ({
       ...st,
       teachers: { profiles: teacherProfileMap[st.teacher_id] ?? null }
     }))
