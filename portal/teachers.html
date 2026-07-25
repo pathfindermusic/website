@@ -369,7 +369,7 @@ function renderTeachers() {
         </div>
       </div>
       <div class="teacher-card-footer">
-        <button class="btn btn-ghost btn-sm" onclick="openTeacherModal(${JSON.stringify(t).split('"').join('&quot;')})">Edit</button>
+        <button class="btn btn-ghost btn-sm" onclick="openTeacherByIndex(${allTeachers.indexOf(t)})">Edit</button>
         <button class="btn btn-danger btn-sm" onclick="toggleTeacherStatus('${t.profiles?.id}','${p.status}')">
           ${p.status === 'inactive' ? 'Activate' : 'Deactivate'}
         </button>
@@ -380,6 +380,10 @@ function renderTeachers() {
 }
 
 // ---- Modal ----
+function openTeacherByIndex(idx) {
+  openTeacherModal(allTeachers[idx]);
+}
+
 function openTeacherModal(teacher = null) {
   buildInstrumentCheckboxes(teacher?.instruments ?? []);
   buildStudioCheckboxes(teacher?.studio_ids ?? []);
@@ -397,11 +401,13 @@ function openTeacherModal(teacher = null) {
     (teacher.teacher_availability ?? []).forEach(a => addAvailSlot(a));
 
     // Fetch email from auth.users via Netlify Function
-    if (teacher.user_id) {
+    // Use profiles.id (same as auth user id) which is already set above
+    const userId = teacher.profiles?.id ?? teacher.user_id ?? '';
+    if (userId) {
       fetch('/.netlify/functions/create-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get-email', userId: teacher.user_id }),
+        body: JSON.stringify({ action: 'get-email', userId }),
       })
       .then(r => r.json())
       .then(d => {

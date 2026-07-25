@@ -480,7 +480,7 @@ function renderStudents(students) {
       <td><span class="pill pill-${s.status}">${s.status.charAt(0).toUpperCase()+s.status.slice(1)}</span></td>
       <td>
         <div class="action-btns" onclick="event.stopPropagation()">
-          <button class="btn btn-ghost btn-sm" onclick="openStudentModal(${JSON.stringify(s).split('"').join('&quot;')})">Edit</button>
+          <button class="btn btn-ghost btn-sm" onclick="openStudentByIndex(${allStudents.indexOf(s)})">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="toggleStudentStatus('${s.id}','${s.status}')">
             ${s.status === 'inactive' ? 'Activate' : 'Deactivate'}
           </button>
@@ -549,6 +549,10 @@ function removeInstrumentRow(id) {
 }
 
 // ---- Open/close student modal ----
+function openStudentByIndex(idx) {
+  openStudentModal(allStudents[idx]);
+}
+
 function openStudentModal(student = null) {
   document.getElementById('instrumentRows').innerHTML = '';
   instrumentCount = 0;
@@ -564,11 +568,12 @@ function openStudentModal(student = null) {
     document.getElementById('sPhone').value        = student.profiles?.phone      ?? '';
 
     // Fetch email from auth.users via Netlify Function
-    if (student.user_id) {
+    const userId = student.profiles?.id ?? student.user_id ?? '';
+    if (userId) {
       fetch('/.netlify/functions/create-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get-email', userId: student.user_id }),
+        body: JSON.stringify({ action: 'get-email', userId }),
       })
       .then(r => r.json())
       .then(d => { document.getElementById('sEmail').value = d.email ?? ''; })
