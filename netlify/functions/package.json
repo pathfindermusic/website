@@ -1,6 +1,7 @@
 {
   "name": "pathfinder-portal-functions",
   "version": "1.0.0",
+  "description": "Netlify Functions for Pathfinder Music Lessons portal",
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0"
   }
