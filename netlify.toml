@@ -5,9 +5,6 @@
 [build]
   functions = "netlify/functions"
 
-[functions]
-  node_bundler = "esbuild"
-
 # Redirect portal root to login
 [[redirects]]
   from = "/portal"
