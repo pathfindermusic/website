@@ -250,13 +250,25 @@ async function loadStudios() {
 }
 
 async function loadTeachers() {
-  const { data, error } = await db
+  // Fetch teachers and profiles separately to avoid join issues
+  const { data: teacherData, error } = await db
     .from('teachers')
-    .select(`
-      id, instruments, studio_ids, virtual_room_link,
-      profiles(id, first_name, last_name, email, phone, status),
-      teacher_availability(id, studio_id, day_of_week, start_time, end_time)
-    `);
+    .select('id, instruments, studio_ids, virtual_room_link, user_id, teacher_availability(id, studio_id, day_of_week, start_time, end_time)')
+    .order('id');
+
+  if (error) { showToast('Error loading teachers', 'error'); return; }
+
+  // Fetch profiles for all teacher user_ids
+  const userIds = (teacherData ?? []).map(t => t.user_id);
+  const { data: profileData } = userIds.length > 0
+    ? await db.from('profiles').select('id, first_name, last_name, email, phone, status').in('id', userIds)
+    : { data: [] };
+
+  const profileMap = {};
+  (profileData ?? []).forEach(p => { profileMap[p.id] = p; });
+
+  // Merge profiles into teacher records
+  const data = (teacherData ?? []).map(t => ({ ...t, profiles: profileMap[t.user_id] ?? null }));
 
   if (error) { showToast('Error loading teachers', 'error'); return; }
   allTeachers = data ?? [];

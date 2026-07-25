@@ -239,8 +239,7 @@ async function loadStats() {
     db.from('lesson_occurrences')
       .select('id', { count: 'exact' })
       .lt('date', today)
-      .eq('status','scheduled')
-      .is('attendance.status', null),
+      .eq('status','scheduled'),
   ]);
 
   document.getElementById('statToday').textContent    = todayRes.count ?? '–';
