@@ -377,7 +377,7 @@ async function loadStudents() {
   // Fetch profiles for all student user_ids
   const userIds = (studentData ?? []).map(s => s.user_id);
   const { data: profileData } = userIds.length > 0
-    ? await db.from('profiles').select('id, first_name, last_name, email, phone').in('id', userIds)
+    ? await db.from('profiles').select('*').in('id', userIds)
     : { data: [] };
   const profileMap = {};
   (profileData ?? []).forEach(p => { profileMap[p.id] = p; });

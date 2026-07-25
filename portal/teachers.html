@@ -262,7 +262,7 @@ async function loadTeachers() {
   // Fetch profiles separately
   const userIds = (teacherData ?? []).map(t => t.user_id);
   const { data: profileData } = userIds.length > 0
-    ? await db.from('profiles').select('id, first_name, last_name, email, phone, status').in('id', userIds)
+    ? await db.from('profiles').select('*').in('id', userIds)
     : { data: [] };
   const profileMap = {};
   (profileData ?? []).forEach(p => { profileMap[p.id] = p; });
