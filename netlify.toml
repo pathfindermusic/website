@@ -1,0 +1,15 @@
+# ============================================================
+# Netlify configuration for Pathfinder Music Lessons
+# ============================================================
+
+[build]
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+# Redirect portal root to login
+[[redirects]]
+  from = "/portal"
+  to   = "/portal/login.html"
+  status = 200
