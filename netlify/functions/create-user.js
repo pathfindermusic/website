@@ -1,6 +1,7 @@
 // ============================================================
 // Netlify Function: create-user (no npm dependencies)
 // Uses Supabase Admin REST API directly via fetch
+// Handles duplicate email detection server-side
 // ============================================================
 
 exports.handler = async (event) => {
@@ -31,24 +32,38 @@ exports.handler = async (event) => {
   };
 
   try {
-    // Check if user already exists by listing users and filtering by email
+    // Check if user already exists in auth.users
     const listRes = await fetch(
-      `${SUPABASE_URL}/auth/v1/admin/users?email=${encodeURIComponent(email)}`,
+      `${SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=1000`,
       { headers }
     );
     const listData = await listRes.json();
-    const existing = listData?.users?.find(u => u.email === email);
+    const existing = (listData?.users ?? []).find(
+      u => u.email?.toLowerCase() === email.toLowerCase()
+    );
 
     if (existing) {
+      // Check their role in profiles table
+      const profileRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?id=eq.${existing.id}&select=role`,
+        { headers }
+      );
+      const profileData = await profileRes.json();
+      const existingRole = profileData?.[0]?.role ?? 'user';
+      const roleLabel = existingRole.charAt(0).toUpperCase() + existingRole.slice(1);
+
       return {
-        statusCode: 200,
+        statusCode: 409, // Conflict
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: existing.id, email: existing.email, existed: true }),
+        body: JSON.stringify({
+          error: `This email is already registered as a ${roleLabel}. Please use a different email.`,
+          existed: true,
+        }),
       };
     }
 
     // Generate a readable temporary password
-    const num         = Math.floor(1000 + Math.random() * 9000);
+    const num          = Math.floor(1000 + Math.random() * 9000);
     const tempPassword = `Welcome-${num}!`;
 
     // Create new auth user
@@ -68,7 +83,7 @@ exports.handler = async (event) => {
       return {
         statusCode: 400,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: createData?.message ?? 'Could not create user' }),
+        body: JSON.stringify({ error: createData?.message ?? 'Could not create user account.' }),
       };
     }
 
