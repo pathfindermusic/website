@@ -424,20 +424,7 @@ async function saveTeacher() {
     showToast('Please fill in all required fields.', 'error'); return;
   }
 
-  // Check for duplicate email (only when adding a new teacher)
-  if (!editId) {
-    const { data: existing } = await db
-      .from('profiles')
-      .select('id, role')
-      .eq('email', email)
-      .maybeSingle();
-
-    if (existing) {
-      const roleLabel = existing.role.charAt(0).toUpperCase() + existing.role.slice(1);
-      showToast(`This email is already registered as a ${roleLabel}. Please use a different email.`, 'error');
-      return;
-    }
-  }
+  // Duplicate email check is handled inside the Netlify Function
 
   const instruments = [...document.querySelectorAll('#tInstruments input:checked')].map(c => c.value);
   const studioIds   = [...document.querySelectorAll('#tStudios input:checked')].map(c => c.value);
@@ -460,7 +447,10 @@ async function saveTeacher() {
         body: JSON.stringify({ email, role: 'teacher' }),
       });
       const createData = await createRes.json();
-      if (!createRes.ok) throw new Error(createData.error ?? 'Could not create user account.');
+      if (!createRes.ok) {
+        showToast(createData.error ?? 'Could not create user account.', 'error');
+        return;
+      }
       userId = createData.id;
 
       // Insert or update profile
