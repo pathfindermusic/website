@@ -407,7 +407,7 @@ async function loadStudents() {
   // Fetch students base records only
   const { data: studentData, error } = await db
     .from('students')
-    .select('id, status, user_id, studio_id')
+    .select('id, status, user_id')
     .order('id');
 
   if (error) { showToast('Error loading students: ' + error.message, 'error'); return; }
@@ -495,7 +495,7 @@ function renderStudents(students) {
         <div class="student-name">${p.first_name ?? ''} ${p.last_name ?? ''}</div>
         <div class="student-email">${p.email ?? ''}</div>
       </td>
-      <td class="text-sm">${allStudiosMap[s.studio_id] ?? '–'}</td>
+      <td class="text-sm">–</td>
       <td>
         <div class="instrument-tags">
           ${instruments.map(i => `<span class="instrument-tag">${i}</span>`).join('') || '–'}
@@ -526,7 +526,7 @@ function filterStudents() {
     const name = `${p.first_name ?? ''} ${p.last_name ?? ''} ${p.email ?? ''}`.toLowerCase();
     const insts = (s.student_instruments ?? []).map(i => i.instrument.toLowerCase()).join(' ');
     const matchQ      = !q      || name.includes(q) || insts.includes(q);
-    const matchStudio = !studio || s.studio_id === studio;
+    const matchStudio = !studio;
     const matchStatus = !status || s.status === status;
     return matchQ && matchStudio && matchStatus;
   });
@@ -604,7 +604,7 @@ function openStudentModal(student = null) {
       .then(d => { document.getElementById('sEmail').value = d.email ?? ''; })
       .catch(() => { document.getElementById('sEmail').value = ''; });
     }
-    document.getElementById('sStudio').value       = student.studio_id            ?? '';
+    document.getElementById('sStudio').value       = '';
     document.getElementById('sStatus').value       = student.status               ?? 'active';
     document.getElementById('sParentName').value   = student.parent_name          ?? '';
     document.getElementById('sParentPhone').value  = student.parent_phone         ?? '';
@@ -679,7 +679,7 @@ async function saveStudent() {
 
       // Insert student record
       const { data: sData, error: sErr } = await db.from('students').insert({
-        user_id: userId, status, studio_id: studioId,
+        user_id: userId, status,
         parent_name: parentName || null, parent_phone: parentPhone || null, parent_email: parentEmail || null,
       }).select('id').single();
       if (sErr) throw new Error(sErr.message);
@@ -695,7 +695,7 @@ async function saveStudent() {
       await db.from('profiles').update({ first_name: firstName, last_name: lastName, phone }).eq('id', editUserId);
       // Update student
       await db.from('students').update({
-        status, studio_id: studioId,
+        status,
         parent_name: parentName || null, parent_phone: parentPhone || null, parent_email: parentEmail || null,
       }).eq('id', editId);
     }
@@ -843,7 +843,7 @@ async function confirmImport() {
 
       // Upsert student
       const { data: sData } = await db.from('students')
-        .upsert({ user_id: userId, status: row.status || 'active', studio_id: studioId,
+        .upsert({ user_id: userId, status: row.status || 'active',
           parent_name: row.parent_name || null, parent_phone: row.parent_phone || null, parent_email: row.parent_email || null
         }, { onConflict: 'user_id' }).select('id').single();
 
