@@ -221,6 +221,44 @@
 
 <div id="toastWrap" class="toast-wrap"></div>
 
+<!-- PASSWORD MODAL -->
+<div class="modal-overlay hidden" id="passwordModal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <span class="modal-title">✅ Teacher Account Created</span>
+      <button class="modal-close" onclick="closePasswordModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-sm" style="margin-bottom:1.25rem;line-height:1.7;">
+        A login account has been created for <strong id="pwName"></strong>.
+        Share these login details with them — they can change their password after first login.
+      </p>
+      <div style="background:var(--off-white);border:1px solid var(--border);border-radius:var(--r-sm);padding:1.1rem;">
+        <div class="form-group" style="margin-bottom:0.75rem;">
+          <label class="form-label">Email (login username)</label>
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <input class="form-input" type="text" id="pwEmail" readonly style="background:var(--white);">
+            <button class="btn btn-ghost btn-sm" onclick="copyToClipboard('pwEmail')">Copy</button>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Temporary Password</label>
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <input class="form-input" type="text" id="pwPassword" readonly style="background:var(--white);font-weight:700;letter-spacing:0.05em;">
+            <button class="btn btn-ghost btn-sm" onclick="copyToClipboard('pwPassword')">Copy</button>
+          </div>
+        </div>
+      </div>
+      <p class="text-sm text-muted" style="margin-top:0.85rem;">
+        Portal login: <a href="https://portal.pathfindermusiclessons.com.au/portal/login.html" target="_blank" style="color:var(--orange);">portal.pathfindermusiclessons.com.au</a>
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closePasswordModal()">Done — I've noted the password</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-client.js"></script>
 <script>
@@ -335,7 +373,7 @@ function renderTeachers() {
         <button class="btn btn-danger btn-sm" onclick="toggleTeacherStatus('${t.profiles?.id}','${p.status}')">
           ${p.status === 'inactive' ? 'Activate' : 'Deactivate'}
         </button>
-        <a href="teacher-detail.html?id=${t.id}" class="btn btn-secondary btn-sm">View</a>
+        <button class="btn btn-secondary btn-sm" onclick="showToast('Teacher detail page coming soon.', 'warning')">View</button>
       </div>
     </div>`;
   }).join('');
@@ -353,10 +391,24 @@ function openTeacherModal(teacher = null) {
     document.getElementById('editTeacherUserId').value = teacher.profiles?.id ?? '';
     document.getElementById('tFirstName').value        = teacher.profiles?.first_name ?? '';
     document.getElementById('tLastName').value         = teacher.profiles?.last_name  ?? '';
-    document.getElementById('tEmail').value            = teacher.profiles?.email      ?? '';
+    document.getElementById('tEmail').value            = 'Loading…';
     document.getElementById('tPhone').value            = teacher.profiles?.phone      ?? '';
     document.getElementById('tZoom').value             = teacher.virtual_room_link    ?? '';
     (teacher.teacher_availability ?? []).forEach(a => addAvailSlot(a));
+
+    // Fetch email from auth.users via Netlify Function
+    if (teacher.user_id) {
+      fetch('/.netlify/functions/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get-email', userId: teacher.user_id }),
+      })
+      .then(r => r.json())
+      .then(d => {
+        document.getElementById('tEmail').value = d.email ?? '';
+      })
+      .catch(() => { document.getElementById('tEmail').value = ''; });
+    }
   } else {
     document.getElementById('teacherModalTitle').textContent = 'Add Teacher';
     document.getElementById('editTeacherId').value     = '';
@@ -463,12 +515,9 @@ async function saveTeacher() {
       }).select('id').single();
       teacherId = tData.id;
 
-      // Show temp password to admin if new account was created
+      // Show temp password in a modal so admin can copy it
       if (!createData.existed) {
-        showToast(
-          `Teacher added. Temporary password: ${createData.tempPassword} — share this with ${firstName}.`,
-          'success'
-        );
+        showPasswordModal(firstName, createData.email, createData.tempPassword);
       }
     } else {
       await db.from('profiles').update({ first_name: firstName, last_name: lastName, phone }).eq('id', userId);
@@ -498,6 +547,26 @@ async function toggleTeacherStatus(userId, currentStatus) {
 
 document.getElementById('teacherModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeTeacherModal(); });
 function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+function showPasswordModal(name, email, password) {
+  document.getElementById('pwName').textContent     = name;
+  document.getElementById('pwEmail').value          = email;
+  document.getElementById('pwPassword').value       = password;
+  document.getElementById('passwordModal').classList.remove('hidden');
+}
+
+function closePasswordModal() {
+  document.getElementById('passwordModal').classList.add('hidden');
+  showToast('Teacher added successfully.', 'success');
+  loadTeachers();
+}
+
+function copyToClipboard(inputId) {
+  const input = document.getElementById(inputId);
+  input.select();
+  document.execCommand('copy');
+  showToast('Copied to clipboard!', 'success');
+}
 </script>
 </body>
 </html>
