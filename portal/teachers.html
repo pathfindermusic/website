@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teachers — Pathfinder Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/portal.css">
+  <style>
+    .teachers-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.1rem;
+    }
+    .teacher-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .teacher-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-h); }
+    .teacher-card-top {
+      background: var(--charcoal);
+      padding: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+    .teacher-avatar {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: var(--orange);
+      color: var(--white);
+      font-size: 1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .teacher-card-name { font-size: 1rem; font-weight: 700; color: var(--white); }
+    .teacher-card-email { font-size: 0.78rem; color: rgba(255,255,255,0.5); margin-top: 0.15rem; }
+    .teacher-card-body { padding: 1.1rem; }
+    .teacher-meta-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      font-size: 0.82rem;
+      color: var(--dark-grey);
+      margin-bottom: 0.55rem;
+    }
+    .teacher-meta-icon { flex-shrink: 0; margin-top: 1px; }
+    .avail-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 3px;
+      margin-top: 0.35rem;
+    }
+    .avail-day {
+      text-align: center;
+      font-size: 0.62rem;
+      font-weight: 600;
+      padding: 3px 2px;
+      border-radius: 3px;
+      background: var(--light-grey);
+      color: var(--mid-grey);
+    }
+    .avail-day.on { background: rgba(232,73,30,0.12); color: var(--orange); }
+    .teacher-card-footer {
+      border-top: 1px solid var(--border);
+      padding: 0.85rem 1.1rem;
+      display: flex;
+      gap: 0.4rem;
+      justify-content: flex-end;
+    }
+    /* Availability slots in modal */
+    .avail-slots { display: flex; flex-direction: column; gap: 0.65rem; margin-top: 0.65rem; }
+    .avail-slot {
+      display: grid;
+      grid-template-columns: 110px 1fr 1fr auto;
+      gap: 0.65rem;
+      align-items: center;
+    }
+    @media (max-width: 900px) { .teachers-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 580px) { .teachers-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<div class="portal-shell">
+
+  <!-- TOP NAV -->
+  <nav class="topnav">
+    <a href="#" class="topnav-logo"><img src="../Logo_-_long.png" alt="Pathfinder Music Lessons"></a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">–</span>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Main</div>
+    <a class="nav-item" href="dashboard-admin.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Schedule
+    </a>
+    <a class="nav-item" href="students.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Students
+    </a>
+    <a class="nav-item active" href="teachers.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+      Teachers
+    </a>
+    <a class="nav-item" href="lessons.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Lessons
+    </a>
+    <div class="sidebar-section">Reports</div>
+    <a class="nav-item" href="attendance-report.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Attendance
+    </a>
+    <div class="sidebar-section hidden" id="superuserSection">Super User</div>
+    <a class="nav-item hidden" href="studios.html" id="studiosLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      Studios
+    </a>
+    <a class="nav-item hidden" href="admins.html" id="adminsLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Admins
+    </a>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Teachers</div>
+        <div class="page-sub" id="teacherCount">Loading…</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="openTeacherModal()">+ Add Teacher</button>
+    </div>
+
+    <div class="teachers-grid" id="teachersGrid">
+      <div style="grid-column:1/-1;"><div class="loading"><div class="spinner"></div> Loading teachers…</div></div>
+    </div>
+  </main>
+</div>
+
+<!-- ADD/EDIT TEACHER MODAL -->
+<div class="modal-overlay hidden" id="teacherModal">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-header">
+      <span class="modal-title" id="teacherModalTitle">Add Teacher</span>
+      <button class="modal-close" onclick="closeTeacherModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editTeacherId">
+      <input type="hidden" id="editTeacherUserId">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">First Name *</label>
+          <input class="form-input" type="text" id="tFirstName">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Last Name *</label>
+          <input class="form-input" type="text" id="tLastName">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Email *</label>
+          <input class="form-input" type="email" id="tEmail">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone</label>
+          <input class="form-input" type="tel" id="tPhone">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Virtual Room Link (Zoom etc.)</label>
+        <input class="form-input" type="url" id="tZoom" placeholder="https://zoom.us/j/...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Instruments taught</label>
+        <div id="tInstruments" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.25rem;">
+          <!-- Checkboxes injected by JS -->
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Studios</label>
+        <div id="tStudios" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.25rem;"></div>
+      </div>
+
+      <!-- Availability -->
+      <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:0.5rem;">
+        <div class="form-label" style="margin-bottom:0.65rem;">Availability</div>
+        <div class="avail-slots" id="availSlots"></div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:0.65rem;" onclick="addAvailSlot()">+ Add availability slot</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeTeacherModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTeacher()">Save Teacher</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastWrap" class="toast-wrap"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script>
+const INSTRUMENTS = ['Guitar','Bass','Drums','Piano','Voice / Singing','Violin','Ukulele','Music Theory','Saxophone','Other'];
+const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+let allTeachers = [];
+let allStudios  = [];
+let currentProfile = null;
+
+(async () => {
+  currentProfile = await requireAuth(['superuser','admin']);
+  if (!currentProfile) return;
+  renderTopNavUser(currentProfile);
+  if (currentProfile.role === 'superuser') {
+    document.getElementById('superuserSection').classList.remove('hidden');
+    document.getElementById('studiosLink').classList.remove('hidden');
+    document.getElementById('adminsLink').classList.remove('hidden');
+  }
+  if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
+  await loadStudios();
+  await loadTeachers();
+})();
+
+async function loadStudios() {
+  const { data } = await db.from('studios').select('id, name').eq('status','active').order('name');
+  allStudios = data ?? [];
+}
+
+async function loadTeachers() {
+  const { data, error } = await db
+    .from('teachers')
+    .select(`
+      id, instruments, studio_ids, virtual_room_link,
+      profiles(id, first_name, last_name, email, phone, status),
+      teacher_availability(id, studio_id, day_of_week, start_time, end_time)
+    `);
+
+  if (error) { showToast('Error loading teachers', 'error'); return; }
+  allTeachers = data ?? [];
+
+  const active = allTeachers.filter(t => t.profiles?.status === 'active').length;
+  document.getElementById('teacherCount').textContent = `${active} active · ${allTeachers.length} total`;
+  renderTeachers();
+}
+
+function renderTeachers() {
+  const grid = document.getElementById('teachersGrid');
+  if (!allTeachers.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1;"><div class="empty-state"><div class="empty-state-icon">👩‍🏫</div><h3>No teachers yet</h3><p>Add your first teacher using the button above.</p></div></div>`;
+    return;
+  }
+
+  // Build studio map
+  const studioMap = {};
+  allStudios.forEach(s => studioMap[s.id] = s.name);
+
+  grid.innerHTML = allTeachers.map(t => {
+    const p        = t.profiles ?? {};
+    const initials = ((p.first_name?.[0] ?? '') + (p.last_name?.[0] ?? '')).toUpperCase();
+    const studios  = (t.studio_ids ?? []).map(id => studioMap[id] ?? id).join(', ') || '–';
+    const avail    = t.teacher_availability ?? [];
+    const availDays = avail.map(a => a.day_of_week);
+
+    return `<div class="teacher-card">
+      <div class="teacher-card-top">
+        <div class="teacher-avatar">${initials}</div>
+        <div>
+          <div class="teacher-card-name">${p.first_name ?? ''} ${p.last_name ?? ''}</div>
+          <div class="teacher-card-email">${p.email ?? ''}</div>
+        </div>
+        <div style="margin-left:auto;">
+          <span class="pill pill-${p.status === 'active' ? 'active' : 'inactive'}">${p.status === 'active' ? 'Active' : 'Inactive'}</span>
+        </div>
+      </div>
+      <div class="teacher-card-body">
+        <div class="teacher-meta-row"><span class="teacher-meta-icon">🎵</span><span>${(t.instruments ?? []).join(', ') || '–'}</span></div>
+        <div class="teacher-meta-row"><span class="teacher-meta-icon">📍</span><span>${studios}</span></div>
+        ${t.virtual_room_link ? `<div class="teacher-meta-row"><span class="teacher-meta-icon">🎥</span><a href="${t.virtual_room_link}" target="_blank" class="text-orange" style="font-size:0.82rem;text-decoration:none;">Virtual room</a></div>` : ''}
+        <div class="text-sm text-muted" style="margin-bottom:0.35rem;">Availability</div>
+        <div class="avail-grid">
+          ${DAYS.map((d, i) => `<div class="avail-day ${availDays.includes(i) ? 'on' : ''}">${d}</div>`).join('')}
+        </div>
+      </div>
+      <div class="teacher-card-footer">
+        <button class="btn btn-ghost btn-sm" onclick="openTeacherModal(${JSON.stringify(t).split('"').join('&quot;')})">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="toggleTeacherStatus('${t.profiles?.id}','${p.status}')">
+          ${p.status === 'inactive' ? 'Activate' : 'Deactivate'}
+        </button>
+        <a href="teacher-detail.html?id=${t.id}" class="btn btn-secondary btn-sm">View</a>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ---- Modal ----
+function openTeacherModal(teacher = null) {
+  buildInstrumentCheckboxes(teacher?.instruments ?? []);
+  buildStudioCheckboxes(teacher?.studio_ids ?? []);
+  document.getElementById('availSlots').innerHTML = '';
+
+  if (teacher) {
+    document.getElementById('teacherModalTitle').textContent = 'Edit Teacher';
+    document.getElementById('editTeacherId').value     = teacher.id;
+    document.getElementById('editTeacherUserId').value = teacher.profiles?.id ?? '';
+    document.getElementById('tFirstName').value        = teacher.profiles?.first_name ?? '';
+    document.getElementById('tLastName').value         = teacher.profiles?.last_name  ?? '';
+    document.getElementById('tEmail').value            = teacher.profiles?.email      ?? '';
+    document.getElementById('tPhone').value            = teacher.profiles?.phone      ?? '';
+    document.getElementById('tZoom').value             = teacher.virtual_room_link    ?? '';
+    (teacher.teacher_availability ?? []).forEach(a => addAvailSlot(a));
+  } else {
+    document.getElementById('teacherModalTitle').textContent = 'Add Teacher';
+    document.getElementById('editTeacherId').value     = '';
+    document.getElementById('editTeacherUserId').value = '';
+    ['tFirstName','tLastName','tEmail','tPhone','tZoom'].forEach(id => document.getElementById(id).value = '');
+    addAvailSlot();
+  }
+  document.getElementById('teacherModal').classList.remove('hidden');
+}
+
+function closeTeacherModal() { document.getElementById('teacherModal').classList.add('hidden'); }
+
+function buildInstrumentCheckboxes(selected) {
+  document.getElementById('tInstruments').innerHTML = INSTRUMENTS.map(i =>
+    `<label style="display:flex;align-items:center;gap:0.35rem;font-size:0.82rem;cursor:pointer;">
+      <input type="checkbox" value="${i}" ${selected.includes(i) ? 'checked' : ''} style="accent-color:var(--orange);">
+      ${i}
+    </label>`
+  ).join('');
+}
+
+function buildStudioCheckboxes(selected) {
+  document.getElementById('tStudios').innerHTML = allStudios.map(s =>
+    `<label style="display:flex;align-items:center;gap:0.35rem;font-size:0.82rem;cursor:pointer;">
+      <input type="checkbox" value="${s.id}" ${selected.includes(s.id) ? 'checked' : ''} style="accent-color:var(--orange);">
+      ${s.name}
+    </label>`
+  ).join('');
+}
+
+let availCount = 0;
+function addAvailSlot(existing = null) {
+  availCount++;
+  const id  = `avail${availCount}`;
+  const div = document.createElement('div');
+  div.className = 'avail-slot';
+  div.id = id;
+  div.innerHTML = `
+    <select class="form-select avail-day-sel" style="font-size:0.82rem;">
+      ${DAYS.map((d, i) => `<option value="${i}" ${existing?.day_of_week === i ? 'selected' : ''}>${d}</option>`).join('')}
+    </select>
+    <select class="form-select avail-studio-sel" style="font-size:0.82rem;">
+      ${allStudios.map(s => `<option value="${s.id}" ${existing?.studio_id === s.id ? 'selected' : ''}>${s.name}</option>`).join('')}
+    </select>
+    <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:0.35rem;">
+      <input class="form-input avail-start" type="time" value="${existing?.start_time?.slice(0,5) ?? '09:00'}" style="font-size:0.82rem;">
+      <span class="text-sm text-muted">to</span>
+      <input class="form-input avail-end" type="time" value="${existing?.end_time?.slice(0,5) ?? '17:00'}" style="font-size:0.82rem;">
+    </div>
+    <button class="btn btn-danger btn-sm" onclick="document.getElementById('${id}').remove()">✕</button>`;
+  document.getElementById('availSlots').appendChild(div);
+}
+
+// ---- Save teacher ----
+async function saveTeacher() {
+  const firstName     = document.getElementById('tFirstName').value.trim();
+  const lastName      = document.getElementById('tLastName').value.trim();
+  const email         = document.getElementById('tEmail').value.trim();
+  const phone         = document.getElementById('tPhone').value.trim();
+  const zoom          = document.getElementById('tZoom').value.trim();
+  const editId        = document.getElementById('editTeacherId').value;
+  const editUserId    = document.getElementById('editTeacherUserId').value;
+
+  if (!firstName || !lastName || !email) {
+    showToast('Please fill in all required fields.', 'error'); return;
+  }
+
+  const instruments = [...document.querySelectorAll('#tInstruments input:checked')].map(c => c.value);
+  const studioIds   = [...document.querySelectorAll('#tStudios input:checked')].map(c => c.value);
+  const availability = [...document.querySelectorAll('#availSlots .avail-slot')].map(slot => ({
+    day_of_week: parseInt(slot.querySelector('.avail-day-sel').value),
+    studio_id:   slot.querySelector('.avail-studio-sel').value,
+    start_time:  slot.querySelector('.avail-start').value + ':00',
+    end_time:    slot.querySelector('.avail-end').value   + ':00',
+  }));
+
+  try {
+    let teacherId = editId;
+    let userId    = editUserId;
+
+    if (!editId) {
+      const tempId = crypto.randomUUID();
+      await db.from('profiles').insert({
+        id: tempId, first_name: firstName, last_name: lastName, phone, role: 'teacher', status: 'active'
+      });
+      userId = tempId;
+      const { data: tData } = await db.from('teachers').insert({
+        user_id: userId, instruments, studio_ids: studioIds, virtual_room_link: zoom || null
+      }).select('id').single();
+      teacherId = tData.id;
+    } else {
+      await db.from('profiles').update({ first_name: firstName, last_name: lastName, phone }).eq('id', userId);
+      await db.from('teachers').update({ instruments, studio_ids: studioIds, virtual_room_link: zoom || null }).eq('id', editId);
+    }
+
+    // Replace availability
+    await db.from('teacher_availability').delete().eq('teacher_id', teacherId);
+    if (availability.length > 0) {
+      await db.from('teacher_availability').insert(availability.map(a => ({ ...a, teacher_id: teacherId })));
+    }
+
+    showToast(editId ? 'Teacher updated.' : 'Teacher added.', 'success');
+    closeTeacherModal();
+    await loadTeachers();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function toggleTeacherStatus(userId, currentStatus) {
+  const newStatus = currentStatus === 'inactive' ? 'active' : 'inactive';
+  await db.from('profiles').update({ status: newStatus }).eq('id', userId);
+  showToast(`Teacher ${newStatus === 'inactive' ? 'deactivated' : 'activated'}.`, 'success');
+  await loadTeachers();
+}
+
+document.getElementById('teacherModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeTeacherModal(); });
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+</script>
+</body>
+</html>

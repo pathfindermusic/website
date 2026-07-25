@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Students — Pathfinder Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/portal.css">
+  <style>
+    .student-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.1rem;
+    }
+    .student-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .student-card-top {
+      padding: 1.1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .student-card-name { font-size: 1rem; font-weight: 700; color: var(--charcoal); }
+    .student-card-meta { font-size: 0.78rem; color: var(--mid-grey); margin-top: 0.15rem; }
+    .student-card-body { padding: 1.1rem 1.25rem; }
+    .skill-row {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      margin-bottom: 0.75rem;
+      font-size: 0.845rem;
+    }
+    .skill-instrument { min-width: 110px; color: var(--dark-grey); font-weight: 500; }
+    .skill-bar-wrap {
+      flex: 1;
+      background: var(--light-grey);
+      border-radius: 20px;
+      height: 5px;
+    }
+    .skill-bar { height: 5px; border-radius: 20px; transition: width 0.3s; }
+    .skill-level-text { font-size: 0.75rem; color: var(--mid-grey); min-width: 90px; text-align: right; }
+    .skill-edit-btn {
+      font-size: 0.7rem;
+      padding: 0.18rem 0.5rem;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      background: var(--off-white);
+      color: var(--dark-grey);
+      cursor: pointer;
+    }
+    .skill-edit-btn:hover { background: var(--light-grey); }
+    .recent-note {
+      background: var(--off-white);
+      border-left: 3px solid var(--orange);
+      border-radius: 0 var(--r-sm) var(--r-sm) 0;
+      padding: 0.65rem 0.85rem;
+      font-size: 0.82rem;
+      color: var(--dark-grey);
+      line-height: 1.6;
+      margin-top: 0.75rem;
+    }
+    .recent-note-label { font-size: 0.7rem; color: var(--mid-grey); margin-bottom: 0.3rem; }
+    @media (max-width: 900px) { .student-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<div class="portal-shell">
+
+  <!-- TOP NAV -->
+  <nav class="topnav">
+    <a href="#" class="topnav-logo"><img src="../Logo_-_long.png" alt="Pathfinder Music Lessons"></a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">Teacher</span>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Main</div>
+    <a class="nav-item" href="dashboard-teacher.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      My Schedule
+    </a>
+    <a class="nav-item active" href="my-students.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      My Students
+    </a>
+    <a class="nav-item" href="my-notes.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Lesson Notes
+    </a>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <div class="page-title">My Students</div>
+        <div class="page-sub" id="studentCount">Loading…</div>
+      </div>
+    </div>
+
+    <div class="student-grid" id="studentGrid">
+      <div style="grid-column:1/-1;"><div class="loading"><div class="spinner"></div> Loading your students…</div></div>
+    </div>
+  </main>
+</div>
+
+<!-- SKILL LEVEL MODAL -->
+<div class="modal-overlay hidden" id="skillModal">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header">
+      <span class="modal-title" id="skillModalTitle">Update Skill Level</span>
+      <button class="modal-close" onclick="closeSkillModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="skillStudentInstrumentId">
+      <div class="form-group">
+        <label class="form-label" id="skillModalLabel">Skill level</label>
+        <div style="display:flex;align-items:center;gap:1rem;margin-top:0.5rem;">
+          <input type="range" id="skillRange" min="0" max="8" value="0"
+            oninput="updateSkillDisplay(+this.value)"
+            style="flex:1;accent-color:var(--orange);">
+          <span id="skillDisplay" style="font-size:0.875rem;font-weight:600;min-width:120px;text-align:right;">–</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.68rem;color:var(--mid-grey);margin-top:0.25rem;">
+          <span>0 — Absolute beginner</span><span>8 — Advanced</span>
+        </div>
+      </div>
+      <div style="margin-top:1rem;padding:0.75rem;background:var(--off-white);border-radius:var(--r-sm);font-size:0.82rem;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:0.3rem;">
+          <span style="color:#2563eb;font-weight:500;">Beginner</span><span class="text-muted">0 – 3</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:0.3rem;">
+          <span style="color:#d97706;font-weight:500;">Intermediate</span><span class="text-muted">4 – 6</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <span style="color:#16a34a;font-weight:500;">Advanced</span><span class="text-muted">7 – 8</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeSkillModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSkillLevel()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastWrap" class="toast-wrap"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script>
+let currentProfile = null;
+let teacherRecord  = null;
+let activeSkillEdit = null; // { studentId, instrument, currentLevel }
+
+(async () => {
+  currentProfile = await requireAuth(['teacher']);
+  if (!currentProfile) return;
+  renderTopNavUser(currentProfile);
+  if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
+
+  const { data: t } = await db.from('teachers').select('*').eq('user_id', currentProfile.id).single();
+  teacherRecord = t;
+
+  await loadStudents();
+})();
+
+async function loadStudents() {
+  if (!teacherRecord) return;
+  const grid = document.getElementById('studentGrid');
+
+  // Get all students assigned to this teacher
+  const { data: assignments, error } = await db
+    .from('student_teachers')
+    .select(`
+      instrument,
+      students(
+        id, status,
+        profiles(first_name, last_name),
+        student_instruments(instrument, skill_level)
+      )
+    `)
+    .eq('teacher_id', teacherRecord.id);
+
+  if (error || !assignments || assignments.length === 0) {
+    grid.innerHTML = `<div style="grid-column:1/-1;"><div class="empty-state">
+      <div class="empty-state-icon">🎵</div>
+      <h3>No students yet</h3>
+      <p>Students assigned to you will appear here once an admin sets up their lessons.</p>
+    </div></div>`;
+    document.getElementById('studentCount').textContent = '0 students';
+    return;
+  }
+
+  // Group by student (a student can appear multiple times if multiple instruments)
+  const studentMap = {};
+  assignments.forEach(a => {
+    const s = a.students;
+    if (!s) return;
+    if (!studentMap[s.id]) studentMap[s.id] = { ...s, myInstruments: [] };
+    studentMap[s.id].myInstruments.push(a.instrument);
+  });
+
+  const students = Object.values(studentMap);
+  const active   = students.filter(s => s.status === 'active').length;
+  document.getElementById('studentCount').textContent = `${active} active · ${students.length} total`;
+
+  // Get most recent lesson note per student
+  const studentIds = students.map(s => s.id);
+  const { data: recentNotes } = await db
+    .from('lesson_notes')
+    .select('note_text, created_at, lesson_occurrence_id, lesson_occurrences(lessons(student_id))')
+    .eq('teacher_id', teacherRecord.id)
+    .in('lesson_occurrences.lessons.student_id', studentIds)
+    .order('created_at', { ascending: false });
+
+  const latestNoteByStudent = {};
+  (recentNotes ?? []).forEach(n => {
+    const sId = n.lesson_occurrences?.lessons?.student_id;
+    if (sId && !latestNoteByStudent[sId]) latestNoteByStudent[sId] = n;
+  });
+
+  grid.innerHTML = students.map(s => {
+    const p         = s.profiles ?? {};
+    const initials  = ((p.first_name?.[0] ?? '') + (p.last_name?.[0] ?? '')).toUpperCase();
+    const allInsts  = s.student_instruments ?? [];
+    const myInsts   = s.myInstruments ?? [];
+    const latestNote = latestNoteByStudent[s.id];
+
+    const skillRows = myInsts.map(inst => {
+      const instData = allInsts.find(i => i.instrument === inst);
+      const level    = instData?.skill_level ?? 0;
+      const pct      = Math.round((level / 8) * 100);
+      const colour   = level <= 3 ? '#2563eb' : level <= 6 ? '#d97706' : '#16a34a';
+
+      return `<div class="skill-row">
+        <div class="skill-instrument">${inst}</div>
+        <div class="skill-bar-wrap"><div class="skill-bar" style="width:${pct}%;background:${colour};"></div></div>
+        <div class="skill-level-text">${skillLabel(level)}</div>
+        <button class="skill-edit-btn" onclick="openSkillModal('${s.id}','${inst}',${level})">Edit</button>
+      </div>`;
+    }).join('');
+
+    return `<div class="student-card">
+      <div class="student-card-top">
+        <div>
+          <div class="student-card-name">${p.first_name ?? ''} ${p.last_name ?? ''}</div>
+          <div class="student-card-meta">${myInsts.join(' · ')}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <span class="pill pill-${s.status}">${s.status.charAt(0).toUpperCase()+s.status.slice(1)}</span>
+        </div>
+      </div>
+      <div class="student-card-body">
+        <div class="form-label mb-1">Skill levels</div>
+        ${skillRows || '<div class="text-sm text-muted">No instruments on file</div>'}
+        ${latestNote ? `
+          <div class="recent-note">
+            <div class="recent-note-label">Most recent note · ${formatLongDate(new Date(latestNote.created_at))}</div>
+            ${latestNote.note_text?.slice(0, 120) ?? ''}${(latestNote.note_text?.length ?? 0) > 120 ? '…' : ''}
+          </div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ---- Skill modal ----
+function openSkillModal(studentId, instrument, currentLevel) {
+  activeSkillEdit = { studentId, instrument };
+  document.getElementById('skillModalTitle').textContent = `Update Skill Level`;
+  document.getElementById('skillModalLabel').textContent = `${instrument} — skill level`;
+  document.getElementById('skillRange').value = currentLevel;
+  updateSkillDisplay(currentLevel);
+  document.getElementById('skillModal').classList.remove('hidden');
+}
+
+function closeSkillModal() {
+  document.getElementById('skillModal').classList.add('hidden');
+  activeSkillEdit = null;
+}
+
+function updateSkillDisplay(level) {
+  document.getElementById('skillDisplay').textContent = skillLabel(level);
+}
+
+async function saveSkillLevel() {
+  if (!activeSkillEdit) return;
+  const level = parseInt(document.getElementById('skillRange').value);
+  const { studentId, instrument } = activeSkillEdit;
+
+  const { error } = await db
+    .from('student_instruments')
+    .update({ skill_level: level })
+    .eq('student_id', studentId)
+    .eq('instrument', instrument);
+
+  if (error) {
+    showToast('Could not save skill level.', 'error');
+  } else {
+    showToast('Skill level updated.', 'success');
+    closeSkillModal();
+    await loadStudents();
+  }
+}
+
+document.getElementById('skillModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeSkillModal(); });
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+</script>
+</body>
+</html>
