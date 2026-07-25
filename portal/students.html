@@ -548,24 +548,29 @@ async function saveStudent() {
     let studentId = editId;
 
     if (!editId) {
-      // Create auth user (sends invite email)
-      const { data: authData, error: authErr } = await db.auth.admin.createUser({
-        email, password: Math.random().toString(36).slice(-10) + 'A1!',
-        email_confirm: true,
-      });
-      // Note: admin.createUser requires service role key — fall back to inserting profile directly
-      // For now we insert the profile with a placeholder UUID and update when user is confirmed
-      // Admin should create the auth user separately in Supabase dashboard
-      if (authErr) throw new Error('Could not create auth user: ' + authErr.message);
-      userId = authData.user.id;
+      // Look up existing auth user profile by email.
+      // Admin must first create the auth user in Supabase:
+      // Authentication → Users → Add user → enter email + temporary password
+      const { data: existingProfile } = await db
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
 
-      // Insert profile
-      const { error: pErr } = await db.from('profiles').insert({
-        id: userId, first_name: firstName, last_name: lastName, phone, role: 'student', status: 'active'
-      });
-      if (pErr) throw new Error(pErr.message);
+      if (existingProfile) {
+        userId = existingProfile.id;
+        await db.from('profiles').update({
+          first_name: firstName, last_name: lastName, phone, role: 'student', status: 'active'
+        }).eq('id', userId);
+      } else {
+        throw new Error(
+          'No Supabase account found for ' + email + '. ' +
+          'Please first go to Supabase → Authentication → Users → Add user, ' +
+          'create the account with this email, then come back and save the student.'
+        );
+      }
 
-      // Insert student
+      // Insert student record
       const { data: sData, error: sErr } = await db.from('students').insert({
         user_id: userId, status, studio_id: studioId,
         parent_name: parentName || null, parent_phone: parentPhone || null, parent_email: parentEmail || null,

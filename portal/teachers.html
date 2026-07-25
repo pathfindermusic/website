@@ -412,11 +412,28 @@ async function saveTeacher() {
     let userId    = editUserId;
 
     if (!editId) {
-      const tempId = crypto.randomUUID();
-      await db.from('profiles').insert({
-        id: tempId, first_name: firstName, last_name: lastName, phone, role: 'teacher', status: 'active'
-      });
-      userId = tempId;
+      // Look up existing auth user profile by email.
+      // Admin must first create the auth user in Supabase:
+      // Authentication → Users → Add user → enter email + temporary password
+      const { data: existingProfile } = await db
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (existingProfile) {
+        userId = existingProfile.id;
+        await db.from('profiles').update({
+          first_name: firstName, last_name: lastName, phone, role: 'teacher', status: 'active'
+        }).eq('id', userId);
+      } else {
+        throw new Error(
+          'No Supabase account found for ' + email + '. ' +
+          'Please first go to Supabase → Authentication → Users → Add user, ' +
+          'create the account with this email, then come back and save the teacher.'
+        );
+      }
+
       const { data: tData } = await db.from('teachers').insert({
         user_id: userId, instruments, studio_ids: studioIds, virtual_room_link: zoom || null
       }).select('id').single();
