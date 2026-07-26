@@ -243,6 +243,12 @@
       return;
     }
 
+    // If must change password, redirect to change password page
+    if (profile.must_change_password) {
+      window.location.href = 'change-password.html';
+      return;
+    }
+
     redirectByRole(profile.role);
   }
 
