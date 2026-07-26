@@ -1,188 +1,633 @@
-<!DOCTYPE html><html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Our Teachers — Pathfinder Music Lessons</title>
-<meta name="description" content="Meet the Pathfinder team — experienced performers and music lovers guiding students of all levels in Kilsyth and Ringwood.">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-:root {
-  --orange: #E8491E; --orange-light: #FF6B45; --orange-dark: #C23A14;
-  --charcoal: #1C1C1E; --charcoal-mid: #2C2C2E; --charcoal-light: #3A3A3C;
-  --white: #FFFFFF; --off-white: #F7F7F7; --light-grey: #EBEBEB;
-  --mid-grey: #999999; --dark-grey: #555555;
-  --border-l: rgba(0,0,0,0.09); --border-d: rgba(255,255,255,0.1);
-  --shadow: 0 2px 16px rgba(0,0,0,0.07); --shadow-h: 0 6px 28px rgba(0,0,0,0.13);
-  --r: 8px; --r-sm: 5px;
-}
-html { scroll-behavior: smooth; }
-body { font-family: 'Inter', sans-serif; background: var(--white); color: var(--charcoal); line-height: 1.6; overflow-x: hidden; }
-/* NAV */
-nav { position: sticky; top: 0; z-index: 100; background: var(--charcoal); padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 66px; border-bottom: 3px solid var(--orange); }
-.logo-img { height: 34px; width: auto; display: block; }
-.nav-links { display: flex; align-items: center; gap: 1.4rem; list-style: none; }
-.nav-links a { color: rgba(255,255,255,0.68); text-decoration: none; font-size: 0.78rem; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; transition: color 0.18s; white-space: nowrap; }
-.nav-links a:hover, .nav-links a.active { color: var(--white); }
-.nav-links a.active { color: var(--orange); }
-.nav-cta { background: var(--orange) !important; color: var(--white) !important; padding: 0.42rem 1rem; border-radius: var(--r-sm); font-weight: 600 !important; white-space: nowrap; }
-.nav-cta:hover { background: var(--orange-light) !important; }
-.nav-toggle { display: none; flex-direction: column; gap: 5px; cursor: pointer; background: none; border: none; padding: 4px; }
-.nav-toggle span { display: block; width: 22px; height: 2px; background: var(--white); border-radius: 2px; }
-/* PAGE HEADER */
-.page-header { position: relative; padding: 4.5rem 2rem 3.5rem; overflow: hidden; background: var(--charcoal); border-bottom: 3px solid var(--orange); }
-.ph-content { position: relative; z-index: 2; max-width: 1100px; margin: 0 auto; }
-.page-header h1 { font-size: clamp(2.25rem, 5.5vw, 3.75rem); font-weight: 800; line-height: 1.05; color: var(--white); margin-bottom: 0.85rem; }
-.page-header p { color: rgba(255,255,255,0.62); font-size: 1rem; max-width: 560px; line-height: 1.7; }
-/* SHARED LAYOUT */
-.container { max-width: 1100px; margin: 0 auto; }
-section { padding: 4.5rem 2rem; }
-.sec-label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--orange); margin-bottom: 0.6rem; }
-.sec-title { font-size: clamp(1.6rem, 3.2vw, 2.4rem); font-weight: 800; line-height: 1.1; margin-bottom: 1.1rem; color: var(--charcoal); }
-.sec-body { color: var(--dark-grey); font-size: 0.975rem; line-height: 1.78; }
-.dark-sec { background: var(--charcoal); }
-.dark-sec .sec-title { color: var(--white); }
-.dark-sec .sec-body { color: rgba(255,255,255,0.6); }
-.off-sec { background: var(--off-white); }
-/* BUTTONS */
-.btn { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.875rem; font-weight: 700; padding: 0.75rem 1.6rem; border-radius: var(--r-sm); text-decoration: none; border: none; cursor: pointer; transition: background 0.18s, transform 0.14s, border-color 0.18s; letter-spacing: 0.02em; white-space: nowrap; }
-.btn-orange { background: var(--orange); color: var(--white); }
-.btn-orange:hover { background: var(--orange-light); transform: translateY(-1px); }
-.btn-outline-dark { background: transparent; color: var(--charcoal); border: 2px solid var(--charcoal); }
-.btn-outline-dark:hover { background: var(--charcoal); color: var(--white); }
-.btn-outline-white { background: transparent; color: var(--white); border: 2px solid rgba(255,255,255,0.38); }
-.btn-outline-white:hover { background: rgba(255,255,255,0.1); border-color: var(--white); }
-/* CARDS */
-.card { background: var(--white); border: 1px solid var(--border-l); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
-.card:hover { transform: translateY(-3px); box-shadow: var(--shadow-h); }
-/* FORM */
-.f-grid { display: grid; gap: 0.85rem; }
-.f-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; }
-.f-group { display: flex; flex-direction: column; gap: 0.35rem; }
-.f-group label { font-size: 0.8rem; font-weight: 600; color: var(--charcoal); }
-.f-group input, .f-group select, .f-group textarea { background: var(--off-white); border: 1.5px solid var(--light-grey); border-radius: var(--r-sm); color: var(--charcoal); font-family: 'Inter', sans-serif; font-size: 0.925rem; padding: 0.7rem 0.9rem; width: 100%; transition: border-color 0.18s; -webkit-appearance: none; }
-.f-group input:focus, .f-group select:focus, .f-group textarea:focus { outline: none; border-color: var(--orange); background: var(--white); }
-.f-group textarea { resize: vertical; min-height: 110px; }
-/* FOOTER */
-footer { background: var(--charcoal); padding: 3.5rem 2rem 2rem; border-top: 3px solid var(--orange); }
-.footer-logo { height: 36px; width: auto; margin-bottom: 1rem; display: block; }
-.f-grid-footer { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 3rem; margin-bottom: 2.5rem; }
-.f-desc { font-size: 0.85rem; color: rgba(255,255,255,0.42); line-height: 1.7; }
-.f-col h4 { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.16em; color: var(--orange); margin-bottom: 0.9rem; }
-.f-col ul { list-style: none; display: flex; flex-direction: column; gap: 0.55rem; }
-.f-col ul a { font-size: 0.85rem; color: rgba(255,255,255,0.48); text-decoration: none; transition: color 0.18s; }
-.f-col ul a:hover { color: var(--white); }
-.f-bottom { border-top: 1px solid var(--border-d); padding-top: 1.25rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; color: rgba(255,255,255,0.28); }
-/* RESPONSIVE */
-@media (max-width: 1040px) { .nav-links { gap: 0.9rem; } .nav-links a { font-size: 0.72rem; } }
-@media (max-width: 900px) {
-  .nav-links { display: none; }
-  .nav-links.open { display: flex; flex-direction: column; position: fixed; top: 66px; left: 0; right: 0; background: var(--charcoal-mid); border-bottom: 2px solid var(--orange); padding: 1.5rem 2rem; gap: 1.1rem; z-index: 99; }
-  .nav-links.open a { font-size: 0.95rem; color: var(--white); }
-  .nav-toggle { display: flex; }
-  .f-grid-footer { grid-template-columns: 1fr; gap: 1.75rem; }
-  .f-bottom { flex-direction: column; gap: 0.5rem; text-align: center; }
-  .f-row { grid-template-columns: 1fr; }
-}
-.t-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem;margin-top:2.75rem;}
-.t-card{background:var(--white);border:1px solid var(--border-l);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;transition:transform 0.2s,box-shadow 0.2s;}
-.t-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-h);}
-.t-photo{width:100%;aspect-ratio:1/1;object-fit:cover;object-position:center 15%;display:block;background:var(--light-grey);}
-.t-body{padding:1.4rem;}
-.t-name{font-size:1.1rem;font-weight:800;margin-bottom:0.45rem;color:var(--charcoal);}
-.t-tags{display:flex;flex-wrap:wrap;gap:0.35rem;margin-bottom:0.85rem;}
-.t-tag{font-size:0.68rem;font-weight:600;padding:0.2rem 0.6rem;border-radius:3px;background:var(--light-grey);color:var(--charcoal);border:1px solid var(--border-l);}
-.t-bio{font-size:0.845rem;color:var(--dark-grey);line-height:1.68;}
-.cred-band{background:var(--off-white);border:1px solid var(--border-l);border-radius:var(--r);padding:1.75rem 2rem;display:flex;align-items:center;justify-content:space-between;gap:1.5rem;flex-wrap:wrap;margin-top:2.25rem;}
-.cred-item{text-align:center;}
-.cred-icon{font-size:1.65rem;margin-bottom:0.3rem;}
-.cred-item strong{display:block;font-size:0.82rem;font-weight:700;color:var(--charcoal);}
-.cred-item span{font-size:0.75rem;color:var(--dark-grey);}
-.cta-band{background:var(--charcoal);padding:3.5rem 2rem;text-align:center;border-top:3px solid var(--orange);}
-.cta-band h2{font-size:clamp(1.6rem,3.2vw,2.2rem);font-weight:800;color:var(--white);margin-bottom:0.85rem;}
-.cta-band p{color:rgba(255,255,255,0.58);margin-bottom:1.75rem;max-width:500px;margin-left:auto;margin-right:auto;}
-.cta-btns{display:flex;justify-content:center;gap:1rem;flex-wrap:wrap;}
-@media(max-width:900px){.t-grid{grid-template-columns:1fr 1fr;} .cred-band{flex-direction:column;text-align:center;}}
-@media(max-width:580px){.t-grid{grid-template-columns:1fr;}}
-</style>
-</head><body>
-<nav>
-  <a href="index.html"><img src="Logo_-_long.png" alt="Pathfinder Music Lessons" class="logo-img"></a>
-  <ul class="nav-links" id="nl">
-    <li><a href="teachers.html">Our Teachers</a></li>
-    <li><a href="pricing.html">Pricing</a></li>
-    <li><a href="gift-vouchers.html">Gift Vouchers</a></li>
-    <li><a href="events.html">Events</a></li>
-    <li><a href="student-concerts.html">Student Concerts</a></li>
-    <li><a href="student-portal.html">Student Portal</a></li>
-    <li><a href="careers.html">Careers</a></li>
-    <li><a href="studios.html">Studios</a></li>
-    <li><a href="index.html#contact" class="nav-cta">Book a Lesson</a></li>
-  </ul>
-  <button class="nav-toggle" id="nt" aria-label="Menu"><span></span><span></span><span></span></button>
-</nav>
-<div class="page-header">
-  <div class="ph-content">
-    <p class="sec-label">The Pathfinder Team</p>
-    <h1>Meet Our Teachers</h1>
-    <p>Experienced performers, composers, and all-round music lovers — collectively they've guided thousands of musicians of all levels to their goals.</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teachers — Pathfinder Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/portal.css">
+  <style>
+    .teachers-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.1rem;
+    }
+    .teacher-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .teacher-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-h); }
+    .teacher-card-top {
+      background: var(--charcoal);
+      padding: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+    .teacher-avatar {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: var(--orange);
+      color: var(--white);
+      font-size: 1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .teacher-card-name { font-size: 1rem; font-weight: 700; color: var(--white); }
+    .teacher-card-email { font-size: 0.78rem; color: rgba(255,255,255,0.5); margin-top: 0.15rem; }
+    .teacher-card-body { padding: 1.1rem; }
+    .teacher-meta-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      font-size: 0.82rem;
+      color: var(--dark-grey);
+      margin-bottom: 0.55rem;
+    }
+    .teacher-meta-icon { flex-shrink: 0; margin-top: 1px; }
+    .avail-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 3px;
+      margin-top: 0.35rem;
+    }
+    .avail-day {
+      text-align: center;
+      font-size: 0.62rem;
+      font-weight: 600;
+      padding: 3px 2px;
+      border-radius: 3px;
+      background: var(--light-grey);
+      color: var(--mid-grey);
+    }
+    .avail-day.on { background: rgba(232,73,30,0.12); color: var(--orange); }
+    .teacher-card-footer {
+      border-top: 1px solid var(--border);
+      padding: 0.85rem 1.1rem;
+      display: flex;
+      gap: 0.4rem;
+      justify-content: flex-end;
+    }
+    /* Availability slots in modal */
+    .avail-slots { display: flex; flex-direction: column; gap: 0.65rem; margin-top: 0.65rem; }
+    .avail-slot {
+      display: grid;
+      grid-template-columns: 110px 1fr 1fr auto;
+      gap: 0.65rem;
+      align-items: center;
+    }
+    @media (max-width: 900px) { .teachers-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 580px) { .teachers-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<div class="portal-shell">
+
+  <!-- TOP NAV -->
+  <nav class="topnav">
+    <a href="#" class="topnav-logo"><img src="../Logo_-_long.png" alt="Pathfinder Music Lessons"></a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">–</span>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Main</div>
+    <a class="nav-item" href="dashboard-admin.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Schedule
+    </a>
+    <a class="nav-item" href="students.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Students
+    </a>
+    <a class="nav-item active" href="teachers.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+      Teachers
+    </a>
+    <a class="nav-item" href="lessons.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Lessons
+    </a>
+    <div class="sidebar-section">Reports</div>
+    <a class="nav-item" href="attendance-report.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Attendance
+    </a>
+    <div class="sidebar-section hidden" id="superuserSection">Super User</div>
+    <a class="nav-item hidden" href="studios.html" id="studiosLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      Studios
+    </a>
+    <a class="nav-item hidden" href="admins.html" id="adminsLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Admins
+    </a>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Teachers</div>
+        <div class="page-sub" id="teacherCount">Loading…</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="openTeacherModal()">+ Add Teacher</button>
+    </div>
+
+    <div class="teachers-grid" id="teachersGrid">
+      <div style="grid-column:1/-1;"><div class="loading"><div class="spinner"></div> Loading teachers…</div></div>
+    </div>
+  </main>
+</div>
+
+<!-- ADD/EDIT TEACHER MODAL -->
+<div class="modal-overlay hidden" id="teacherModal">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-header">
+      <span class="modal-title" id="teacherModalTitle">Add Teacher</span>
+      <button class="modal-close" onclick="closeTeacherModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editTeacherId">
+      <input type="hidden" id="editTeacherUserId">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">First Name *</label>
+          <input class="form-input" type="text" id="tFirstName">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Last Name *</label>
+          <input class="form-input" type="text" id="tLastName">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Email *</label>
+          <input class="form-input" type="email" id="tEmail">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone</label>
+          <input class="form-input" type="tel" id="tPhone">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Virtual Room Link (Zoom etc.)</label>
+        <input class="form-input" type="url" id="tZoom" placeholder="https://zoom.us/j/...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Instruments taught</label>
+        <div id="tInstruments" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.25rem;">
+          <!-- Checkboxes injected by JS -->
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Studios</label>
+        <div id="tStudios" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.25rem;"></div>
+      </div>
+
+      <!-- Availability -->
+      <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:0.5rem;">
+        <div class="form-label" style="margin-bottom:0.65rem;">Availability</div>
+        <div class="avail-slots" id="availSlots"></div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:0.65rem;" onclick="addAvailSlot()">+ Add availability slot</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeTeacherModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTeacher()">Save Teacher</button>
+    </div>
   </div>
 </div>
-<section>
-  <div class="container">
-    <div class="t-grid">
-      <div class="t-card"><img src="Adrian_De_Santis.jpg" alt="Adrian De Santis" class="t-photo"><div class="t-body"><div class="t-name">Adrian De Santis</div><div class="t-tags"><span class="t-tag">Guitar</span><span class="t-tag">Metal</span><span class="t-tag">Technique</span></div><p class="t-bio">Adrian's our resident metal-head, into all things heavy. His focus on technique and advanced guitar playing is highly sought after by students at all levels. He's completing his Bachelor of Music and gigs, writes and records with his metal band in Melbourne.</p></div></div>
-      <div class="t-card"><img src="Miranda_McDonald.png" alt="Miranda McDonald" class="t-photo"><div class="t-body"><div class="t-name">Miranda McDonald</div><div class="t-tags"><span class="t-tag">Voice</span><span class="t-tag">Rock</span><span class="t-tag">Musical Theatre</span></div><p class="t-bio">Miranda's a highly sought-after vocal coach with experience in everything from rock bands to musical theatre. She manages the Kilsyth studio and undertook tertiary music studies at Box Hill — her current passion is music theatre.</p></div></div>
-      <div class="t-card"><img src="Luke_Bailey.jpg" alt="Luke Bailey" class="t-photo"><div class="t-body"><div class="t-name">Luke Bailey</div><div class="t-tags"><span class="t-tag">Guitar</span><span class="t-tag">Fingerstyle</span><span class="t-tag">Kids</span></div><p class="t-bio">Luke joined the team in 2017 as a student and is now one of our most popular teachers — great for young students and advanced fingerstyle players alike. He's established himself as one of the foremost modern guitarists in the world, with endorsements, tours and awards.</p></div></div>
-      <div class="t-card"><img src="Daniel_Vu.jpg" alt="Daniel Vu" class="t-photo"><div class="t-body"><div class="t-name">Daniel Vu</div><div class="t-tags"><span class="t-tag">Piano</span><span class="t-tag">Saxophone</span><span class="t-tag">Jazz</span></div><p class="t-bio">Daniel is a talented pianist who earned his AMusA diploma from the AMEB in Year 11. He's also a passionate saxophonist and leads the most advanced Jazz Band at Balwyn High, competing at Generations in Jazz in Mount Gambier.</p></div></div>
-      <div class="t-card"><img src="Dave_Hendley.jpg" alt="Dave Hendley" class="t-photo"><div class="t-body"><div class="t-name">Dave Hendley</div><div class="t-tags"><span class="t-tag">Guitar</span><span class="t-tag">Rock</span><span class="t-tag">Composition</span></div><p class="t-bio">Dave's an experienced rocker who has created compositions for film, games, bands and avant garde soundscapes. He joined the team in 2016 and runs many of our group guitar lessons. Dave holds a Masters of Music and a Bachelor of Applied Music from Box Hill.</p></div></div>
-      <div class="t-card"><img src="Christian_Nardella.jpg" alt="Christian Nardella" class="t-photo"><div class="t-body"><div class="t-name">Christian Nardella</div><div class="t-tags"><span class="t-tag">Drums</span><span class="t-tag">Funk</span><span class="t-tag">Soul</span></div><p class="t-bio">Christian's a drummer with a background in church music, soul and funk — his students are exceptionally well-developed in groove and timing. Having completed his Bachelor's, he plays in bands as a drummer and as frontman for his own band.</p></div></div>
-      <!--<div class="t-card"><img src="Harriet_Brat.jpg" alt="Harriet Brat" class="t-photo"><div class="t-body"><div class="t-name">Harriet Brat</div><div class="t-tags"><span class="t-tag">Voice</span><span class="t-tag">Guitar</span><span class="t-tag">Songwriting</span></div><p class="t-bio">Harriet is a passionate vocalist and guitarist who brings warmth and creativity to every lesson. An active performer and songwriter, she brings real-world musical experience into her teaching and loves helping students find their own unique voice.</p></div></div>-->
+
+<div id="toastWrap" class="toast-wrap"></div>
+
+<!-- PASSWORD MODAL -->
+<div class="modal-overlay hidden" id="passwordModal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <span class="modal-title">✅ Teacher Account Created</span>
+      <button class="modal-close" onclick="closePasswordModal()">✕</button>
     </div>
-    <div class="cred-band">
-      <div class="cred-item"><div class="cred-icon">🎓</div><strong>Tertiary Qualified</strong><span>Recognised music qualifications</span></div>
-      <div class="cred-item"><div class="cred-icon">✅</div><strong>WWC Certified</strong><span>Working with Children checks</span></div>
-      <div class="cred-item"><div class="cred-icon">🎸</div><strong>Pro Performers</strong><span>Active gigging musicians</span></div>
-      <div class="cred-item"><div class="cred-icon">❤️</div><strong>Thousands Taught</strong><span>Students guided to their goals</span></div>
-      <a href="index.html#contact" class="btn btn-orange">Book with a Teacher</a>
+    <div class="modal-body">
+      <p class="text-sm" style="margin-bottom:1.25rem;line-height:1.7;">
+        A login account has been created for <strong id="pwName"></strong>.
+        Share these login details with them — they can change their password after first login.
+      </p>
+      <div style="background:var(--off-white);border:1px solid var(--border);border-radius:var(--r-sm);padding:1.1rem;">
+        <div class="form-group" style="margin-bottom:0.75rem;">
+          <label class="form-label">Email (login username)</label>
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <input class="form-input" type="text" id="pwEmail" readonly style="background:var(--white);">
+            <button class="btn btn-ghost btn-sm" onclick="copyToClipboard('pwEmail')">Copy</button>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Temporary Password</label>
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <input class="form-input" type="text" id="pwPassword" readonly style="background:var(--white);font-weight:700;letter-spacing:0.05em;">
+            <button class="btn btn-ghost btn-sm" onclick="copyToClipboard('pwPassword')">Copy</button>
+          </div>
+        </div>
+      </div>
+      <p class="text-sm text-muted" style="margin-top:0.85rem;">
+        Portal login: <a href="https://www.pathfindermusiclessons.com.au/portal/login.html" target="_blank" style="color:var(--orange);">www.pathfindermusiclessons.com.au/portal/login.html</a>
+      </p>
     </div>
-  </div>
-</section>
-<div class="cta-band"><div class="container">
-  <p class="sec-label" style="text-align:center;margin-bottom:0.6rem;">Ready to Start?</p>
-  <h2>Find Your Path to Music Mastery</h2>
-  <p>Enquire today and we'll match you with the right teacher for your goals, instrument and schedule.</p>
-  <div class="cta-btns"><a href="index.html#contact" class="btn btn-orange">Book Your First Lesson</a><a href="pricing.html" class="btn btn-outline-white">View Pricing</a></div>
-</div></div>
-<footer>
-  <div class="container">
-    <div class="f-grid-footer">
-      <div><img src="Logo_-_long.png" alt="Pathfinder Music Lessons" class="footer-logo"><p class="f-desc">Music lessons for students of all ages in Kilsyth and Ringwood. Guitar, drums, piano, singing, violin and more — from bedroom to stage.</p></div>
-      <div class="f-col"><h4>Pages</h4><ul>
-        <li><a href="teachers.html">Our Teachers</a></li>
-        <li><a href="pricing.html">Pricing</a></li>
-        <li><a href="gift-vouchers.html">Gift Vouchers</a></li>
-        <li><a href="events.html">Events</a></li>
-        <li><a href="student-concerts.html">Student Concerts</a></li>
-        <li><a href="student-portal.html">Student Portal</a></li>
-        <li><a href="careers.html">Careers</a></li>
-        <li><a href="studios.html">Studios</a></li>
-      </ul></div>
-      <div class="f-col"><h4>Contact</h4><ul>
-        <li><a href="tel:0434198929">Kilsyth: 0434 198 929</a></li>
-        <li><a href="tel:0489930719">Ringwood: 0489 930 719</a></li>
-        <li><a href="mailto:kilsyth@pathfindermusiclessons.com.au">kilsyth@pathfindermusiclessons.com.au</a></li>
-        <li><a href="mailto:ringwood@pathfindermusiclessons.com.au">ringwood@pathfindermusiclessons.com.au</a></li>
-      </ul></div>
-    </div>
-    <div class="f-bottom">
-      <span>© 2026 Pathfinder Music Lessons. All rights reserved.</span>
-      <a href="#top" style="color:var(--orange);text-decoration:none;">Back to top ↑</a>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closePasswordModal()">Done — I've noted the password</button>
     </div>
   </div>
-</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
 <script>
-const nt=document.getElementById("nt"),nl=document.getElementById("nl");
-nt.addEventListener("click",()=>nl.classList.toggle("open"));
-document.querySelectorAll("a[href^=\"#\"]").forEach(a=>a.addEventListener("click",()=>nl.classList.remove("open")));
+const INSTRUMENTS = ['Guitar','Bass','Drums','Piano','Voice / Singing','Violin','Ukulele','Music Theory','Saxophone','Other'];
+const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+let allTeachers = [];
+let allStudios  = [];
+let currentProfile = null;
+
+(async () => {
+  currentProfile = await requireAuth(['superuser','admin']);
+  if (!currentProfile) return;
+  renderTopNavUser(currentProfile);
+  if (currentProfile.role === 'superuser') {
+    document.getElementById('superuserSection').classList.remove('hidden');
+    document.getElementById('studiosLink').classList.remove('hidden');
+    document.getElementById('adminsLink').classList.remove('hidden');
+  }
+  if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
+  await loadStudios();
+  await loadTeachers();
+})();
+
+async function loadStudios() {
+  const { data } = await db.from('studios').select('id, name').eq('status','active').order('name');
+  allStudios = data ?? [];
+}
+
+async function loadTeachers() {
+  // Fetch teachers and profiles separately to avoid join issues
+  // Fetch teachers
+  const { data: teacherData, error } = await db
+    .from('teachers')
+    .select('id, instruments, studio_ids, virtual_room_link, user_id')
+    .order('id');
+
+  if (error) { showToast('Error loading teachers: ' + error.message, 'error'); return; }
+
+  // Fetch profiles separately
+  const userIds = (teacherData ?? []).map(t => t.user_id);
+  const { data: profileData } = userIds.length > 0
+    ? await db.from('profiles').select('*').in('id', userIds)
+    : { data: [] };
+  const profileMap = {};
+  (profileData ?? []).forEach(p => { profileMap[p.id] = p; });
+
+  // Fetch availability separately
+  const teacherIds = (teacherData ?? []).map(t => t.id);
+  const { data: availData } = teacherIds.length > 0
+    ? await db.from('teacher_availability').select('id, teacher_id, studio_id, day_of_week, start_time, end_time').in('teacher_id', teacherIds)
+    : { data: [] };
+  const availMap = {};
+  (availData ?? []).forEach(a => {
+    if (!availMap[a.teacher_id]) availMap[a.teacher_id] = [];
+    availMap[a.teacher_id].push(a);
+  });
+
+  // Merge everything
+  const data = (teacherData ?? []).map(t => ({
+    ...t,
+    profiles: profileMap[t.user_id] ?? null,
+    teacher_availability: availMap[t.id] ?? [],
+  }));
+
+  allTeachers = data ?? [];
+
+  const active = allTeachers.filter(t => t.profiles?.status === 'active').length;
+  document.getElementById('teacherCount').textContent = `${active} active · ${allTeachers.length} total`;
+  renderTeachers();
+}
+
+function renderTeachers() {
+  const grid = document.getElementById('teachersGrid');
+  if (!allTeachers.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1;"><div class="empty-state"><div class="empty-state-icon">👩‍🏫</div><h3>No teachers yet</h3><p>Add your first teacher using the button above.</p></div></div>`;
+    return;
+  }
+
+  // Build studio map
+  const studioMap = {};
+  allStudios.forEach(s => studioMap[s.id] = s.name);
+
+  grid.innerHTML = allTeachers.map(t => {
+    const p        = t.profiles ?? {};
+    const initials = ((p.first_name?.[0] ?? '') + (p.last_name?.[0] ?? '')).toUpperCase();
+    const studios  = (t.studio_ids ?? []).map(id => studioMap[id] ?? id).join(', ') || '–';
+    const avail    = t.teacher_availability ?? [];
+    const availDays = avail.map(a => a.day_of_week);
+
+    return `<div class="teacher-card">
+      <div class="teacher-card-top">
+        <div class="teacher-avatar">${initials}</div>
+        <div>
+          <div class="teacher-card-name">${p.first_name ?? ''} ${p.last_name ?? ''}</div>
+          <div class="teacher-card-email">${p.email ?? ''}</div>
+        </div>
+        <div style="margin-left:auto;">
+          <span class="pill pill-${p.status === 'active' ? 'active' : 'inactive'}">${p.status === 'active' ? 'Active' : 'Inactive'}</span>
+        </div>
+      </div>
+      <div class="teacher-card-body">
+        <div class="teacher-meta-row"><span class="teacher-meta-icon">🎵</span><span>${(t.instruments ?? []).join(', ') || '–'}</span></div>
+        <div class="teacher-meta-row"><span class="teacher-meta-icon">📍</span><span>${studios}</span></div>
+        ${t.virtual_room_link ? `<div class="teacher-meta-row"><span class="teacher-meta-icon">🎥</span><a href="${t.virtual_room_link}" target="_blank" class="text-orange" style="font-size:0.82rem;text-decoration:none;">Virtual room</a></div>` : ''}
+        <div class="text-sm text-muted" style="margin-bottom:0.35rem;">Availability</div>
+        <div class="avail-grid">
+          ${DAYS.map((d, i) => `<div class="avail-day ${availDays.includes(i) ? 'on' : ''}">${d}</div>`).join('')}
+        </div>
+      </div>
+      <div class="teacher-card-footer">
+        <button class="btn btn-ghost btn-sm" onclick="openTeacherByIndex(${allTeachers.indexOf(t)})">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="toggleTeacherStatus('${t.profiles?.id}','${p.status}')">
+          ${p.status === 'inactive' ? 'Activate' : 'Deactivate'}
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="showToast('Teacher detail page coming soon.', 'warning')">View</button>
+        <button class="btn btn-ghost btn-sm" onclick="resetPassword('${t.profiles?.id}',${allTeachers.indexOf(t)})">Reset PW</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteTeacher('${t.id}','${t.user_id}',${allTeachers.indexOf(t)})">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ---- Modal ----
+async function resetPassword(userId, idx) {
+  const teacher = allTeachers[idx];
+  const name    = `${teacher.profiles?.first_name ?? ''} ${teacher.profiles?.last_name ?? ''}`.trim();
+
+  // Get email first
+  const emailRes  = await fetch('/.netlify/functions/create-user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'get-email', userId }),
+  });
+  const emailData = await emailRes.json();
+  if (!emailRes.ok || !emailData.email) {
+    showToast('Could not find email for this user.', 'error'); return;
+  }
+
+  // Send reset email
+  const res  = await fetch('/.netlify/functions/create-user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'reset-password', email: emailData.email }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    showToast(data.error ?? 'Could not send reset email.', 'error');
+  } else {
+    showToast(`Password reset email sent to ${name}.`, 'success');
+  }
+}
+
+async function deleteTeacher(teacherId, userId, idx) {
+  const t    = allTeachers[idx];
+  const name = `${t.profiles?.first_name ?? ''} ${t.profiles?.last_name ?? ''}`.trim();
+  if (!confirm(`Are you sure you want to permanently delete ${name}? This cannot be undone.`)) return;
+
+  await db.from('teacher_availability').delete().eq('teacher_id', teacherId);
+  await db.from('student_teachers').delete().eq('teacher_id', teacherId);
+  await db.from('teachers').delete().eq('id', teacherId);
+  await db.from('profiles').delete().eq('id', userId);
+
+  const res = await fetch('/.netlify/functions/create-user', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'delete-user', userId }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    showToast('Teacher deleted but auth account may remain: ' + (data.error ?? ''), 'warning');
+  } else {
+    showToast(`${name} deleted successfully.`, 'success');
+  }
+  await loadTeachers();
+}
+
+function openTeacherByIndex(idx) {
+  openTeacherModal(allTeachers[idx]);
+}
+
+function openTeacherModal(teacher = null) {
+  buildInstrumentCheckboxes(teacher?.instruments ?? []);
+  buildStudioCheckboxes(teacher?.studio_ids ?? []);
+  document.getElementById('availSlots').innerHTML = '';
+
+  if (teacher) {
+    document.getElementById('teacherModalTitle').textContent = 'Edit Teacher';
+    document.getElementById('editTeacherId').value     = teacher.id;
+    document.getElementById('editTeacherUserId').value = teacher.profiles?.id ?? '';
+    document.getElementById('tFirstName').value        = teacher.profiles?.first_name ?? '';
+    document.getElementById('tLastName').value         = teacher.profiles?.last_name  ?? '';
+    document.getElementById('tEmail').value            = 'Loading…';
+    document.getElementById('tPhone').value            = teacher.profiles?.phone      ?? '';
+    document.getElementById('tZoom').value             = teacher.virtual_room_link    ?? '';
+    (teacher.teacher_availability ?? []).forEach(a => addAvailSlot(a));
+
+    // Fetch email from auth.users via Netlify Function
+    // Use profiles.id (same as auth user id) which is already set above
+    const userId = teacher.profiles?.id ?? teacher.user_id ?? '';
+    if (userId) {
+      fetch('/.netlify/functions/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get-email', userId }),
+      })
+      .then(r => r.json())
+      .then(d => {
+        document.getElementById('tEmail').value = d.email ?? '';
+      })
+      .catch(() => { document.getElementById('tEmail').value = ''; });
+    }
+  } else {
+    document.getElementById('teacherModalTitle').textContent = 'Add Teacher';
+    document.getElementById('editTeacherId').value     = '';
+    document.getElementById('editTeacherUserId').value = '';
+    ['tFirstName','tLastName','tEmail','tPhone','tZoom'].forEach(id => document.getElementById(id).value = '');
+    addAvailSlot();
+  }
+  document.getElementById('teacherModal').classList.remove('hidden');
+}
+
+function closeTeacherModal() { document.getElementById('teacherModal').classList.add('hidden'); }
+
+function buildInstrumentCheckboxes(selected) {
+  document.getElementById('tInstruments').innerHTML = INSTRUMENTS.map(i =>
+    `<label style="display:flex;align-items:center;gap:0.35rem;font-size:0.82rem;cursor:pointer;">
+      <input type="checkbox" value="${i}" ${selected.includes(i) ? 'checked' : ''} style="accent-color:var(--orange);">
+      ${i}
+    </label>`
+  ).join('');
+}
+
+function buildStudioCheckboxes(selected) {
+  document.getElementById('tStudios').innerHTML = allStudios.map(s =>
+    `<label style="display:flex;align-items:center;gap:0.35rem;font-size:0.82rem;cursor:pointer;">
+      <input type="checkbox" value="${s.id}" ${selected.includes(s.id) ? 'checked' : ''} style="accent-color:var(--orange);">
+      ${s.name}
+    </label>`
+  ).join('');
+}
+
+let availCount = 0;
+function addAvailSlot(existing = null) {
+  availCount++;
+  const id  = `avail${availCount}`;
+  const div = document.createElement('div');
+  div.className = 'avail-slot';
+  div.id = id;
+  div.innerHTML = `
+    <select class="form-select avail-day-sel" style="font-size:0.82rem;">
+      ${DAYS.map((d, i) => `<option value="${i}" ${existing?.day_of_week === i ? 'selected' : ''}>${d}</option>`).join('')}
+    </select>
+    <select class="form-select avail-studio-sel" style="font-size:0.82rem;">
+      ${allStudios.map(s => `<option value="${s.id}" ${existing?.studio_id === s.id ? 'selected' : ''}>${s.name}</option>`).join('')}
+    </select>
+    <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:0.35rem;">
+      <input class="form-input avail-start" type="time" value="${existing?.start_time?.slice(0,5) ?? '09:00'}" style="font-size:0.82rem;">
+      <span class="text-sm text-muted">to</span>
+      <input class="form-input avail-end" type="time" value="${existing?.end_time?.slice(0,5) ?? '17:00'}" style="font-size:0.82rem;">
+    </div>
+    <button class="btn btn-danger btn-sm" onclick="document.getElementById('${id}').remove()">✕</button>`;
+  document.getElementById('availSlots').appendChild(div);
+}
+
+// ---- Save teacher ----
+async function saveTeacher() {
+  const firstName     = document.getElementById('tFirstName').value.trim();
+  const lastName      = document.getElementById('tLastName').value.trim();
+  const email         = document.getElementById('tEmail').value.trim();
+  const phone         = document.getElementById('tPhone').value.trim();
+  const zoom          = document.getElementById('tZoom').value.trim();
+  const editId        = document.getElementById('editTeacherId').value;
+  const editUserId    = document.getElementById('editTeacherUserId').value;
+
+  if (!firstName || !lastName || !email) {
+    showToast('Please fill in all required fields.', 'error'); return;
+  }
+
+  // Duplicate email check is handled inside the Netlify Function
+
+  const instruments = [...document.querySelectorAll('#tInstruments input:checked')].map(c => c.value);
+  const studioIds   = [...document.querySelectorAll('#tStudios input:checked')].map(c => c.value);
+  const availability = [...document.querySelectorAll('#availSlots .avail-slot')].map(slot => ({
+    day_of_week: parseInt(slot.querySelector('.avail-day-sel').value),
+    studio_id:   slot.querySelector('.avail-studio-sel').value,
+    start_time:  slot.querySelector('.avail-start').value + ':00',
+    end_time:    slot.querySelector('.avail-end').value   + ':00',
+  }));
+
+  try {
+    let teacherId = editId;
+    let userId    = editUserId;
+
+    if (!editId) {
+      // Call Netlify Function to create the auth user server-side
+      const createRes = await fetch('/.netlify/functions/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, role: 'teacher' }),
+      });
+      const createData = await createRes.json();
+      if (!createRes.ok) {
+        showToast(createData.error ?? 'Could not create user account.', 'error');
+        return;
+      }
+      userId = createData.id;
+
+      // Insert or update profile
+      await db.from('profiles').upsert({
+        id: userId, first_name: firstName, last_name: lastName, phone, role: 'teacher', status: 'active',
+        must_change_password: true,
+      }, { onConflict: 'id' });
+
+      const { data: tData } = await db.from('teachers').insert({
+        user_id: userId, instruments, studio_ids: studioIds, virtual_room_link: zoom || null
+      }).select('id').single();
+      teacherId = tData.id;
+
+      // Show temp password in a modal so admin can copy it
+      if (!createData.existed) {
+        showPasswordModal(firstName, createData.email, createData.tempPassword);
+      }
+    } else {
+      await db.from('profiles').update({ first_name: firstName, last_name: lastName, phone }).eq('id', userId);
+      await db.from('teachers').update({ instruments, studio_ids: studioIds, virtual_room_link: zoom || null }).eq('id', editId);
+    }
+
+    // Replace availability
+    await db.from('teacher_availability').delete().eq('teacher_id', teacherId);
+    if (availability.length > 0) {
+      await db.from('teacher_availability').insert(availability.map(a => ({ ...a, teacher_id: teacherId })));
+    }
+
+    showToast(editId ? 'Teacher updated.' : 'Teacher added.', 'success');
+    closeTeacherModal();
+    await loadTeachers();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function toggleTeacherStatus(userId, currentStatus) {
+  const newStatus = currentStatus === 'inactive' ? 'active' : 'inactive';
+  await db.from('profiles').update({ status: newStatus }).eq('id', userId);
+  showToast(`Teacher ${newStatus === 'inactive' ? 'deactivated' : 'activated'}.`, 'success');
+  await loadTeachers();
+}
+
+document.getElementById('teacherModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeTeacherModal(); });
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+function showPasswordModal(name, email, password) {
+  document.getElementById('pwName').textContent     = name;
+  document.getElementById('pwEmail').value          = email;
+  document.getElementById('pwPassword').value       = password;
+  document.getElementById('passwordModal').classList.remove('hidden');
+}
+
+function closePasswordModal() {
+  document.getElementById('passwordModal').classList.add('hidden');
+  showToast('Teacher added successfully.', 'success');
+  loadTeachers();
+}
+
+function copyToClipboard(inputId) {
+  const input = document.getElementById(inputId);
+  input.select();
+  document.execCommand('copy');
+  showToast('Copied to clipboard!', 'success');
+}
 </script>
-</body></html>
+</body>
+</html>
