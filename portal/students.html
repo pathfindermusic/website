@@ -510,6 +510,7 @@ function renderStudents(students) {
             ${s.status === 'inactive' ? 'Activate' : 'Deactivate'}
           </button>
           <button class="btn btn-ghost btn-sm" onclick="resetPassword('${s.user_id}','${s.profiles?.first_name ?? ''} ${s.profiles?.last_name ?? ''}')">Reset PW</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteStudent('${s.id}','${s.user_id}','${s.profiles?.first_name ?? ''} ${s.profiles?.last_name ?? ''}')">Delete</button>
         </div>
       </td>
     </tr>`;
@@ -599,6 +600,33 @@ async function resetPassword(userId, name) {
   } else {
     showToast(`Password reset email sent to ${name.trim()}.`, 'success');
   }
+}
+
+async function deleteStudent(studentId, userId, name) {
+  if (!confirm(`Are you sure you want to permanently delete ${name.trim()}? This cannot be undone.`)) return;
+
+  await db.from('student_instruments').delete().eq('student_id', studentId);
+  await db.from('student_teachers').delete().eq('student_id', studentId);
+  await db.from('attendance').delete().in('lesson_occurrence_id',
+    (await db.from('lesson_occurrences').select('id')
+      .in('lesson_id', (await db.from('lessons').select('id').eq('student_id', studentId)).data?.map(l => l.id) ?? [])
+    ).data?.map(o => o.id) ?? []
+  );
+  await db.from('lessons').delete().eq('student_id', studentId);
+  await db.from('students').delete().eq('id', studentId);
+  await db.from('profiles').delete().eq('id', userId);
+
+  const res = await fetch('/.netlify/functions/create-user', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'delete-user', userId }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    showToast('Student deleted but auth account may remain: ' + (data.error ?? ''), 'warning');
+  } else {
+    showToast(`${name.trim()} deleted successfully.`, 'success');
+  }
+  await loadStudents();
 }
 
 function openStudentByIndex(idx) {
@@ -701,7 +729,8 @@ async function saveStudent() {
 
       // Insert or update profile
       await db.from('profiles').upsert({
-        id: userId, first_name: firstName, last_name: lastName, phone, role: 'student', status: 'active'
+        id: userId, first_name: firstName, last_name: lastName, phone, role: 'student', status: 'active',
+        must_change_password: true,
       }, { onConflict: 'id' });
 
       // Insert student record

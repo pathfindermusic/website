@@ -375,6 +375,7 @@ function renderTeachers() {
         </button>
         <button class="btn btn-secondary btn-sm" onclick="showToast('Teacher detail page coming soon.', 'warning')">View</button>
         <button class="btn btn-ghost btn-sm" onclick="resetPassword('${t.profiles?.id}',${allTeachers.indexOf(t)})">Reset PW</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteTeacher('${t.id}','${t.user_id}',${allTeachers.indexOf(t)})">Delete</button>
       </div>
     </div>`;
   }).join('');
@@ -408,6 +409,29 @@ async function resetPassword(userId, idx) {
   } else {
     showToast(`Password reset email sent to ${name}.`, 'success');
   }
+}
+
+async function deleteTeacher(teacherId, userId, idx) {
+  const t    = allTeachers[idx];
+  const name = `${t.profiles?.first_name ?? ''} ${t.profiles?.last_name ?? ''}`.trim();
+  if (!confirm(`Are you sure you want to permanently delete ${name}? This cannot be undone.`)) return;
+
+  await db.from('teacher_availability').delete().eq('teacher_id', teacherId);
+  await db.from('student_teachers').delete().eq('teacher_id', teacherId);
+  await db.from('teachers').delete().eq('id', teacherId);
+  await db.from('profiles').delete().eq('id', userId);
+
+  const res = await fetch('/.netlify/functions/create-user', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'delete-user', userId }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    showToast('Teacher deleted but auth account may remain: ' + (data.error ?? ''), 'warning');
+  } else {
+    showToast(`${name} deleted successfully.`, 'success');
+  }
+  await loadTeachers();
 }
 
 function openTeacherByIndex(idx) {
@@ -543,7 +567,8 @@ async function saveTeacher() {
 
       // Insert or update profile
       await db.from('profiles').upsert({
-        id: userId, first_name: firstName, last_name: lastName, phone, role: 'teacher', status: 'active'
+        id: userId, first_name: firstName, last_name: lastName, phone, role: 'teacher', status: 'active',
+        must_change_password: true,
       }, { onConflict: 'id' });
 
       const { data: tData } = await db.from('teachers').insert({
