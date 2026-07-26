@@ -85,6 +85,7 @@ exports.handler = async (event) => {
         body: JSON.stringify({
           email,
           gotrue_meta_security: {},
+          redirect_to: 'https://www.pathfindermusiclessons.com.au/portal/change-password.html',
         }),
       });
 
