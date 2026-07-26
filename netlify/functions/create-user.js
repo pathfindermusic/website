@@ -76,7 +76,8 @@ exports.handler = async (event) => {
     try {
       // Use /recover endpoint which actually sends the email
       // (generate_link only creates a link, doesn't send email)
-      const res = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
+      const redirectTo = encodeURIComponent('https://www.pathfindermusiclessons.com.au/portal/change-password.html');
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/recover?redirect_to=${redirectTo}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -85,10 +86,8 @@ exports.handler = async (event) => {
         body: JSON.stringify({
           email,
           gotrue_meta_security: {},
-          redirect_to: 'https://www.pathfindermusiclessons.com.au/portal/change-password.html',
         }),
-      });
-
+      });      
       // /recover returns 200 with empty body on success
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
