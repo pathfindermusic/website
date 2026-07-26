@@ -374,12 +374,42 @@ function renderTeachers() {
           ${p.status === 'inactive' ? 'Activate' : 'Deactivate'}
         </button>
         <button class="btn btn-secondary btn-sm" onclick="showToast('Teacher detail page coming soon.', 'warning')">View</button>
+        <button class="btn btn-ghost btn-sm" onclick="resetPassword('${t.profiles?.id}',${allTeachers.indexOf(t)})">Reset PW</button>
       </div>
     </div>`;
   }).join('');
 }
 
 // ---- Modal ----
+async function resetPassword(userId, idx) {
+  const teacher = allTeachers[idx];
+  const name    = `${teacher.profiles?.first_name ?? ''} ${teacher.profiles?.last_name ?? ''}`.trim();
+
+  // Get email first
+  const emailRes  = await fetch('/.netlify/functions/create-user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'get-email', userId }),
+  });
+  const emailData = await emailRes.json();
+  if (!emailRes.ok || !emailData.email) {
+    showToast('Could not find email for this user.', 'error'); return;
+  }
+
+  // Send reset email
+  const res  = await fetch('/.netlify/functions/create-user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'reset-password', email: emailData.email }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    showToast(data.error ?? 'Could not send reset email.', 'error');
+  } else {
+    showToast(`Password reset email sent to ${name}.`, 'success');
+  }
+}
+
 function openTeacherByIndex(idx) {
   openTeacherModal(allTeachers[idx]);
 }

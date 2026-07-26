@@ -509,6 +509,7 @@ function renderStudents(students) {
           <button class="btn btn-danger btn-sm" onclick="toggleStudentStatus('${s.id}','${s.status}')">
             ${s.status === 'inactive' ? 'Activate' : 'Deactivate'}
           </button>
+          <button class="btn btn-ghost btn-sm" onclick="resetPassword('${s.user_id}','${s.profiles?.first_name ?? ''} ${s.profiles?.last_name ?? ''}')">Reset PW</button>
         </div>
       </td>
     </tr>`;
@@ -574,6 +575,32 @@ function removeInstrumentRow(id) {
 }
 
 // ---- Open/close student modal ----
+async function resetPassword(userId, name) {
+  // Get email first
+  const emailRes  = await fetch('/.netlify/functions/create-user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'get-email', userId }),
+  });
+  const emailData = await emailRes.json();
+  if (!emailRes.ok || !emailData.email) {
+    showToast('Could not find email for this user.', 'error'); return;
+  }
+
+  // Send reset email
+  const res  = await fetch('/.netlify/functions/create-user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'reset-password', email: emailData.email }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    showToast(data.error ?? 'Could not send reset email.', 'error');
+  } else {
+    showToast(`Password reset email sent to ${name.trim()}.`, 'success');
+  }
+}
+
 function openStudentByIndex(idx) {
   openStudentModal(allStudents[idx]);
 }

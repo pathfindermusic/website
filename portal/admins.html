@@ -255,6 +255,7 @@ async function loadAdmins() {
           <button class="btn btn-danger btn-sm" onclick="toggleAdminStatus('${p.id}','${p.status}')">
             ${p.status === 'active' ? 'Deactivate' : 'Activate'}
           </button>
+          <button class="btn btn-ghost btn-sm" onclick="resetAdminPassword('${a.user_id}','${p.first_name ?? ''} ${p.last_name ?? ''}')">Reset PW</button>
         </div>
       </td>
     </tr>`;
@@ -405,6 +406,29 @@ function showPasswordModal(name, email, password) {
 function closePasswordModal() {
   document.getElementById('passwordModal').classList.add('hidden');
   loadAdmins();
+}
+
+async function resetAdminPassword(userId, name) {
+  const emailRes  = await fetch('/.netlify/functions/create-user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'get-email', userId }),
+  });
+  const emailData = await emailRes.json();
+  if (!emailRes.ok || !emailData.email) {
+    showToast('Could not find email for this user.', 'error'); return;
+  }
+  const res  = await fetch('/.netlify/functions/create-user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'reset-password', email: emailData.email }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    showToast(data.error ?? 'Could not send reset email.', 'error');
+  } else {
+    showToast(`Password reset email sent to ${name.trim()}.`, 'success');
+  }
 }
 
 function copyField(id) {
