@@ -48,27 +48,56 @@ exports.handler = async (event) => {
     }
   }
 
+  // ---- DELETE USER ----
+  if (action === 'delete-user') {
+    const { userId } = body;
+    if (!userId) return { statusCode: 400, body: JSON.stringify({ error: 'userId is required' }) };
+    try {
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
+        method: 'DELETE', headers,
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        return { statusCode: 400, headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: data?.message ?? 'Could not delete user' }) };
+      }
+      return { statusCode: 200, headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: true }) };
+    } catch (err) {
+      return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+    }
+  }
+
   // ---- RESET PASSWORD ----
   if (action === 'reset-password') {
     const { email } = body;
     if (!email) return { statusCode: 400, body: JSON.stringify({ error: 'Email is required' }) };
 
     try {
-      const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
+      // Use /recover endpoint which actually sends the email
+      // (generate_link only creates a link, doesn't send email)
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
         method: 'POST',
-        headers,
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_SERVICE_KEY,
+        },
         body: JSON.stringify({
-          type: 'recovery',
           email,
-          redirect_to: 'https://www.pathfindermusiclessons.com.au/portal/change-password.html',
+          gotrue_meta_security: {},
         }),
       });
-      const data = await res.json();
-      if (!res.ok) return {
-        statusCode: 400,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: data?.message ?? 'Could not send reset email' }),
-      };
+
+      // /recover returns 200 with empty body on success
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: data?.message ?? 'Could not send reset email' }),
+        };
+      }
+
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
