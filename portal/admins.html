@@ -353,18 +353,28 @@ async function saveAdmin() {
       }
       userId = createData.id;
 
-      // Insert profile
-      await db.from('profiles').upsert({
+      // Insert or update profile
+      const { error: pErr } = await db.from('profiles').upsert({
         id: userId, first_name: firstName, last_name: lastName,
         phone: phone || null, role: 'admin', status: 'active',
         must_change_password: true,
       }, { onConflict: 'id' });
+      if (pErr) throw new Error('Profile error: ' + pErr.message);
 
-      // Insert admin record
-      const { data: aData } = await db.from('admins')
-        .insert({ user_id: userId, studio_ids: studioIds })
-        .select('id').single();
-      adminId = aData.id;
+      // Check if admin record already exists for this user
+      const { data: existingAdmin } = await db
+        .from('admins').select('id').eq('user_id', userId).maybeSingle();
+
+      if (existingAdmin) {
+        await db.from('admins').update({ studio_ids: studioIds }).eq('id', existingAdmin.id);
+        adminId = existingAdmin.id;
+      } else {
+        const { data: aData, error: aErr } = await db.from('admins')
+          .insert({ user_id: userId, studio_ids: studioIds })
+          .select('id').single();
+        if (aErr) throw new Error('Admin record error: ' + aErr.message);
+        adminId = aData.id;
+      }
 
       if (!createData.existed) {
         showPasswordModal(firstName, createData.email, createData.tempPassword);

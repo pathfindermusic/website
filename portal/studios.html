@@ -139,10 +139,10 @@ async function loadStudios() {
   allStudios = data ?? [];
   document.getElementById('studioCount').textContent =
     `${allStudios.filter(s => s.status === 'active').length} active · ${allStudios.length} total`;
-  renderStudios();
+  await renderStudios();
 }
 
-function renderStudios() {
+async function renderStudios() {
   const grid = document.getElementById('studiosGrid');
   if (!allStudios.length) {
     grid.innerHTML = `<div style="grid-column:1/-1;"><div class="empty-state">
@@ -153,7 +153,27 @@ function renderStudios() {
     return;
   }
 
-  grid.innerHTML = allStudios.map((s, idx) => `
+  // Fetch admins for each studio
+  const { data: adminData } = await db
+    .from('admins')
+    .select('id, user_id, studio_ids');
+  const { data: profileData } = adminData?.length > 0
+    ? await db.from('profiles').select('id, first_name, last_name, status').in('id', adminData.map(a => a.user_id))
+    : { data: [] };
+  const profileMap = {};
+  (profileData ?? []).forEach(p => { profileMap[p.id] = p; });
+
+  grid.innerHTML = allStudios.map((s, idx) => {
+    // Find admins who have access to this studio (or all studios if studio_ids is empty)
+    const studioAdmins = (adminData ?? []).filter(a =>
+      (a.studio_ids ?? []).length === 0 || (a.studio_ids ?? []).includes(s.id)
+    );
+    const adminNames = studioAdmins.map(a => {
+      const p = profileMap[a.user_id];
+      return p ? `${p.first_name} ${p.last_name}` : null;
+    }).filter(Boolean);
+
+    return `
     <div class="studio-card">
       <div class="studio-card-top">
         <div class="studio-name">${s.name}</div>
@@ -161,16 +181,25 @@ function renderStudios() {
       </div>
       <div class="studio-body">
         ${s.address ? `<div class="studio-detail">📍 <span>${s.address}</span></div>` : ''}
-        ${s.email    ? `<div class="studio-detail">✉️ <a href="mailto:${s.email}">${s.email}</a></div>` : ''}
+        ${s.email   ? `<div class="studio-detail">✉️ <a href="mailto:${s.email}">${s.email}</a></div>` : ''}
         ${!s.address && !s.email ? `<div class="text-sm text-muted">No details added yet.</div>` : ''}
+        <div class="studio-detail" style="margin-top:0.5rem;">
+          👤 <span>
+            ${adminNames.length > 0
+              ? `<strong>${adminNames.length}</strong> admin${adminNames.length !== 1 ? 's' : ''}: ${adminNames.join(', ')}`
+              : '<span class="text-muted">No admins assigned</span>'}
+          </span>
+        </div>
       </div>
       <div class="studio-footer">
         <button class="btn btn-ghost btn-sm" onclick="openStudioModal(${idx})">Edit</button>
         <button class="btn btn-danger btn-sm" onclick="toggleStudioStatus('${s.id}','${s.status}')">
           ${s.status === 'active' ? 'Deactivate' : 'Activate'}
         </button>
+        <button class="btn btn-danger btn-sm" onclick="deleteStudio('${s.id}','${s.name}')">Delete</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function openStudioModal(idx = null) {
@@ -191,6 +220,30 @@ function openStudioModal(idx = null) {
 
 function closeStudioModal() { document.getElementById('studioModal').classList.add('hidden'); }
 
+async function deleteStudio(id, name) {
+  // Check if studio has any active lessons or students before deleting
+  const { count: lessonCount } = await db
+    .from('lessons')
+    .select('id', { count: 'exact' })
+    .eq('studio_id', id)
+    .eq('status', 'active');
+
+  if (lessonCount > 0) {
+    showToast(`Cannot delete ${name} — it has ${lessonCount} active lesson(s). Deactivate the studio instead.`, 'warning');
+    return;
+  }
+
+  if (!confirm(`Are you sure you want to permanently delete the ${name} studio? This cannot be undone.`)) return;
+
+  const { error } = await db.from('studios').delete().eq('id', id);
+  if (error) {
+    showToast('Error deleting studio: ' + error.message, 'error');
+  } else {
+    showToast(`${name} studio deleted.`, 'success');
+    await loadStudios();
+  }
+}
+
 async function saveStudio() {
   const name    = document.getElementById('sName').value.trim();
   const address = document.getElementById('sAddress').value.trim();
@@ -198,6 +251,18 @@ async function saveStudio() {
   const editId  = document.getElementById('editStudioId').value;
 
   if (!name) { showToast('Please enter a studio name.', 'error'); return; }
+
+  // Validate unique email if provided
+  if (email) {
+    const { data: existing } = await db
+      .from('studios')
+      .select('id, name')
+      .eq('email', email)
+      .maybeSingle();
+    if (existing && existing.id !== editId) {
+      showToast(`This email is already used by the ${existing.name} studio.`, 'error'); return;
+    }
+  }
 
   const payload = { name, address: address || null, email: email || null };
 
