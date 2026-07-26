@@ -7,6 +7,7 @@
 const SUPABASE_URL  = 'https://oxuyzcjgxmohpqyijpip.supabase.co';   // e.g. https://xxxxxxxxxxxx.supabase.co -- It's the API URL Supabase Dashboard → Project Settings → Data API
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im94dXl6Y2pneG1vaHBxeWlqcGlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTQ3NzMsImV4cCI6MjEwMDQ5MDc3M30.3BiBBOqQFMwpb7mZC7xLISDp2EJCXfML-7_wq-Imwws';      // anon public API Key generated for pathfinder_student_portal role in Supabase Dashboard → Project Settings → API Key
 
+
 // Load Supabase via CDN (included in each HTML page's <head>)
 // <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 const { createClient } = supabase;
@@ -49,6 +50,11 @@ async function requireAuth(allowedRoles = []) {
   }
   if (allowedRoles.length > 0 && !allowedRoles.includes(profile.role)) {
     window.location.href = '/portal/login.html';
+    return null;
+  }
+  // If must change password, redirect unless already on change-password page
+  if (profile.must_change_password && !window.location.pathname.includes('change-password')) {
+    window.location.href = '/portal/change-password.html';
     return null;
   }
   return profile;
