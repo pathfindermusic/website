@@ -48,6 +48,37 @@ exports.handler = async (event) => {
     }
   }
 
+  // ---- RESET PASSWORD ----
+  if (action === 'reset-password') {
+    const { email } = body;
+    if (!email) return { statusCode: 400, body: JSON.stringify({ error: 'Email is required' }) };
+
+    try {
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          type: 'recovery',
+          email,
+          redirect_to: 'https://www.pathfindermusiclessons.com.au/portal/change-password.html',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) return {
+        statusCode: 400,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: data?.message ?? 'Could not send reset email' }),
+      };
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: true }),
+      };
+    } catch (err) {
+      return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+    }
+  }
+
   // ---- CREATE new auth user ----
   const { email, role } = body;
   if (!email || !role) {
