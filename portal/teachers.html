@@ -195,6 +195,11 @@
         <input class="form-input" type="url" id="tZoom" placeholder="https://zoom.us/j/...">
       </div>
       <div class="form-group">
+        <label class="form-label">Teaching Room</label>
+        <input class="form-input" type="text" id="tRoom" placeholder="e.g. Ringwood - Dave's Room">
+        <div class="form-hint">Default: Studio Name - Teacher First Name's Room. Leave blank to auto-generate.</div>
+      </div>
+      <div class="form-group">
         <label class="form-label">Instruments taught</label>
         <div id="tInstruments" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.25rem;">
           <!-- Checkboxes injected by JS -->
@@ -262,7 +267,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-client.js"></script>
 <script>
-const INSTRUMENTS = ['Guitar','Bass','Drums','Piano','Voice / Singing','Violin','Ukulele','Music Theory','Saxophone','Other'];
+const INSTRUMENTS = ['Guitar','Bass','Drums','Piano','Voice / Singing','Violin','Ukulele','Music Theory','Saxophone','Band','Other'];
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 let allTeachers = [];
 let allStudios  = [];
@@ -452,6 +457,7 @@ function openTeacherModal(teacher = null) {
     document.getElementById('tEmail').value            = 'Loading…';
     document.getElementById('tPhone').value            = teacher.profiles?.phone      ?? '';
     document.getElementById('tZoom').value             = teacher.virtual_room_link    ?? '';
+    document.getElementById('tRoom').value             = teacher.teaching_room        ?? '';
     (teacher.teacher_availability ?? []).forEach(a => addAvailSlot(a));
 
     // Fetch email from auth.users via Netlify Function
@@ -473,7 +479,7 @@ function openTeacherModal(teacher = null) {
     document.getElementById('teacherModalTitle').textContent = 'Add Teacher';
     document.getElementById('editTeacherId').value     = '';
     document.getElementById('editTeacherUserId').value = '';
-    ['tFirstName','tLastName','tEmail','tPhone','tZoom'].forEach(id => document.getElementById(id).value = '');
+    ['tFirstName','tLastName','tEmail','tPhone','tZoom','tRoom'].forEach(id => document.getElementById(id).value = '');
     addAvailSlot();
   }
   document.getElementById('teacherModal').classList.remove('hidden');
@@ -571,8 +577,12 @@ async function saveTeacher() {
         must_change_password: true,
       }, { onConflict: 'id' });
 
+      const room = document.getElementById('tRoom').value.trim();
+      // Auto-generate teaching room if blank
+      const autoRoom = room || '';
       const { data: tData } = await db.from('teachers').insert({
-        user_id: userId, instruments, studio_ids: studioIds, virtual_room_link: zoom || null
+        user_id: userId, instruments, studio_ids: studioIds, virtual_room_link: zoom || null,
+        teaching_room: autoRoom || null,
       }).select('id').single();
       teacherId = tData.id;
 
@@ -582,7 +592,8 @@ async function saveTeacher() {
       }
     } else {
       await db.from('profiles').update({ first_name: firstName, last_name: lastName, phone }).eq('id', userId);
-      await db.from('teachers').update({ instruments, studio_ids: studioIds, virtual_room_link: zoom || null }).eq('id', editId);
+      const room = document.getElementById('tRoom').value.trim();
+      await db.from('teachers').update({ instruments, studio_ids: studioIds, virtual_room_link: zoom || null, teaching_room: room || null }).eq('id', editId);
     }
 
     // Replace availability

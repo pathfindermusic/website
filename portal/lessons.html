@@ -1,54 +1,238 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>Lessons — Pathfinder Portal</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/portal.css">
   <style>
-    .lessons-table { width: 100%; border-collapse: collapse; font-size: 0.845rem; }
-    .lessons-table th {
-      text-align: left;
-      font-size: 0.72rem;
-      font-weight: 600;
+    /* ---- VIEW TOGGLE ---- */
+    .view-toggle {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      overflow: hidden;
+    }
+    .view-btn {
+      padding: 0.42rem 1rem;
+      font-size: 0.8rem;
+      font-weight: 500;
+      font-family: 'Inter', sans-serif;
+      background: var(--white);
+      color: var(--dark-grey);
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .view-btn.active {
+      background: var(--charcoal);
+      color: var(--white);
+    }
+    .view-btn:not(.active):hover { background: var(--off-white); }
+
+    /* ---- DAILY GRID ---- */
+    .studios-wrap { display: flex; flex-direction: column; gap: 2rem; }
+
+    .studio-grid-section {}
+    .studio-grid-title {
+      font-size: 0.75rem;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.07em;
-      color: var(--mid-grey);
-      padding: 0 1rem 0.65rem;
-      border-bottom: 1px solid var(--border);
+      letter-spacing: 0.12em;
+      color: var(--orange);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .studio-grid-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .daily-grid-wrap { overflow-x: auto; border-radius: var(--r); border: 1px solid var(--border); background: var(--white); box-shadow: var(--shadow); }
+
+    .daily-grid {
+      border-collapse: collapse;
+      min-width: 100%;
+      table-layout: fixed;
+    }
+
+    /* Header row — teacher names */
+    .daily-grid thead th {
+      background: var(--charcoal);
+      color: rgba(255,255,255,0.8);
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 0.65rem 0.75rem;
+      text-align: center;
+      border-right: 1px solid rgba(255,255,255,0.08);
       white-space: nowrap;
     }
-    .lessons-table td {
-      padding: 0.85rem 1rem;
-      border-bottom: 1px solid var(--border);
-      color: var(--dark-grey);
-      vertical-align: middle;
-    }
-    .lessons-table tr:last-child td { border-bottom: none; }
-    .lessons-table tr:hover td { background: var(--off-white); }
-    .lessons-table tr.inactive td { opacity: 0.5; }
-    .recurrence-badge {
+    .daily-grid thead th:first-child {
+      background: var(--charcoal);
+      color: rgba(255,255,255,0.35);
+      width: 72px;
+      min-width: 72px;
+      border-right: 2px solid var(--orange);
       font-size: 0.68rem;
-      font-weight: 500;
-      padding: 0.15rem 0.5rem;
-      border-radius: 3px;
-      background: var(--scheduled-bg);
-      color: var(--scheduled);
     }
-    .warning-banner {
-      background: #fef3c7;
-      border: 1px solid #fcd34d;
+    .daily-grid thead th.teacher-col { min-width: 160px; }
+
+    /* Time rows */
+    .daily-grid tbody tr { border-bottom: 1px solid var(--border); }
+    .daily-grid tbody tr:last-child { border-bottom: none; }
+
+    .time-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--mid-grey);
+      text-align: right;
+      padding: 0 0.6rem 0 0.25rem;
+      white-space: nowrap;
+      background: var(--off-white);
+      border-right: 2px solid var(--orange);
+      vertical-align: top;
+      padding-top: 0.35rem;
+    }
+    .half-hour { border-top: 1px dashed var(--light-grey); }
+    .full-hour { border-top: 1px solid var(--border); }
+
+    /* Lesson cells */
+    .grid-cell {
+      border-right: 1px solid var(--border);
+      vertical-align: top;
+      padding: 2px;
+      height: 36px;
+      cursor: pointer;
+      transition: background 0.12s;
+      position: relative;
+    }
+    .grid-cell:last-child { border-right: none; }
+    .grid-cell:hover { background: rgba(232,73,30,0.04); }
+    .grid-cell.blocked { cursor: not-allowed; background: var(--off-white); }
+
+    /* Lesson block inside cell */
+    .lesson-block {
+      position: absolute;
+      left: 2px; right: 2px;
+      border-radius: 4px;
+      padding: 3px 6px;
+      font-size: 0.72rem;
+      line-height: 1.35;
+      cursor: pointer;
+      overflow: hidden;
+      z-index: 2;
+      transition: filter 0.15s;
+    }
+    .lesson-block:hover { filter: brightness(0.92); }
+
+    .lesson-block.private {
+      background: rgba(37,99,235,0.12);
+      border-left: 3px solid #2563eb;
+      color: #1e40af;
+    }
+    .lesson-block.group {
+      background: rgba(16,163,74,0.12);
+      border-left: 3px solid #10a37f;
+      color: #065f46;
+    }
+    .lesson-block.cancelled {
+      background: rgba(220,38,38,0.08);
+      border-left: 3px solid #dc2626;
+      color: var(--mid-grey);
+      text-decoration: line-through;
+      opacity: 0.7;
+    }
+
+    .lesson-block-name { font-weight: 600; }
+    .lesson-block-meta { font-size: 0.65rem; opacity: 0.8; }
+    .lesson-cancel-icon { position: absolute; top: 3px; right: 4px; font-size: 0.7rem; color: #dc2626; }
+
+    /* ---- WEEKLY VIEW ---- */
+    .schedule-wrap { overflow-x: auto; border-radius: var(--r); border: 1px solid var(--border); background: var(--white); box-shadow: var(--shadow); }
+    .schedule-table { width: 100%; border-collapse: collapse; min-width: 640px; }
+    .schedule-table th { background: var(--charcoal); color: rgba(255,255,255,0.75); font-size: 0.78rem; font-weight: 500; padding: 0.7rem 1rem; text-align: left; white-space: nowrap; }
+    .schedule-table td { padding: 0.85rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.845rem; vertical-align: top; }
+    .schedule-table tr:last-child td { border-bottom: none; }
+    .schedule-table tr:hover td { background: var(--off-white); cursor: pointer; }
+
+    /* ---- LESSON MODAL ---- */
+    .clash-error {
+      background: #fee2e2;
+      border: 1px solid #fca5a5;
       border-radius: var(--r-sm);
       padding: 0.65rem 0.9rem;
       font-size: 0.82rem;
-      color: #92400e;
+      color: #dc2626;
+      margin-bottom: 0.75rem;
       display: none;
-      margin-top: 0.5rem;
     }
-    .warning-banner.show { display: flex; align-items: center; gap: 0.5rem; }
+    .clash-error.show { display: flex; align-items: flex-start; gap: 0.5rem; }
+
+    .students-list { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.65rem; }
+    .student-tag {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.45rem 0.75rem;
+      background: var(--off-white);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      font-size: 0.845rem;
+    }
+    .student-tag-name { font-weight: 500; color: var(--charcoal); }
+    .student-tag-remove {
+      background: none;
+      border: none;
+      color: var(--mid-grey);
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+      padding: 0 0.2rem;
+    }
+    .student-tag-remove:hover { color: #dc2626; }
+
+    .add-student-row { display: flex; gap: 0.5rem; }
+    .add-student-row select { flex: 1; }
+
+    /* Avail warning */
+    .avail-warning {
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
+      border-radius: var(--r-sm);
+      padding: 0.55rem 0.75rem;
+      font-size: 0.78rem;
+      color: #92400e;
+      margin-top: 0.5rem;
+      display: none;
+    }
+    .avail-warning.show { display: flex; align-items: flex-start; gap: 0.4rem; }
+
+    /* ---- PDF AGENDA MODAL ---- */
+    .agenda-preview {
+      background: var(--off-white);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: 1.25rem;
+      font-size: 0.875rem;
+      line-height: 1.7;
+      max-height: 340px;
+      overflow-y: auto;
+    }
+    .agenda-heading { font-size: 1.1rem; font-weight: 700; color: var(--charcoal); margin-bottom: 0.25rem; }
+    .agenda-subheading { font-size: 0.82rem; color: var(--mid-grey); margin-bottom: 1rem; }
+    .agenda-item { display: grid; grid-template-columns: 90px 1fr 80px 1fr; gap: 0.5rem; padding: 0.35rem 0; border-bottom: 1px solid var(--light-grey); font-size: 0.82rem; }
+    .agenda-item:last-child { border-bottom: none; }
+    .agenda-time { font-weight: 600; color: var(--charcoal); }
+    .agenda-student { color: var(--charcoal); }
+    .agenda-type { color: var(--mid-grey); font-size: 0.75rem; }
+    .agenda-location { color: var(--dark-grey); font-size: 0.75rem; word-break: break-all; }
   </style>
 </head>
 <body>
@@ -66,6 +250,7 @@
           <span class="topnav-role-badge" id="navRole">–</span>
         </div>
       </div>
+      <a href="change-password.html" class="btn-logout" style="text-decoration:none;">🔑 Password</a>
       <button class="btn-logout" onclick="signOut()">Sign out</button>
     </div>
   </nav>
@@ -109,86 +294,94 @@
   <main class="main">
     <div class="page-header">
       <div>
-        <div class="page-title">Lessons</div>
-        <div class="page-sub" id="lessonCount">Loading…</div>
+        <div class="page-title" id="pageTitle">Daily Schedule</div>
+        <div class="page-sub" id="dateLabel">Loading…</div>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="openLessonModal()" id="newLessonBtn">+ Add Lesson</button>
+      <div class="flex items-center gap-2" style="flex-wrap:wrap;">
+        <!-- View toggle -->
+        <div class="view-toggle">
+          <button class="view-btn active" id="btnDaily" onclick="switchView('daily')">Daily</button>
+          <button class="view-btn" id="btnWeekly" onclick="switchView('weekly')">Weekly</button>
+        </div>
+        <!-- Date / week navigation -->
+        <div class="week-nav">
+          <button class="week-nav-btn" onclick="navBack()">‹</button>
+          <button class="btn btn-ghost btn-sm" onclick="goToday()">Today</button>
+          <button class="week-nav-btn" onclick="navForward()">›</button>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="openAgendaModal()">📄 Agenda PDF</button>
+        <button class="btn btn-primary btn-sm" onclick="openLessonModal()">+ Add Lesson</button>
+      </div>
     </div>
 
     <!-- Filters -->
     <div class="filters-bar">
-      <select class="filter-select" id="filterStudio" onchange="loadLessons()">
+      <select class="filter-select" id="filterStudio" onchange="loadView()">
         <option value="">All Studios</option>
       </select>
-      <select class="filter-select" id="filterTeacher" onchange="loadLessons()">
-        <option value="">All Teachers</option>
-      </select>
-      <select class="filter-select" id="filterStatus" onchange="loadLessons()">
-        <option value="active" selected>Active lessons</option>
-        <option value="">All lessons</option>
+      <select class="filter-select" id="filterStatus" onchange="loadView()">
+        <option value="scheduled">Scheduled</option>
+        <option value="">All statuses</option>
         <option value="cancelled">Cancelled</option>
       </select>
     </div>
 
-    <div class="card">
-      <div style="overflow-x:auto;">
-        <table class="lessons-table">
-          <thead>
-            <tr>
-              <th>Student</th>
-              <th>Teacher</th>
-              <th>Instrument</th>
-              <th>Studio</th>
-              <th>Day &amp; Time</th>
-              <th>Duration</th>
-              <th>Recurrence</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="lessonsBody">
-            <tr><td colspan="8"><div class="loading"><div class="spinner"></div> Loading lessons…</div></td></tr>
-          </tbody>
-        </table>
-      </div>
+    <!-- Content area -->
+    <div id="viewContent">
+      <div class="loading"><div class="spinner"></div> Loading schedule…</div>
     </div>
   </main>
 </div>
 
-<!-- ADD/EDIT LESSON MODAL -->
+<!-- ============================================================
+     LESSON MODAL — Add / Edit
+     ============================================================ -->
 <div class="modal-overlay hidden" id="lessonModal">
-  <div class="modal" style="max-width:580px;">
+  <div class="modal" style="max-width:600px;">
     <div class="modal-header">
       <span class="modal-title" id="lessonModalTitle">Add Lesson</span>
       <button class="modal-close" onclick="closeLessonModal()">✕</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="editLessonId">
+      <input type="hidden" id="editOccurrenceId">
 
+      <!-- Clash error -->
+      <div class="clash-error" id="clashError">
+        <span>🚫</span><span id="clashMsg">Scheduling clash detected.</span>
+      </div>
+
+      <!-- Lesson type -->
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Student *</label>
-          <select class="form-select" id="lStudent" onchange="checkAvailability()"></select>
+          <label class="form-label">Lesson type *</label>
+          <select class="form-select" id="lType" onchange="onTypeChange()">
+            <option value="private">Private (1-on-1)</option>
+            <option value="group">Group (up to 6 students)</option>
+          </select>
         </div>
         <div class="form-group">
           <label class="form-label">Instrument *</label>
-          <select class="form-select" id="lInstrument">
-            <option value="">— Select —</option>
-          </select>
+          <select class="form-select" id="lInstrument"></select>
         </div>
       </div>
+
+      <!-- Teacher + Studio -->
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Teacher *</label>
-          <select class="form-select" id="lTeacher" onchange="checkAvailability()"></select>
+          <select class="form-select" id="lTeacher" onchange="onTeacherChange()"></select>
         </div>
         <div class="form-group">
           <label class="form-label">Studio *</label>
           <select class="form-select" id="lStudio" onchange="checkAvailability()"></select>
         </div>
       </div>
+
+      <!-- Day + Time + Duration -->
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Day of week *</label>
+          <label class="form-label">Day *</label>
           <select class="form-select" id="lDay" onchange="checkAvailability()">
             <option value="1">Monday</option>
             <option value="2">Tuesday</option>
@@ -201,7 +394,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">Start time *</label>
-          <input class="form-input" type="time" id="lTime" value="16:00" onchange="checkAvailability()">
+          <input class="form-input" type="time" id="lTime" value="15:30" onchange="checkAvailability()">
         </div>
       </div>
       <div class="form-row">
@@ -221,15 +414,27 @@
       </div>
 
       <!-- Availability warning -->
-      <div class="warning-banner" id="availWarning">
-        ⚠️ <span id="availWarningText">This lesson falls outside the teacher's stated availability. You can still proceed.</span>
+      <div class="avail-warning" id="availWarning">
+        ⚠️ <span id="availWarningText"></span>
+      </div>
+
+      <!-- Students section -->
+      <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:0.75rem;">
+        <div class="form-label" style="margin-bottom:0.65rem;" id="studentsLabel">Student *</div>
+        <div class="students-list" id="studentsList"></div>
+        <div class="add-student-row">
+          <select class="form-select" id="studentPicker">
+            <option value="">— Select student —</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="addStudentToLesson()">Add</button>
+        </div>
+        <div id="groupCapacityNote" class="text-sm text-muted mt-1" style="display:none;">Group lessons: up to 6 students</div>
       </div>
 
       <!-- Recurrence -->
-      <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:0.75rem;">
+      <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:1rem;">
         <div class="form-label" style="margin-bottom:0.65rem;">Recurrence</div>
         <div class="form-group">
-          <label class="form-label">Repeat</label>
           <select class="form-select" id="lRecurrence" onchange="toggleRecurrenceFields()">
             <option value="indefinite">Indefinitely (until cancelled)</option>
             <option value="occurrences">Fixed number of lessons</option>
@@ -238,11 +443,19 @@
         </div>
         <div class="form-group hidden" id="recurrenceCountWrap">
           <label class="form-label">Number of lessons</label>
-          <input class="form-input" type="number" id="lCount" min="1" max="52" value="10" placeholder="e.g. 10">
+          <input class="form-input" type="number" id="lCount" min="1" max="52" value="10">
         </div>
         <div class="form-group hidden" id="recurrenceEndWrap">
           <label class="form-label">End date</label>
           <input class="form-input" type="date" id="lEndDate">
+        </div>
+      </div>
+
+      <!-- Series notes -->
+      <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:0.75rem;">
+        <div class="form-group">
+          <label class="form-label">Series notes (optional)</label>
+          <textarea class="form-textarea" id="lSeriesNotes" placeholder="e.g. Student prefers lessons before 5pm" style="min-height:60px;"></textarea>
         </div>
       </div>
     </div>
@@ -253,23 +466,89 @@
   </div>
 </div>
 
-<!-- CANCEL LESSON MODAL -->
-<div class="modal-overlay hidden" id="cancelModal">
-  <div class="modal" style="max-width:420px;">
+<!-- ============================================================
+     OCCURRENCE MODAL — Edit single occurrence
+     ============================================================ -->
+<div class="modal-overlay hidden" id="occurrenceModal">
+  <div class="modal" style="max-width:520px;">
     <div class="modal-header">
-      <span class="modal-title">Cancel Lesson</span>
-      <button class="modal-close" onclick="closeCancelModal()">✕</button>
+      <span class="modal-title" id="occModalTitle">Lesson Details</span>
+      <button class="modal-close" onclick="closeOccModal()">✕</button>
     </div>
     <div class="modal-body">
-      <p class="sec-body" style="margin-bottom:1.25rem;">How would you like to cancel this lesson?</p>
-      <input type="hidden" id="cancelLessonId">
-      <div style="display:flex;flex-direction:column;gap:0.65rem;">
-        <button class="btn btn-secondary" onclick="cancelLesson('all')">Cancel all lessons in this series</button>
-        <button class="btn btn-secondary" onclick="cancelLesson('future')">Cancel this and all future occurrences</button>
+      <input type="hidden" id="occId">
+      <input type="hidden" id="occLessonId">
+
+      <!-- Info summary -->
+      <div id="occSummary" style="background:var(--off-white);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.85rem;margin-bottom:1rem;font-size:0.875rem;line-height:1.65;"></div>
+
+      <!-- Students in this lesson -->
+      <div class="form-group">
+        <label class="form-label">Students in this lesson</label>
+        <div id="occStudentsList" style="font-size:0.875rem;color:var(--dark-grey);"></div>
+      </div>
+
+      <!-- Online toggle -->
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.845rem;cursor:pointer;">
+          <input type="checkbox" id="occIsOnline" style="accent-color:var(--orange);width:15px;height:15px;">
+          Online lesson (Zoom / virtual room)
+        </label>
+      </div>
+
+      <!-- Occurrence notes -->
+      <div class="form-group">
+        <label class="form-label">Occurrence notes (optional)</label>
+        <textarea class="form-textarea" id="occNotes" placeholder="e.g. Makeup lesson for 20 July · Substitute teacher: Dave" style="min-height:70px;"></textarea>
+      </div>
+
+      <!-- Cancel this occurrence -->
+      <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:0.5rem;">
+        <div class="form-label" style="margin-bottom:0.65rem;">Cancel options</div>
+        <div class="flex gap-1" style="flex-wrap:wrap;">
+          <button class="btn btn-danger btn-sm" onclick="cancelOccurrence('single')">Cancel this lesson only</button>
+          <button class="btn btn-danger btn-sm" onclick="cancelOccurrence('future')">Cancel this + all future</button>
+          <button class="btn btn-danger btn-sm" onclick="cancelOccurrence('all')">Cancel entire series</button>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeCancelModal()">Go back</button>
+      <button class="btn btn-ghost" onclick="closeOccModal()">Close</button>
+      <button class="btn btn-primary" onclick="saveOccurrence()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     AGENDA PDF MODAL
+     ============================================================ -->
+<div class="modal-overlay hidden" id="agendaModal">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <span class="modal-title">Generate Agenda PDF</span>
+      <button class="modal-close" onclick="closeAgendaModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Teacher *</label>
+          <select class="form-select" id="agendaTeacher" onchange="previewAgenda()"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Date *</label>
+          <input class="form-input" type="date" id="agendaDate" onchange="previewAgenda()">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Preview</label>
+        <div class="agenda-preview" id="agendaPreview">
+          <div class="text-sm text-muted">Select a teacher and date to preview.</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeAgendaModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="downloadAgendaPDF()">⬇ Download PDF</button>
     </div>
   </div>
 </div>
@@ -279,16 +558,41 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-client.js"></script>
 <script>
-const INSTRUMENTS = ['Guitar','Bass','Drums','Piano','Voice / Singing','Violin','Ukulele','Music Theory','Saxophone','Other'];
+// ============================================================
+// CONSTANTS
+// ============================================================
+const INSTRUMENTS = ['Guitar','Bass','Drums','Piano','Voice / Singing','Violin','Ukulele','Music Theory','Saxophone','Band','Other'];
 const DAY_NAMES   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-let allTeacherData = [];
-let allStudioData  = [];
-let currentProfile = null;
+const DAY_SHORT   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
+// Time slots: 8am to 9pm in 30-min blocks
+const TIME_SLOTS = [];
+for (let h = 8; h <= 20; h++) {
+  TIME_SLOTS.push(`${String(h).padStart(2,'0')}:00`);
+  if (h < 20) TIME_SLOTS.push(`${String(h).padStart(2,'0')}:30`);
+}
+
+// ============================================================
+// STATE
+// ============================================================
+let currentProfile  = null;
+let currentView     = 'daily';
+let currentDate     = new Date();
+let weekStart       = getWeekStart(new Date());
+let allStudios      = [];
+let allTeachers     = [];
+let allStudents     = [];
+let lessonStudents  = []; // students added to current lesson being edited
+let allOccurrences  = []; // cached occurrences for current view
+
+// ============================================================
+// INIT
+// ============================================================
 (async () => {
   currentProfile = await requireAuth(['superuser','admin']);
   if (!currentProfile) return;
   renderTopNavUser(currentProfile);
+
   if (currentProfile.role === 'superuser') {
     document.getElementById('superuserSection').classList.remove('hidden');
     document.getElementById('studiosLink').classList.remove('hidden');
@@ -300,136 +604,515 @@ let currentProfile = null;
   const nextMon = new Date();
   nextMon.setDate(nextMon.getDate() + ((1 + 7 - nextMon.getDay()) % 7 || 7));
   document.getElementById('lStartDate').value = toISODate(nextMon);
+  document.getElementById('agendaDate').value  = toISODate(new Date());
 
-  await Promise.all([loadFilters(), loadLessons()]);
-
-  // Auto-open new lesson if ?new in URL
-  if (window.location.search.includes('new') || window.location.hash === '#new') openLessonModal();
+  await Promise.all([loadStudios(), loadTeachers(), loadStudents()]);
+  populateInstruments();
+  loadView();
 })();
 
-async function loadFilters() {
-  // Studios
-  const { data: studios } = await db.from('studios').select('id, name').eq('status','active').order('name');
-  allStudioData = studios ?? [];
-  const studioFilter = document.getElementById('filterStudio');
-  const lStudio      = document.getElementById('lStudio');
-  allStudioData.forEach(s => {
-    studioFilter.innerHTML += `<option value="${s.id}">${s.name}</option>`;
-    lStudio.innerHTML      += `<option value="${s.id}">${s.name}</option>`;
+// ============================================================
+// DATA LOADERS
+// ============================================================
+async function loadStudios() {
+  const { data } = await db.from('studios').select('id,name,email').eq('status','active').order('name');
+  allStudios = data ?? [];
+  const filterSel = document.getElementById('filterStudio');
+  const lStudio   = document.getElementById('lStudio');
+  const agTeacher = document.getElementById('agendaTeacher'); // populated separately
+  allStudios.forEach(s => {
+    filterSel.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+    lStudio.innerHTML   += `<option value="${s.id}">${s.name}</option>`;
   });
+}
 
-  // Teachers
-  const { data: teachers } = await db
-    .from('teachers')
-    .select('id, instruments, studio_ids, teacher_availability(*), profiles(first_name, last_name, status)')
-    .eq('profiles.status','active');
-  allTeacherData = teachers ?? [];
-  const teacherFilter = document.getElementById('filterTeacher');
-  const lTeacher      = document.getElementById('lTeacher');
-  allTeacherData.forEach(t => {
-    const name = `${t.profiles?.first_name ?? ''} ${t.profiles?.last_name ?? ''}`.trim();
-    teacherFilter.innerHTML += `<option value="${t.id}">${name}</option>`;
-    lTeacher.innerHTML      += `<option value="${t.id}">${name}</option>`;
-  });
+async function loadTeachers() {
+  const { data: tData } = await db.from('teachers')
+    .select('id,user_id,instruments,studio_ids,virtual_room_link,teaching_room,teacher_availability(day_of_week,studio_id,start_time,end_time)');
+  const userIds = (tData ?? []).map(t => t.user_id);
+  const { data: pData } = userIds.length > 0
+    ? await db.from('profiles').select('id,first_name,last_name,status').in('id', userIds)
+    : { data: [] };
+  const pMap = {};
+  (pData ?? []).forEach(p => { pMap[p.id] = p; });
+  allTeachers = (tData ?? []).map(t => ({ ...t, profile: pMap[t.user_id] ?? null }))
+    .filter(t => t.profile?.status === 'active');
 
-  // Students for form
-  const { data: students } = await db
-    .from('students')
-    .select('id, profiles(first_name, last_name), student_instruments(instrument)')
-    .eq('status','active')
-    .order('profiles(last_name)');
-  const lStudent = document.getElementById('lStudent');
-  (students ?? []).forEach(s => {
-    const name = `${s.profiles?.first_name ?? ''} ${s.profiles?.last_name ?? ''}`.trim();
-    lStudent.innerHTML += `<option value="${s.id}" data-instruments="${(s.student_instruments ?? []).map(i => i.instrument).join(',')}">${name}</option>`;
+  const lTeacher  = document.getElementById('lTeacher');
+  const agTeacher = document.getElementById('agendaTeacher');
+  allTeachers.forEach(t => {
+    const name = `${t.profile?.first_name ?? ''} ${t.profile?.last_name ?? ''}`.trim();
+    lTeacher.innerHTML  += `<option value="${t.id}">${name}</option>`;
+    agTeacher.innerHTML += `<option value="${t.id}">${name}</option>`;
   });
-  populateInstruments();
+}
+
+async function loadStudents() {
+  const { data: sData } = await db.from('students').select('id,user_id,status').eq('status','active');
+  const userIds = (sData ?? []).map(s => s.user_id);
+  const { data: pData } = userIds.length > 0
+    ? await db.from('profiles').select('id,first_name,last_name').in('id', userIds)
+    : { data: [] };
+  const pMap = {};
+  (pData ?? []).forEach(p => { pMap[p.id] = p; });
+  allStudents = (sData ?? []).map(s => ({ ...s, profile: pMap[s.user_id] ?? null }));
+
+  const picker = document.getElementById('studentPicker');
+  allStudents.forEach(s => {
+    const name = `${s.profile?.first_name ?? ''} ${s.profile?.last_name ?? ''}`.trim();
+    picker.innerHTML += `<option value="${s.id}">${name}</option>`;
+  });
 }
 
 function populateInstruments() {
-  const sel      = document.getElementById('lStudent');
-  const opt      = sel.options[sel.selectedIndex];
-  const insts    = (opt?.dataset.instruments ?? '').split(',').filter(Boolean);
-  const instSel  = document.getElementById('lInstrument');
-  instSel.innerHTML = '<option value="">— Select —</option>';
-  (insts.length > 0 ? insts : INSTRUMENTS).forEach(i => {
-    instSel.innerHTML += `<option value="${i}">${i}</option>`;
-  });
+  const sel = document.getElementById('lInstrument');
+  INSTRUMENTS.forEach(i => { sel.innerHTML += `<option value="${i}">${i}</option>`; });
 }
 
-document.getElementById('lStudent').addEventListener('change', () => { populateInstruments(); checkAvailability(); });
+// ============================================================
+// VIEW SWITCHING
+// ============================================================
+function switchView(view) {
+  currentView = view;
+  document.getElementById('btnDaily').classList.toggle('active', view === 'daily');
+  document.getElementById('btnWeekly').classList.toggle('active', view === 'weekly');
+  document.getElementById('pageTitle').textContent = view === 'daily' ? 'Daily Schedule' : 'Weekly Schedule';
+  loadView();
+}
 
-async function loadLessons() {
-  const studio  = document.getElementById('filterStudio').value;
-  const teacher = document.getElementById('filterTeacher').value;
-  const status  = document.getElementById('filterStatus').value;
+function navBack() {
+  if (currentView === 'daily') {
+    currentDate.setDate(currentDate.getDate() - 1);
+  } else {
+    weekStart = new Date(weekStart.getTime() - 7 * 86400000);
+  }
+  loadView();
+}
 
-  let query = db
-    .from('lessons')
+function navForward() {
+  if (currentView === 'daily') {
+    currentDate.setDate(currentDate.getDate() + 1);
+  } else {
+    weekStart = new Date(weekStart.getTime() + 7 * 86400000);
+  }
+  loadView();
+}
+
+function goToday() {
+  currentDate = new Date();
+  weekStart   = getWeekStart(new Date());
+  loadView();
+}
+
+async function loadView() {
+  if (currentView === 'daily') {
+    await loadDailyView();
+  } else {
+    await loadWeeklyView();
+  }
+}
+
+// ============================================================
+// DAILY GRID VIEW
+// ============================================================
+async function loadDailyView() {
+  const wrap      = document.getElementById('viewContent');
+  const dateStr   = toISODate(currentDate);
+  const dayOfWeek = currentDate.getDay();
+
+  document.getElementById('dateLabel').textContent =
+    currentDate.toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+
+  wrap.innerHTML = `<div class="loading"><div class="spinner"></div> Loading…</div>`;
+
+  const studioFilter = document.getElementById('filterStudio').value;
+
+  // Filter studios
+  const studios = studioFilter
+    ? allStudios.filter(s => s.id === studioFilter)
+    : allStudios;
+
+  // Load all occurrences for this date
+  const { data: occData, error } = await db
+    .from('lesson_occurrences')
     .select(`
-      id, instrument, day_of_week, start_time, duration_mins, recurrence_type, recurrence_end, recurrence_count, status,
-      students(profiles(first_name, last_name)),
-      teachers(profiles(first_name, last_name)),
-      studios(name)
+      id, date, status, is_online, occurrence_notes,
+      lessons(id, teacher_id, studio_id, instrument, start_time, duration_mins, lesson_type, max_students, series_notes)
     `)
-    .order('day_of_week').order('start_time');
+    .eq('date', dateStr);
 
-  if (studio)  query = query.eq('studio_id', studio);
-  if (teacher) query = query.eq('teacher_id', teacher);
-  if (status)  query = query.eq('status', status);
+  if (error) { wrap.innerHTML = `<div class="empty-state"><p style="color:#dc2626;">${error.message}</p></div>`; return; }
 
-  const { data, error } = await query;
-  if (error) { showToast('Error loading lessons', 'error'); return; }
+  // Load lesson_students for all lessons
+  const lessonIds = [...new Set((occData ?? []).map(o => o.lessons?.id).filter(Boolean))];
+  const { data: lsData } = lessonIds.length > 0
+    ? await db.from('lesson_students').select('lesson_id,student_id').in('lesson_id', lessonIds)
+    : { data: [] };
 
-  const active = (data ?? []).filter(l => l.status === 'active').length;
-  document.getElementById('lessonCount').textContent = `${active} active · ${(data ?? []).length} total`;
+  // Build student name map
+  const studentIds = [...new Set((lsData ?? []).map(ls => ls.student_id))];
+  const { data: spData } = studentIds.length > 0
+    ? await db.from('students').select('id,user_id').in('id', studentIds)
+    : { data: [] };
+  const spUserIds = (spData ?? []).map(s => s.user_id);
+  const { data: spProfiles } = spUserIds.length > 0
+    ? await db.from('profiles').select('id,first_name,last_name').in('id', spUserIds)
+    : { data: [] };
+  const spMap = {};
+  (spData ?? []).forEach(s => {
+    const p = (spProfiles ?? []).find(p => p.id === s.user_id);
+    if (p) spMap[s.id] = `${p.first_name} ${p.last_name}`.trim();
+  });
 
-  const tbody = document.getElementById('lessonsBody');
-  if (!data || data.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">📅</div><h3>No lessons found</h3><p>Add your first lesson using the button above.</p></div></td></tr>`;
+  // Group occurrences by lesson_id → lesson_students
+  const lsMap = {}; // lesson_id → [student_ids]
+  (lsData ?? []).forEach(ls => {
+    if (!lsMap[ls.lesson_id]) lsMap[ls.lesson_id] = [];
+    lsMap[ls.lesson_id].push(ls.student_id);
+  });
+
+  allOccurrences = (occData ?? []).map(o => ({
+    ...o, lessonStudents: lsMap[o.lessons?.id] ?? [],
+  }));
+
+  // Render one grid per studio
+  if (studios.length === 0) {
+    wrap.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📅</div><h3>No studios</h3></div>`;
     return;
   }
 
-  const recurrenceLabel = r => ({
-    indefinite:   '<span class="recurrence-badge">Ongoing</span>',
-    occurrences:  `<span class="recurrence-badge">${r.recurrence_count} lessons</span>`,
-    date_range:   `<span class="recurrence-badge">Until ${r.recurrence_end ? formatShortDate(new Date(r.recurrence_end)) : '?'}</span>`,
-  })[r.recurrence_type] ?? '–';
+  let html = `<div class="studios-wrap">`;
 
-  tbody.innerHTML = (data ?? []).map(l => {
-    const sName = `${l.students?.profiles?.first_name ?? ''} ${l.students?.profiles?.last_name ?? ''}`.trim();
-    const tName = `${l.teachers?.profiles?.first_name ?? ''} ${l.teachers?.profiles?.last_name ?? ''}`.trim();
-    return `<tr class="${l.status === 'cancelled' ? 'inactive' : ''}">
-      <td style="font-weight:600;color:var(--charcoal);">${sName}</td>
-      <td>${tName}</td>
-      <td><span class="pill" style="background:rgba(232,73,30,0.08);color:var(--orange);font-size:0.72rem;">${l.instrument}</span></td>
-      <td>${l.studios?.name ?? '–'}</td>
-      <td>${DAY_NAMES[l.day_of_week]} · ${formatTime(l.start_time)}</td>
-      <td>${formatDuration(l.duration_mins)}</td>
-      <td>${recurrenceLabel(l)}</td>
-      <td>
-        <div class="flex gap-1">
-          ${l.status === 'active' ? `
-            <button class="btn btn-ghost btn-sm" onclick="openLessonModal(${JSON.stringify(l).split('"').join('&quot;')})">Edit</button>
-            <button class="btn btn-danger btn-sm" onclick="openCancelModal('${l.id}')">Cancel</button>
-          ` : '<span class="pill pill-cancelled">Cancelled</span>'}
+  studios.forEach(studio => {
+    // Teachers at this studio
+    const teachers = allTeachers.filter(t => (t.studio_ids ?? []).includes(studio.id));
+    if (teachers.length === 0) {
+      html += `<div class="studio-grid-section">
+        <div class="studio-grid-title">${studio.name}</div>
+        <div class="empty-state" style="padding:1.5rem;"><p>No teachers assigned to this studio.</p></div>
+      </div>`;
+      return;
+    }
+
+    html += `<div class="studio-grid-section">
+      <div class="studio-grid-title">${studio.name}</div>
+      <div class="daily-grid-wrap">
+        <table class="daily-grid">
+          <thead>
+            <tr>
+              <th>Time</th>
+              ${teachers.map(t => `<th class="teacher-col">${t.profile?.first_name ?? ''} ${t.profile?.last_name ?? ''}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>`;
+
+    // Build occupied slots map: teacherId → Set of slot strings
+    const occupied = {}; // teacherId → { slotKey: occurrenceId }
+    teachers.forEach(t => { occupied[t.id] = {}; });
+
+    allOccurrences
+      .filter(o => o.lessons?.studio_id === studio.id && o.status !== 'cancelled')
+      .forEach(o => {
+        const tid   = o.lessons?.teacher_id;
+        const start = o.lessons?.start_time;
+        const dur   = o.lessons?.duration_mins ?? 30;
+        if (!tid || !start || !occupied[tid]) return;
+
+        const [sh, sm] = start.split(':').map(Number);
+        const startMin = sh * 60 + sm;
+        for (let i = 0; i < dur; i += 30) {
+          const slotMin = startMin + i;
+          const slotKey = `${String(Math.floor(slotMin/60)).padStart(2,'0')}:${String(slotMin%60).padStart(2,'0')}`;
+          occupied[tid][slotKey] = o.id;
+        }
+      });
+
+    TIME_SLOTS.forEach((slot, idx) => {
+      const [h, m] = slot.split(':').map(Number);
+      const isHour = m === 0;
+      const timeLabel = formatTime(slot + ':00');
+
+      html += `<tr>
+        <td class="time-label ${isHour ? 'full-hour' : 'half-hour'}">${isHour ? timeLabel : ''}</td>`;
+
+      teachers.forEach(t => {
+        // Check if this slot is the START of a lesson
+        const startOcc = allOccurrences.find(o =>
+          o.lessons?.teacher_id === t.id &&
+          o.lessons?.studio_id  === studio.id &&
+          o.lessons?.start_time?.startsWith(slot)
+        );
+
+        if (startOcc) {
+          const dur      = startOcc.lessons?.duration_mins ?? 30;
+          const rowspan  = dur / 30;
+          const lType    = startOcc.lessons?.lesson_type ?? 'private';
+          const isCancelled = startOcc.status === 'cancelled';
+          const sIds     = startOcc.lessonStudents ?? [];
+          const sNames   = sIds.map(id => spMap[id]).filter(Boolean);
+
+          let displayName, displayMeta;
+          if (lType === 'group') {
+            displayName = `${sIds.length} student${sIds.length !== 1 ? 's' : ''}`;
+            displayMeta = `Group · ${startOcc.lessons?.instrument}`;
+          } else {
+            displayName = sNames[0] ?? '—';
+            displayMeta = `Private · ${startOcc.lessons?.instrument}`;
+          }
+
+          html += `<td class="grid-cell" rowspan="${rowspan}" 
+            onclick="openOccurrenceModal('${startOcc.id}')"
+            style="vertical-align:top;height:${rowspan * 36}px;">
+            <div class="lesson-block ${isCancelled ? 'cancelled' : lType}" style="height:calc(100% - 4px);">
+              ${isCancelled ? '<span class="lesson-cancel-icon">✕</span>' : ''}
+              <div class="lesson-block-name">${displayName}</div>
+              <div class="lesson-block-meta">${displayMeta}</div>
+              ${startOcc.occurrence_notes ? `<div class="lesson-block-meta" style="font-style:italic;">📝 ${startOcc.occurrence_notes.slice(0,30)}…</div>` : ''}
+            </div>
+          </td>`;
+        } else if (!occupied[t.id]?.[slot]) {
+          // Empty cell — clickable to add lesson
+          html += `<td class="grid-cell" 
+            onclick="openLessonModalFromCell('${t.id}','${studio.id}','${slot}','${dayOfWeek}')"
+            title="Click to add lesson at ${formatTime(slot + ':00')}">
+          </td>`;
+        }
+        // else: cell is mid-lesson, covered by rowspan — skip
+      });
+
+      html += `</tr>`;
+    });
+
+    html += `</tbody></table></div></div>`;
+  });
+
+  html += `</div>`;
+  wrap.innerHTML = html;
+}
+
+// ============================================================
+// WEEKLY VIEW
+// ============================================================
+async function loadWeeklyView() {
+  const wrap  = document.getElementById('viewContent');
+  const days  = getWeekDays(weekStart);
+  const wStart = toISODate(days[0]);
+  const wEnd   = toISODate(days[days.length - 1]);
+
+  document.getElementById('dateLabel').textContent =
+    `${formatShortDate(days[0])} – ${formatShortDate(days[days.length - 1])}`;
+
+  wrap.innerHTML = `<div class="loading"><div class="spinner"></div> Loading…</div>`;
+
+  const studioFilter  = document.getElementById('filterStudio').value;
+  const statusFilter  = document.getElementById('filterStatus').value;
+
+  let query = db.from('lesson_occurrences')
+    .select(`id,date,status,is_online,occurrence_notes,
+      lessons(id,teacher_id,studio_id,instrument,start_time,duration_mins,lesson_type,max_students,series_notes)`)
+    .gte('date', wStart).lte('date', wEnd).order('date').order('lessons(start_time)');
+
+  if (studioFilter) query = query.eq('lessons.studio_id', studioFilter);
+  if (statusFilter) query = query.eq('status', statusFilter);
+
+  const { data, error } = await query;
+  if (error) { wrap.innerHTML = `<div class="empty-state"><p style="color:#dc2626;">${error.message}</p></div>`; return; }
+
+  allOccurrences = data ?? [];
+
+  if (!allOccurrences.length) {
+    wrap.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📅</div><h3>No lessons this week</h3><p>Navigate to another week or add a lesson.</p></div>`;
+    return;
+  }
+
+  // Load lesson students
+  const lessonIds = [...new Set(allOccurrences.map(o => o.lessons?.id).filter(Boolean))];
+  const { data: lsData } = lessonIds.length > 0
+    ? await db.from('lesson_students').select('lesson_id,student_id').in('lesson_id', lessonIds)
+    : { data: [] };
+  const lsMap = {};
+  (lsData ?? []).forEach(ls => {
+    if (!lsMap[ls.lesson_id]) lsMap[ls.lesson_id] = [];
+    lsMap[ls.lesson_id].push(ls.student_id);
+  });
+
+  // Student name map
+  const studentIds = [...new Set((lsData ?? []).map(ls => ls.student_id))];
+  const { data: spData } = studentIds.length > 0
+    ? await db.from('students').select('id,user_id').in('id', studentIds)
+    : { data: [] };
+  const spUserIds = (spData ?? []).map(s => s.user_id);
+  const { data: spProfiles } = spUserIds.length > 0
+    ? await db.from('profiles').select('id,first_name,last_name').in('id', spUserIds)
+    : { data: [] };
+  const spMap = {};
+  (spData ?? []).forEach(s => {
+    const p = (spProfiles ?? []).find(p => p.id === s.user_id);
+    if (p) spMap[s.id] = `${p.first_name} ${p.last_name}`.trim();
+  });
+
+  // Teacher name map
+  const teacherMap = {};
+  allTeachers.forEach(t => {
+    teacherMap[t.id] = `${t.profile?.first_name ?? ''} ${t.profile?.last_name ?? ''}`.trim();
+  });
+
+  // Studio name map
+  const studioMap = {};
+  allStudios.forEach(s => { studioMap[s.id] = s.name; });
+
+  // Group by date
+  const byDate = {};
+  days.forEach(d => { byDate[toISODate(d)] = []; });
+  allOccurrences.forEach(o => {
+    const k = toISODate(new Date(o.date));
+    if (byDate[k]) byDate[k].push(o);
+  });
+
+  const today = toISODate(new Date());
+  let html = ``;
+
+  days.forEach(d => {
+    const key     = toISODate(d);
+    const lessons = byDate[key];
+    if (!lessons || lessons.length === 0) return;
+    const isToday = key === today;
+
+    html += `<div class="card" style="margin-bottom:1rem;">
+      <div class="card-header">
+        <span class="card-title" style="${isToday ? 'color:var(--orange);' : ''}">${formatShortDate(d).toUpperCase()}${isToday ? ' <span class="pill pill-scheduled" style="font-size:0.65rem;">Today</span>' : ''}</span>
+        <span class="text-sm text-muted">${lessons.length} lesson${lessons.length !== 1 ? 's' : ''}</span>
+      </div>`;
+
+    lessons.forEach(o => {
+      const l        = o.lessons ?? {};
+      const lType    = l.lesson_type ?? 'private';
+      const sIds     = lsMap[l.id] ?? [];
+      const sNames   = sIds.map(id => spMap[id]).filter(Boolean);
+      const isCancelled = o.status === 'cancelled';
+
+      html += `<div style="display:grid;grid-template-columns:85px 1fr auto;gap:1rem;align-items:center;padding:0.85rem 1.25rem;border-bottom:1px solid var(--border);${isCancelled ? 'opacity:0.5;' : ''}cursor:pointer;"
+        onclick="openOccurrenceModal('${o.id}')">
+        <div>
+          <div class="time-cell">${formatTime(l.start_time)}</div>
+          <div class="duration-label">${formatDuration(l.duration_mins)}</div>
         </div>
-      </td>
-    </tr>`;
+        <div>
+          <div class="lesson-name">${lType === 'group' ? `Group (${sIds.length} students)` : (sNames[0] ?? '—')}</div>
+          <div class="lesson-instrument">${l.instrument}</div>
+          <div class="lesson-meta">${teacherMap[l.teacher_id] ?? '—'} · ${studioMap[l.studio_id] ?? '—'}</div>
+          ${o.occurrence_notes ? `<div class="text-sm text-muted mt-1">📝 ${o.occurrence_notes}</div>` : ''}
+        </div>
+        <div>
+          ${isCancelled
+            ? `<span class="pill pill-cancelled" style="display:flex;align-items:center;gap:0.3rem;">✕ Cancelled</span>`
+            : `<span class="pill pill-${lType === 'group' ? 'active' : 'scheduled'}">${lType === 'private' ? 'Private' : 'Group'}</span>`}
+          ${o.is_online ? `<div class="mt-1"><span class="pill pill-online">Online</span></div>` : ''}
+        </div>
+      </div>`;
+    });
+
+    html += `</div>`;
+  });
+
+  wrap.innerHTML = html || `<div class="empty-state"><div class="empty-state-icon">📅</div><h3>No lessons this week</h3></div>`;
+}
+
+// ============================================================
+// LESSON MODAL — Add
+// ============================================================
+function openLessonModalFromCell(teacherId, studioId, slot, dayOfWeek) {
+  openLessonModal();
+  document.getElementById('lTeacher').value = teacherId;
+  document.getElementById('lStudio').value  = studioId;
+  document.getElementById('lDay').value     = dayOfWeek;
+  document.getElementById('lTime').value    = slot;
+  checkAvailability();
+}
+
+function openLessonModal(lesson = null) {
+  lessonStudents = [];
+  renderLessonStudents();
+  document.getElementById('clashError').classList.remove('show');
+  document.getElementById('availWarning').classList.remove('show');
+  document.getElementById('lRecurrence').value  = 'indefinite';
+  document.getElementById('lSeriesNotes').value = '';
+  toggleRecurrenceFields();
+  onTypeChange();
+
+  if (!lesson) {
+    document.getElementById('lessonModalTitle').textContent = 'Add Lesson';
+    document.getElementById('editLessonId').value = '';
+  }
+  document.getElementById('lessonModal').classList.remove('hidden');
+}
+
+function closeLessonModal() { document.getElementById('lessonModal').classList.add('hidden'); }
+
+function onTypeChange() {
+  const type = document.getElementById('lType').value;
+  document.getElementById('studentsLabel').textContent = type === 'group' ? 'Students (up to 6)' : 'Student *';
+  document.getElementById('groupCapacityNote').style.display = type === 'group' ? 'block' : 'none';
+}
+
+function onTeacherChange() {
+  checkAvailability();
+}
+
+// Add student to lesson
+function addStudentToLesson() {
+  const picker = document.getElementById('studentPicker');
+  const sid    = picker.value;
+  if (!sid) { showToast('Please select a student.', 'warning'); return; }
+
+  const type  = document.getElementById('lType').value;
+  if (type === 'private' && lessonStudents.length >= 1) {
+    showToast('Private lessons can only have one student.', 'warning'); return;
+  }
+  if (type === 'group' && lessonStudents.length >= 6) {
+    showToast('Group lessons can have a maximum of 6 students.', 'warning'); return;
+  }
+  if (lessonStudents.includes(sid)) {
+    showToast('This student is already added.', 'warning'); return;
+  }
+
+  lessonStudents.push(sid);
+  renderLessonStudents();
+  picker.value = '';
+}
+
+function removeStudentFromLesson(sid) {
+  lessonStudents = lessonStudents.filter(s => s !== sid);
+  renderLessonStudents();
+}
+
+function renderLessonStudents() {
+  const list = document.getElementById('studentsList');
+  if (!lessonStudents.length) {
+    list.innerHTML = `<div class="text-sm text-muted">No students added yet.</div>`;
+    return;
+  }
+  list.innerHTML = lessonStudents.map(sid => {
+    const s    = allStudents.find(s => s.id === sid);
+    const name = s ? `${s.profile?.first_name ?? ''} ${s.profile?.last_name ?? ''}`.trim() : sid;
+    return `<div class="student-tag">
+      <span class="student-tag-name">${name}</span>
+      <button class="student-tag-remove" onclick="removeStudentFromLesson('${sid}')">✕</button>
+    </div>`;
   }).join('');
 }
 
-// ---- Availability check (soft warning) ----
+// Availability soft warning
 async function checkAvailability() {
   const teacherId = document.getElementById('lTeacher').value;
   const studioId  = document.getElementById('lStudio').value;
   const day       = parseInt(document.getElementById('lDay').value);
   const time      = document.getElementById('lTime').value;
+  const warn      = document.getElementById('availWarning');
 
-  const warn = document.getElementById('availWarning');
   if (!teacherId || !studioId || !time) { warn.classList.remove('show'); return; }
 
-  const teacher = allTeacherData.find(t => t.id === teacherId);
+  const teacher = allTeachers.find(t => t.id === teacherId);
   if (!teacher) { warn.classList.remove('show'); return; }
 
   const avail = (teacher.teacher_availability ?? []).filter(
@@ -438,54 +1121,25 @@ async function checkAvailability() {
 
   if (avail.length === 0) {
     document.getElementById('availWarningText').textContent =
-      `This teacher has no availability listed for ${DAY_NAMES[day]} at this studio. You can still proceed.`;
-    warn.classList.add('show');
-    return;
+      `This teacher has no availability listed for ${DAY_NAMES[day]} at this studio.`;
+    warn.classList.add('show'); return;
   }
 
-  const lessonMins = time.split(':').reduce((h, m, i) => i === 0 ? h + parseInt(m) * 60 : h + parseInt(m), 0);
+  const lessonMins = time.split(':').reduce((acc, v, i) => acc + (i === 0 ? +v * 60 : +v), 0);
   const inSlot = avail.some(a => {
-    const start = a.start_time.split(':').reduce((h, m, i) => i === 0 ? h + parseInt(m) * 60 : h + parseInt(m), 0);
-    const end   = a.end_time.split(':').reduce((h, m, i)   => i === 0 ? h + parseInt(m) * 60 : h + parseInt(m), 0);
+    const start = a.start_time.split(':').reduce((acc, v, i) => acc + (i === 0 ? +v * 60 : +v), 0);
+    const end   = a.end_time.split(':').reduce((acc, v, i)   => acc + (i === 0 ? +v * 60 : +v), 0);
     return lessonMins >= start && lessonMins < end;
   });
 
   if (!inSlot) {
     document.getElementById('availWarningText').textContent =
-      `${time} falls outside this teacher's availability on ${DAY_NAMES[day]}. You can still proceed.`;
+      `${time} is outside this teacher's availability on ${DAY_NAMES[day]}.`;
     warn.classList.add('show');
   } else {
     warn.classList.remove('show');
   }
 }
-
-// ---- Modal ----
-function openLessonModal(lesson = null) {
-  document.getElementById('availWarning').classList.remove('show');
-  toggleRecurrenceFields();
-
-  if (lesson) {
-    document.getElementById('lessonModalTitle').textContent = 'Edit Lesson';
-    document.getElementById('editLessonId').value   = lesson.id;
-    document.getElementById('lTeacher').value       = lesson.teacher_id ?? '';
-    document.getElementById('lStudio').value        = lesson.studio_id  ?? '';
-    document.getElementById('lDay').value           = lesson.day_of_week ?? 1;
-    document.getElementById('lTime').value          = lesson.start_time?.slice(0,5) ?? '16:00';
-    document.getElementById('lDuration').value      = lesson.duration_mins ?? 60;
-    document.getElementById('lRecurrence').value    = lesson.recurrence_type ?? 'indefinite';
-    document.getElementById('lCount').value         = lesson.recurrence_count ?? 10;
-    document.getElementById('lEndDate').value       = lesson.recurrence_end ?? '';
-    toggleRecurrenceFields();
-  } else {
-    document.getElementById('lessonModalTitle').textContent = 'Add Lesson';
-    document.getElementById('editLessonId').value = '';
-    document.getElementById('lRecurrence').value  = 'indefinite';
-    toggleRecurrenceFields();
-  }
-  document.getElementById('lessonModal').classList.remove('hidden');
-}
-
-function closeLessonModal() { document.getElementById('lessonModal').classList.add('hidden'); }
 
 function toggleRecurrenceFields() {
   const val = document.getElementById('lRecurrence').value;
@@ -493,13 +1147,14 @@ function toggleRecurrenceFields() {
   document.getElementById('recurrenceEndWrap').classList.toggle('hidden',   val !== 'date_range');
 }
 
-// ---- Save lesson ----
+// ============================================================
+// SAVE LESSON — with clash detection
+// ============================================================
 async function saveLesson() {
-  const editId      = document.getElementById('editLessonId').value;
-  const studentId   = document.getElementById('lStudent').value;
-  const instrument  = document.getElementById('lInstrument').value;
   const teacherId   = document.getElementById('lTeacher').value;
   const studioId    = document.getElementById('lStudio').value;
+  const instrument  = document.getElementById('lInstrument').value;
+  const lType       = document.getElementById('lType').value;
   const day         = parseInt(document.getElementById('lDay').value);
   const time        = document.getElementById('lTime').value + ':00';
   const duration    = parseInt(document.getElementById('lDuration').value);
@@ -507,71 +1162,129 @@ async function saveLesson() {
   const recurrence  = document.getElementById('lRecurrence').value;
   const count       = parseInt(document.getElementById('lCount').value);
   const endDate     = document.getElementById('lEndDate').value;
+  const seriesNotes = document.getElementById('lSeriesNotes').value.trim();
 
-  if (!studentId || !instrument || !teacherId || !studioId || !time || !startDate) {
+  const clashEl = document.getElementById('clashError');
+  clashEl.classList.remove('show');
+
+  if (!teacherId || !studioId || !instrument || !time || !startDate) {
     showToast('Please fill in all required fields.', 'error'); return;
   }
+  if (lessonStudents.length === 0) {
+    showToast('Please add at least one student.', 'error'); return;
+  }
+  if (lType === 'private' && lessonStudents.length > 1) {
+    showToast('Private lessons can only have one student.', 'error'); return;
+  }
 
-  const payload = {
-    student_id: studentId, instrument, teacher_id: teacherId, studio_id: studioId,
-    day_of_week: day, start_time: time, duration_mins: duration,
-    recurrence_type: recurrence, recurrence_start: startDate,
-    recurrence_count: recurrence === 'occurrences' ? count : null,
-    recurrence_end:   recurrence === 'date_range'  ? endDate : null,
-    status: 'active',
-  };
+  // ---- CLASH DETECTION ----
+  // Get all active lessons on this day of week
+  const { data: existingLessons } = await db
+    .from('lessons')
+    .select('id,teacher_id,start_time,duration_mins,lesson_type,max_students')
+    .eq('day_of_week', day)
+    .eq('status','active');
 
-  try {
-    let lessonId = editId;
-    if (editId) {
-      await db.from('lessons').update(payload).eq('id', editId);
-    } else {
-      const { data } = await db.from('lessons').insert(payload).select('id').single();
-      lessonId = data.id;
+  // Also get lesson_students for those lessons
+  const existingIds = (existingLessons ?? []).map(l => l.id);
+  const { data: existingLS } = existingIds.length > 0
+    ? await db.from('lesson_students').select('lesson_id,student_id').in('lesson_id', existingIds)
+    : { data: [] };
+
+  const newStart = timeToMins(time);
+  const newEnd   = newStart + duration;
+
+  for (const el of (existingLessons ?? [])) {
+    const elStart = timeToMins(el.start_time);
+    const elEnd   = elStart + (el.duration_mins ?? 30);
+    const overlaps = newStart < elEnd && newEnd > elStart;
+    if (!overlaps) continue;
+
+    // Teacher clash
+    if (el.teacher_id === teacherId) {
+      const msg = `Teacher is already teaching another lesson at this time on ${DAY_NAMES[day]}.`;
+      showClashError(msg); return;
     }
 
-    // Generate lesson occurrences
+    // Student clash
+    const elStudents = (existingLS ?? []).filter(ls => ls.lesson_id === el.id).map(ls => ls.student_id);
+    const clash = lessonStudents.find(sid => elStudents.includes(sid));
+    if (clash) {
+      const student = allStudents.find(s => s.id === clash);
+      const name    = student ? `${student.profile?.first_name ?? ''} ${student.profile?.last_name ?? ''}`.trim() : 'A student';
+      showClashError(`${name} already has a lesson at this time on ${DAY_NAMES[day]}.`); return;
+    }
+
+    // Group capacity check
+    if (el.lesson_type === 'group' && el.teacher_id === teacherId) {
+      if (elStudents.length >= (el.max_students ?? 6)) {
+        showClashError(`This group lesson is already at full capacity (${el.max_students ?? 6} students).`); return;
+      }
+    }
+  }
+
+  // ---- SAVE ----
+  try {
+    const { data: lessonData, error: lErr } = await db.from('lessons').insert({
+      teacher_id: teacherId, studio_id: studioId, instrument,
+      lesson_type: lType, max_students: lType === 'group' ? 6 : 1,
+      day_of_week: day, start_time: time, duration_mins: duration,
+      recurrence_type: recurrence, recurrence_start: startDate,
+      recurrence_count: recurrence === 'occurrences' ? count : null,
+      recurrence_end:   recurrence === 'date_range'  ? endDate : null,
+      series_notes: seriesNotes || null,
+      status: 'active',
+    }).select('id').single();
+
+    if (lErr) throw new Error(lErr.message);
+    const lessonId = lessonData.id;
+
+    // Insert lesson_students
+    await db.from('lesson_students').insert(
+      lessonStudents.map(sid => ({ lesson_id: lessonId, student_id: sid }))
+    );
+
+    // Generate occurrences
     await generateOccurrences(lessonId, day, startDate, recurrence, count, endDate);
 
-    showToast(editId ? 'Lesson updated.' : 'Lesson created.', 'success');
+    showToast('Lesson created successfully.', 'success');
     closeLessonModal();
-    await loadLessons();
+    loadView();
   } catch (err) {
     showToast(err.message, 'error');
   }
 }
 
-// ---- Generate occurrences ----
+function showClashError(msg) {
+  const el = document.getElementById('clashError');
+  document.getElementById('clashMsg').textContent = msg;
+  el.classList.add('show');
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function timeToMins(timeStr) {
+  const [h, m] = timeStr.split(':').map(Number);
+  return h * 60 + m;
+}
+
+// Generate lesson occurrences
 async function generateOccurrences(lessonId, dayOfWeek, startDate, recurrenceType, count, endDate) {
-  // Remove future unmodified occurrences
-  await db.from('lesson_occurrences')
-    .delete()
-    .eq('lesson_id', lessonId)
-    .gte('date', startDate)
-    .eq('status', 'scheduled');
+  await db.from('lesson_occurrences').delete()
+    .eq('lesson_id', lessonId).eq('status','scheduled').gte('date', startDate);
 
   const occurrences = [];
   let current = new Date(startDate);
-
-  // Advance to correct day of week
   while (current.getDay() !== dayOfWeek) {
     current.setDate(current.getDate() + 1);
   }
 
-  const maxDate = endDate ? new Date(endDate) : new Date();
-  if (recurrenceType === 'indefinite') {
-    // Generate 52 weeks ahead
-    maxDate.setFullYear(maxDate.getFullYear() + 1);
-  }
-
   let generated = 0;
-  const limit = recurrenceType === 'occurrences' ? count : 104; // max 2 years
+  const limit = recurrenceType === 'occurrences' ? count :
+                recurrenceType === 'date_range'  ? 999 : 52;
 
   while (generated < limit) {
     const dateStr = toISODate(current);
     if (recurrenceType === 'date_range' && current > new Date(endDate)) break;
-    if (recurrenceType === 'indefinite' && generated >= 52) break;
-
     occurrences.push({ lesson_id: lessonId, date: dateStr, status: 'scheduled' });
     generated++;
     current.setDate(current.getDate() + 7);
@@ -582,31 +1295,249 @@ async function generateOccurrences(lessonId, dayOfWeek, startDate, recurrenceTyp
   }
 }
 
-// ---- Cancel modal ----
-function openCancelModal(lessonId) {
-  document.getElementById('cancelLessonId').value = lessonId;
-  document.getElementById('cancelModal').classList.remove('hidden');
-}
-function closeCancelModal() { document.getElementById('cancelModal').classList.add('hidden'); }
+// ============================================================
+// OCCURRENCE MODAL — View/Edit single occurrence
+// ============================================================
+async function openOccurrenceModal(occId) {
+  const occ = allOccurrences.find(o => o.id === occId);
+  if (!occ) return;
 
-async function cancelLesson(scope) {
-  const lessonId = document.getElementById('cancelLessonId').value;
+  const l       = occ.lessons ?? {};
+  const teacher = allTeachers.find(t => t.id === l.teacher_id);
+  const studio  = allStudios.find(s => s.id === l.studio_id);
+  const tName   = teacher ? `${teacher.profile?.first_name ?? ''} ${teacher.profile?.last_name ?? ''}`.trim() : '—';
+
+  // Load student names for this occurrence
+  const sIds = occ.lessonStudents ?? [];
+  const sNames = sIds.map(sid => {
+    const s = allStudents.find(s => s.id === sid);
+    return s ? `${s.profile?.first_name ?? ''} ${s.profile?.last_name ?? ''}`.trim() : '—';
+  });
+
+  document.getElementById('occId').value      = occId;
+  document.getElementById('occLessonId').value = l.id ?? '';
+  document.getElementById('occModalTitle').textContent =
+    `${new Date(occ.date).toLocaleDateString('en-AU', {weekday:'long',day:'numeric',month:'long'})}`;
+  document.getElementById('occIsOnline').checked    = occ.is_online ?? false;
+  document.getElementById('occNotes').value          = occ.occurrence_notes ?? '';
+
+  document.getElementById('occSummary').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+      <div><span class="text-muted text-sm">Teacher</span><div class="font-bold">${tName}</div></div>
+      <div><span class="text-muted text-sm">Instrument</span><div class="font-bold">${l.instrument ?? '—'}</div></div>
+      <div><span class="text-muted text-sm">Time</span><div class="font-bold">${formatTime(l.start_time)} · ${formatDuration(l.duration_mins)}</div></div>
+      <div><span class="text-muted text-sm">Studio</span><div class="font-bold">${studio?.name ?? '—'}</div></div>
+      <div><span class="text-muted text-sm">Type</span><div class="font-bold">${l.lesson_type === 'group' ? 'Group' : 'Private'}</div></div>
+      <div><span class="text-muted text-sm">Status</span><div>${attendancePill(null)}</div></div>
+    </div>
+    ${l.series_notes ? `<div style="margin-top:0.65rem;padding-top:0.65rem;border-top:1px solid var(--border);font-size:0.82rem;color:var(--dark-grey);">📋 Series note: ${l.series_notes}</div>` : ''}`;
+
+  document.getElementById('occStudentsList').innerHTML = sNames.length > 0
+    ? sNames.map(n => `<div class="student-tag"><span class="student-tag-name">${n}</span></div>`).join('')
+    : '<div class="text-sm text-muted">No students assigned.</div>';
+
+  document.getElementById('occurrenceModal').classList.remove('hidden');
+}
+
+function closeOccModal() { document.getElementById('occurrenceModal').classList.add('hidden'); }
+
+async function saveOccurrence() {
+  const occId   = document.getElementById('occId').value;
+  const isOnline = document.getElementById('occIsOnline').checked;
+  const notes    = document.getElementById('occNotes').value.trim();
+
+  const { error } = await db.from('lesson_occurrences').update({
+    is_online:        isOnline,
+    occurrence_notes: notes || null,
+  }).eq('id', occId);
+
+  if (error) { showToast('Error saving: ' + error.message, 'error'); return; }
+  showToast('Lesson updated.', 'success');
+  closeOccModal();
+  loadView();
+}
+
+async function cancelOccurrence(scope) {
+  const occId    = document.getElementById('occId').value;
+  const lessonId = document.getElementById('occLessonId').value;
   const today    = toISODate(new Date());
+  const occ      = allOccurrences.find(o => o.id === occId);
+  const occDate  = occ?.date ?? today;
 
-  if (scope === 'all') {
+  if (scope === 'single') {
+    await db.from('lesson_occurrences').update({ status: 'cancelled' }).eq('id', occId);
+    showToast('Lesson occurrence cancelled.', 'success');
+  } else if (scope === 'future') {
+    await db.from('lesson_occurrences').update({ status: 'cancelled' })
+      .eq('lesson_id', lessonId).gte('date', occDate);
+    showToast('This and all future lessons cancelled.', 'success');
+  } else if (scope === 'all') {
+    await db.from('lesson_occurrences').update({ status: 'cancelled' }).eq('lesson_id', lessonId);
     await db.from('lessons').update({ status: 'cancelled' }).eq('id', lessonId);
-    await db.from('lesson_occurrences').update({ status: 'cancelled' }).eq('lesson_id', lessonId).gte('date', today);
-    showToast('All lessons in this series cancelled.', 'success');
-  } else {
-    await db.from('lesson_occurrences').update({ status: 'cancelled' }).eq('lesson_id', lessonId).gte('date', today);
-    showToast('This and all future occurrences cancelled.', 'success');
+    showToast('Entire lesson series cancelled.', 'success');
   }
-  closeCancelModal();
-  await loadLessons();
+
+  closeOccModal();
+  loadView();
 }
 
+// ============================================================
+// AGENDA PDF
+// ============================================================
+function openAgendaModal() {
+  document.getElementById('agendaModal').classList.remove('hidden');
+  previewAgenda();
+}
+function closeAgendaModal() { document.getElementById('agendaModal').classList.add('hidden'); }
+
+async function previewAgenda() {
+  const teacherId = document.getElementById('agendaTeacher').value;
+  const dateStr   = document.getElementById('agendaDate').value;
+  const preview   = document.getElementById('agendaPreview');
+
+  if (!teacherId || !dateStr) {
+    preview.innerHTML = `<div class="text-sm text-muted">Select a teacher and date to preview.</div>`;
+    return;
+  }
+
+  const teacher = allTeachers.find(t => t.id === teacherId);
+  const tName   = teacher ? `${teacher.profile?.first_name ?? ''} ${teacher.profile?.last_name ?? ''}`.trim() : '—';
+  const dateObj = new Date(dateStr);
+  const dateLabel = dateObj.toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+
+  // Load occurrences for this teacher on this date
+  const { data: occs } = await db
+    .from('lesson_occurrences')
+    .select(`id,status,is_online,occurrence_notes,lessons(id,teacher_id,start_time,duration_mins,lesson_type,instrument,studio_id)`)
+    .eq('date', dateStr)
+    .eq('lessons.teacher_id', teacherId)
+    .neq('status','cancelled')
+    .order('lessons(start_time)');
+
+  // Load students for each lesson
+  const lessonIds = [...new Set((occs ?? []).map(o => o.lessons?.id).filter(Boolean))];
+  const { data: lsData } = lessonIds.length > 0
+    ? await db.from('lesson_students').select('lesson_id,student_id').in('lesson_id', lessonIds)
+    : { data: [] };
+
+  const studentIds = [...new Set((lsData ?? []).map(ls => ls.student_id))];
+  const { data: spData } = studentIds.length > 0
+    ? await db.from('students').select('id,user_id').in('id', studentIds)
+    : { data: [] };
+  const spUserIds = (spData ?? []).map(s => s.user_id);
+  const { data: spProfiles } = spUserIds.length > 0
+    ? await db.from('profiles').select('id,first_name,last_name').in('id', spUserIds)
+    : { data: [] };
+  const spMap = {};
+  (spData ?? []).forEach(s => {
+    const p = (spProfiles ?? []).find(p => p.id === s.user_id);
+    if (p) spMap[s.id] = `${p.first_name} ${p.last_name}`.trim();
+  });
+  const lsMap = {};
+  (lsData ?? []).forEach(ls => {
+    if (!lsMap[ls.lesson_id]) lsMap[ls.lesson_id] = [];
+    lsMap[ls.lesson_id].push(ls.student_id);
+  });
+
+  if (!occs || occs.length === 0) {
+    preview.innerHTML = `<div class="agenda-heading">${tName}</div>
+      <div class="agenda-subheading">${dateLabel}</div>
+      <div class="text-sm text-muted">No lessons scheduled for this date.</div>`;
+    return;
+  }
+
+  let html = `<div class="agenda-heading">${tName}</div>
+    <div class="agenda-subheading">${dateLabel}</div>`;
+
+  (occs ?? []).forEach(o => {
+    const l       = o.lessons ?? {};
+    const lType   = l.lesson_type ?? 'private';
+    const sIds    = lsMap[l.id] ?? [];
+    const sNames  = sIds.map(id => spMap[id]).filter(Boolean);
+    const studio  = allStudios.find(s => s.id === l.studio_id);
+    const location = o.is_online
+      ? (teacher?.virtual_room_link ?? 'Online')
+      : (teacher?.teaching_room ?? `${studio?.name ?? ''} - ${teacher?.profile?.first_name ?? ''}'s Room`);
+
+    html += `<div class="agenda-item">
+      <div class="agenda-time">${formatTime(l.start_time)}</div>
+      <div class="agenda-student">${lType === 'group' ? sNames.join(', ') : (sNames[0] ?? '—')}</div>
+      <div class="agenda-type">${lType === 'private' ? 'Private' : 'Group'}</div>
+      <div class="agenda-location">${location}</div>
+    </div>`;
+  });
+
+  preview.innerHTML = html;
+}
+
+async function downloadAgendaPDF() {
+  const teacherId = document.getElementById('agendaTeacher').value;
+  const dateStr   = document.getElementById('agendaDate').value;
+  const teacher   = allTeachers.find(t => t.id === teacherId);
+  const tName     = teacher ? `${teacher.profile?.first_name ?? ''} ${teacher.profile?.last_name ?? ''}`.trim() : 'Teacher';
+  const dateObj   = new Date(dateStr);
+  const dateLabel = dateObj.toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+
+  // Get preview content
+  const previewEl = document.getElementById('agendaPreview');
+  const items     = previewEl.querySelectorAll('.agenda-item');
+
+  if (!items.length) { showToast('No lessons to export for this date.', 'warning'); return; }
+
+  // Build printable HTML and open in new window for printing/saving as PDF
+  let tableRows = '';
+  items.forEach(item => {
+    const cells = item.querySelectorAll('div');
+    tableRows += `<tr>
+      <td style="padding:8px 12px;border-bottom:1px solid #eee;font-weight:600;">${cells[0]?.textContent ?? ''}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #eee;">${cells[1]?.textContent ?? ''}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#666;">${cells[2]?.textContent ?? ''}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;font-size:12px;">${cells[3]?.textContent ?? ''}</td>
+    </tr>`;
+  });
+
+  const printHTML = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<title>Agenda — ${tName} — ${dateStr}</title>
+<style>
+  body { font-family: Inter, Arial, sans-serif; padding: 40px; color: #1c1c1e; max-width: 720px; margin: 0 auto; }
+  .header { border-bottom: 3px solid #E8491E; padding-bottom: 16px; margin-bottom: 24px; }
+  .logo-bar { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: #E8491E; font-weight: 700; margin-bottom: 8px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .date { font-size: 14px; color: #666; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: #1c1c1e; color: #fff; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; padding: 8px 12px; text-align: left; }
+  tr:last-child td { border-bottom: none; }
+  .footer { margin-top: 32px; font-size: 11px; color: #aaa; border-top: 1px solid #eee; padding-top: 12px; }
+  @media print { body { padding: 20px; } }
+</style>
+</head><body>
+<div class="header">
+  <div class="logo-bar">Pathfinder Music Lessons — Teacher Agenda</div>
+  <h1>${tName}</h1>
+  <div class="date">${dateLabel}</div>
+</div>
+<table>
+  <thead><tr><th>Time</th><th>Student(s)</th><th>Type</th><th>Location</th></tr></thead>
+  <tbody>${tableRows}</tbody>
+</table>
+<div class="footer">Generated ${new Date().toLocaleDateString('en-AU')} · pathfindermusiclessons.com.au</div>
+</body></html>`;
+
+  const win = window.open('', '_blank');
+  win.document.write(printHTML);
+  win.document.close();
+  win.focus();
+  setTimeout(() => { win.print(); }, 500);
+}
+
+// ============================================================
+// MODAL CLOSE ON OVERLAY CLICK
+// ============================================================
 document.getElementById('lessonModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeLessonModal(); });
-document.getElementById('cancelModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeCancelModal(); });
+document.getElementById('occurrenceModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeOccModal(); });
+document.getElementById('agendaModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeAgendaModal(); });
+
 function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
 </script>
 </body>
