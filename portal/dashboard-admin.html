@@ -347,17 +347,19 @@ async function loadSchedule() {
           html += `<td>`;
           lessons.forEach(l => {
             const isCancelled = l.occurrence_status === 'cancelled';
+            const lType       = l.lesson_type ?? 'private';
+            const displayName = lType === 'group'
+              ? `${l.student_count ?? '?'} students`
+              : (l.student_name ?? '—');
+
             html += `
               <div class="lesson-card" style="${isCancelled ? 'opacity:0.45;' : ''}" onclick="openLessonModal(${JSON.stringify(l).split('"').join('&quot;')})" style="cursor:pointer;">
-                <div class="lesson-name">${l.student_name}</div>
+                <div class="lesson-name">${isCancelled ? '✕ ' : ''}${displayName}</div>
                 <div class="lesson-instrument">${l.instrument}</div>
                 <div class="lesson-meta">
-                  ${l.teacher_name} · ${l.studio_name}
+                  ${lType === 'private' ? 'Private' : 'Group'} · ${l.teacher_name ?? '—'}
                 </div>
-                <div class="lesson-meta">
-                  ${formatDuration(l.duration_mins)}
-                  ${l.is_online ? ' · <span class="pill pill-online" style="font-size:0.65rem;">Online</span>' : ''}
-                </div>
+                <div class="lesson-meta">${formatDuration(l.duration_mins)}${l.is_online ? ' · <span class="pill pill-online" style="font-size:0.65rem;">Online</span>' : ''}</div>
                 <div style="margin-top:4px;">${attendancePill(l.attendance_status)}</div>
               </div>`;
           });
@@ -374,17 +376,22 @@ async function loadSchedule() {
 
 // ---- Lesson modal ----
 function openLessonModal(lesson) {
-  document.getElementById('modalTitle').textContent = `${lesson.student_name} — ${lesson.instrument}`;
+  const lType       = lesson.lesson_type ?? 'private';
+  const displayName = lType === 'group'
+    ? `Group lesson (${lesson.student_count ?? '?'} students)`
+    : (lesson.student_name ?? '—');
+
+  document.getElementById('modalTitle').textContent = `${displayName} — ${lesson.instrument}`;
   document.getElementById('modalBody').innerHTML = `
     <div style="display:grid;gap:0.85rem;">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.85rem;">
         <div>
-          <div class="text-sm text-muted mb-1">Student</div>
-          <div class="font-bold">${lesson.student_name}</div>
+          <div class="text-sm text-muted mb-1">${lType === 'group' ? 'Students' : 'Student'}</div>
+          <div class="font-bold">${displayName}</div>
         </div>
         <div>
           <div class="text-sm text-muted mb-1">Teacher</div>
-          <div class="font-bold">${lesson.teacher_name}</div>
+          <div class="font-bold">${lesson.teacher_name ?? '—'}</div>
         </div>
         <div>
           <div class="text-sm text-muted mb-1">Date &amp; Time</div>
@@ -396,12 +403,17 @@ function openLessonModal(lesson) {
         </div>
         <div>
           <div class="text-sm text-muted mb-1">Studio</div>
-          <div class="font-bold">${lesson.studio_name}</div>
+          <div class="font-bold">${lesson.studio_name ?? '—'}</div>
+        </div>
+        <div>
+          <div class="text-sm text-muted mb-1">Type</div>
+          <div class="font-bold">${lType === 'private' ? 'Private' : 'Group'}</div>
         </div>
         <div>
           <div class="text-sm text-muted mb-1">Instrument</div>
           <div class="font-bold">${lesson.instrument}</div>
         </div>
+        ${lesson.is_online ? `<div><div class="text-sm text-muted mb-1">Mode</div><span class="pill pill-online">Online</span></div>` : ''}
       </div>
       <div>
         <div class="text-sm text-muted mb-1">Attendance</div>
