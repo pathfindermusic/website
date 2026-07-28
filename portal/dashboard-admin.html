@@ -345,7 +345,7 @@ async function loadSchedule() {
           html += `<td style="background:var(--off-white);"></td>`;
         } else {
           html += `<td>`;
-          lessons.forEach(l => {
+          lessons.forEach((l, idx) => {
             const isCancelled = l.occurrence_status === 'cancelled';
             const lType       = l.lesson_type ?? 'private';
             const displayName = lType === 'group'
@@ -353,13 +353,14 @@ async function loadSchedule() {
               : (l.student_name ?? '—');
 
             html += `
-              <div class="lesson-card" style="${isCancelled ? 'opacity:0.45;' : ''}" onclick="openLessonModal(${JSON.stringify(l).split('"').join('&quot;')})" style="cursor:pointer;">
+              ${idx > 0 ? '<div style="border-top:1px solid var(--border);margin:4px 0;"></div>' : ''}
+              <div class="lesson-card" style="${isCancelled ? 'opacity:0.5;text-decoration:line-through;' : ''}" onclick="openLessonModal(${JSON.stringify(l).split('"').join('&quot;')})" style="cursor:pointer;">
                 <div class="lesson-name">${isCancelled ? '✕ ' : ''}${displayName}</div>
                 <div class="lesson-instrument">${l.instrument}</div>
                 <div class="lesson-meta">
                   ${lType === 'private' ? 'Private' : 'Group'} · ${l.teacher_name ?? '—'}
                 </div>
-                <div class="lesson-meta">${formatDuration(l.duration_mins)}${l.is_online ? ' · <span class="pill pill-online" style="font-size:0.65rem;">Online</span>' : ''}</div>
+                ${l.is_online ? '<div class="lesson-meta"><span class="pill pill-online" style="font-size:0.65rem;">Online</span></div>' : ''}
                 <div style="margin-top:4px;">${attendancePill(l.attendance_status)}</div>
               </div>`;
           });
@@ -434,7 +435,9 @@ function openLessonModal(lesson) {
     </div>`;
 
   document.getElementById('modalEditBtn').onclick = () => {
-    window.location.href = `lessons.html?edit=${lesson.occurrence_id}`;
+    // Store occurrence ID in sessionStorage so lessons.html can auto-open the modal
+    sessionStorage.setItem('openOccurrence', lesson.occurrence_id);
+    window.location.href = `lessons.html`;
   };
   document.getElementById('lessonModal').classList.remove('hidden');
 }

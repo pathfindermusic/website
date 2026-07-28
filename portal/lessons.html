@@ -655,7 +655,21 @@ let allOccurrences  = []; // cached occurrences for current view
 
   await Promise.all([loadStudios(), loadTeachers(), loadStudents()]);
   populateInstruments();
-  loadView();
+  await loadView();
+
+  // Auto-open occurrence modal if redirected from dashboard
+  const openOccId = sessionStorage.getItem('openOccurrence');
+  if (openOccId) {
+    sessionStorage.removeItem('openOccurrence');
+    // Find the occurrence in the loaded data and open it
+    const occ = allOccurrences.find(o => o.id === openOccId);
+    if (occ) {
+      openOccurrenceModal(openOccId);
+    } else {
+      // Navigate to the correct date first
+      showToast('Navigating to lesson…', 'warning');
+    }
+  }
 })();
 
 // ============================================================
@@ -1685,8 +1699,12 @@ async function previewAgenda() {
       ? (teacher?.virtual_room_link ?? 'Online')
       : (teacher?.teaching_room ?? `${studio?.name ?? ''} - ${teacher?.profile?.first_name ?? ''}'s Room`);
 
+    const startMins = timeToMins(l.start_time);
+    const endMins   = startMins + (l.duration_mins ?? 30);
+    const endTime   = `${String(Math.floor(endMins/60)).padStart(2,'0')}:${String(endMins%60).padStart(2,'0')}:00`;
+
     html += `<div class="agenda-item">
-      <div class="agenda-time">${formatTime(l.start_time)}</div>
+      <div class="agenda-time">${formatTime(l.start_time)}–${formatTime(endTime)}</div>
       <div class="agenda-student">${lType === 'group' ? sNames.join(', ') : (sNames[0] ?? '—')}</div>
       <div class="agenda-type">${lType === 'private' ? 'Private' : 'Group'}</div>
       <div class="agenda-location">${location}</div>
