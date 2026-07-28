@@ -4,8 +4,8 @@
 // Supabase Dashboard → Project Settings → API
 // ============================================================
 
-const SUPABASE_URL  = 'YOUR_SUPABASE_PROJECT_URL';   // e.g. https://xxxxxxxxxxxx.supabase.co
-const SUPABASE_ANON = 'YOUR_SUPABASE_ANON_KEY';      // starts with eyJ...
+const SUPABASE_URL  = 'https://oxuyzcjgxmohpqyijpip.supabase.co/';   // e.g. https://xxxxxxxxxxxx.supabase.co
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im94dXl6Y2pneG1vaHBxeWlqcGlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTQ3NzMsImV4cCI6MjEwMDQ5MDc3M30.3BiBBOqQFMwpb7mZC7xLISDp2EJCXfML-7_wq-Imwws';      // starts with eyJ...
 
 // Load Supabase via CDN (included in each HTML page's <head>)
 // <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
