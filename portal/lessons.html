@@ -1536,8 +1536,6 @@ async function previewAgenda() {
     lessons: (teacherLessons ?? []).find(l => l.id === o.lesson_id) ?? null,
   })).sort((a, b) => (a.lessons?.start_time ?? '').localeCompare(b.lessons?.start_time ?? ''));
 
-  const occs = occsWithLessons;
-
   // Load students for each lesson
   const lessonIds = [...new Set((occs ?? []).map(o => o.lessons?.id).filter(Boolean))];
   const { data: lsData } = lessonIds.length > 0
@@ -1563,7 +1561,7 @@ async function previewAgenda() {
     lsMap[ls.lesson_id].push(ls.student_id);
   });
 
-  if (!occs || occs.length === 0) {
+  if (!occsWithLessons || occsWithLessons.length === 0) {
     preview.innerHTML = `<div class="agenda-heading">${tName}</div>
       <div class="agenda-subheading">${dateLabel}</div>
       <div class="text-sm text-muted" style="margin-top:0.5rem;">No lessons scheduled for this date.</div>`;
@@ -1573,7 +1571,7 @@ async function previewAgenda() {
   let html = `<div class="agenda-heading">${tName}</div>
     <div class="agenda-subheading">${dateLabel}</div>`;
 
-  (occs ?? []).forEach(o => {
+  (occsWithLessons ?? []).forEach(o => {
     const l       = o.lessons ?? {};
     const lType   = l.lesson_type ?? 'private';
     const sIds    = lsMap[l.id] ?? [];
