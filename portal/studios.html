@@ -221,7 +221,7 @@ function openStudioModal(idx = null) {
 function closeStudioModal() { document.getElementById('studioModal').classList.add('hidden'); }
 
 async function deleteStudio(id, name) {
-  // Check if studio has any active lessons or students before deleting
+  // Check if studio has any active lessons before deleting
   const { count: lessonCount } = await db
     .from('lessons')
     .select('id', { count: 'exact' })
@@ -235,11 +235,21 @@ async function deleteStudio(id, name) {
 
   if (!confirm(`Are you sure you want to permanently delete the ${name} studio? This cannot be undone.`)) return;
 
+  // Clean up teacher studio_ids and availability that reference this studio
+  const { data: teachers } = await db.from('teachers').select('id, studio_ids');
+  for (const t of (teachers ?? [])) {
+    const updated = (t.studio_ids ?? []).filter(sid => sid !== id);
+    if (updated.length !== (t.studio_ids ?? []).length) {
+      await db.from('teachers').update({ studio_ids: updated }).eq('id', t.id);
+    }
+  }
+  await db.from('teacher_availability').delete().eq('studio_id', id);
+
   const { error } = await db.from('studios').delete().eq('id', id);
   if (error) {
     showToast('Error deleting studio: ' + error.message, 'error');
   } else {
-    showToast(`${name} studio deleted.`, 'success');
+    showToast(`${name} studio deleted and teacher references cleaned up.`, 'success');
     await loadStudios();
   }
 }

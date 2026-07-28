@@ -349,7 +349,7 @@ function renderTeachers() {
   grid.innerHTML = allTeachers.map(t => {
     const p        = t.profiles ?? {};
     const initials = ((p.first_name?.[0] ?? '') + (p.last_name?.[0] ?? '')).toUpperCase();
-    const studios  = (t.studio_ids ?? []).map(id => studioMap[id] ?? id).join(', ') || '–';
+    const studios  = (t.studio_ids ?? []).map(id => studioMap[id]).filter(Boolean).join(', ') || '–';
     const avail    = t.teacher_availability ?? [];
     const availDays = avail.map(a => a.day_of_week);
 
