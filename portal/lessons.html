@@ -108,7 +108,7 @@
       border-right: 1px solid var(--border);
       vertical-align: top;
       padding: 2px;
-      height: 36px;
+      height: 48px;
       cursor: pointer;
       transition: background 0.12s;
       position: relative;
@@ -401,8 +401,8 @@
         <div class="form-group">
           <label class="form-label">Duration *</label>
           <select class="form-select" id="lDuration">
-            <option value="30">30 minutes</option>
-            <option value="60" selected>60 minutes</option>
+            <option value="30" selected>30 minutes</option>
+            <option value="60">60 minutes</option>
             <option value="90">90 minutes</option>
             <option value="120">120 minutes</option>
           </select>
@@ -981,7 +981,7 @@ async function loadDailyView() {
 
           html += `<td class="grid-cell" rowspan="${rowspan}" 
             onclick="openOccurrenceModal('${startOcc.id}')"
-            style="vertical-align:top;height:${rowspan * 36}px;">
+            style="vertical-align:top;height:${rowspan * 48}px;">
             <div class="lesson-block ${isCancelled ? 'cancelled' : lType}" style="height:calc(100% - 4px);">
               ${isCancelled ? '<span class="lesson-cancel-icon">✕</span>' : ''}
               <div class="lesson-block-name">${displayName}</div>
