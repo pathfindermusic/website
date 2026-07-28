@@ -315,7 +315,7 @@ async function loadSchedule() {
   const byDate = {};
   days.forEach(d => { byDate[toISODate(d)] = []; });
   data.forEach(row => {
-    const key = toISODate(new Date(row.date));
+    const key = row.date?.slice(0, 10); // use string directly to avoid UTC timezone shift
     if (byDate[key]) byDate[key].push(row);
   });
 
@@ -396,7 +396,7 @@ function openLessonModal(lesson) {
         </div>
         <div>
           <div class="text-sm text-muted mb-1">Date &amp; Time</div>
-          <div class="font-bold">${formatLongDate(new Date(lesson.date))} at ${formatTime(lesson.start_time)}</div>
+          <div class="font-bold">${formatLongDate(parseLocalDate(lesson.date))} at ${formatTime(lesson.start_time)}</div>
         </div>
         <div>
           <div class="text-sm text-muted mb-1">Duration</div>

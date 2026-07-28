@@ -4,9 +4,8 @@
 // Supabase Dashboard → Project Settings → API
 // ============================================================
 
-const SUPABASE_URL  = 'https://oxuyzcjgxmohpqyijpip.supabase.co';   // e.g. https://xxxxxxxxxxxx.supabase.co -- It's the API URL Supabase Dashboard → Project Settings → Data API
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im94dXl6Y2pneG1vaHBxeWlqcGlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTQ3NzMsImV4cCI6MjEwMDQ5MDc3M30.3BiBBOqQFMwpb7mZC7xLISDp2EJCXfML-7_wq-Imwws';      // anon public API Key generated for pathfinder_student_portal role in Supabase Dashboard → Project Settings → API Key
-
+const SUPABASE_URL  = 'YOUR_SUPABASE_PROJECT_URL';   // e.g. https://xxxxxxxxxxxx.supabase.co
+const SUPABASE_ANON = 'YOUR_SUPABASE_ANON_KEY';      // starts with eyJ...
 
 // Load Supabase via CDN (included in each HTML page's <head>)
 // <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -138,7 +137,19 @@ function showEmpty(containerId, title = 'No results', message = '') {
 
 /** Returns an ISO date string (YYYY-MM-DD) for a given Date */
 function toISODate(date) {
-  return date.toISOString().split('T')[0];
+  // Use local date parts to avoid UTC timezone shift in Australian timezones
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+// Parse a date string as LOCAL time to avoid UTC timezone day shifts
+// e.g. "2026-07-29" → Wed 29 July in AEST, not Tue 28 July
+function parseLocalDate(dateStr) {
+  if (!dateStr) return new Date();
+  const [y, m, d] = dateStr.slice(0, 10).split('-').map(Number);
+  return new Date(y, m - 1, d);
 }
 
 /** Returns the Monday of the week containing the given date */

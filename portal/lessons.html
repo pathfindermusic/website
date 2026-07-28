@@ -847,7 +847,7 @@ async function loadDailyView() {
   });
 
   allOccurrences = (occData ?? []).map(o => ({
-    ...o, lessonStudents: lsMap[o.lessons?.id] ?? [],
+    ...o, lessonStudents: lsMap[o.lessons?.id ?? o.lesson_id] ?? [],
   })).filter(o => {
     // Always show scheduled occurrences
     if (o.status === 'scheduled') return true;
@@ -1038,7 +1038,7 @@ async function loadWeeklyView() {
   }
 
   // Load lesson students
-  const lessonIds = [...new Set(allOccurrences.map(o => o.lessons?.id).filter(Boolean))];
+  const lessonIds = [...new Set(allOccurrences.map(o => o.lessons?.id ?? o.lesson_id).filter(Boolean))];
   const { data: lsData } = lessonIds.length > 0
     ? await db.from('lesson_students').select('lesson_id,student_id').in('lesson_id', lessonIds)
     : { data: [] };
@@ -1073,12 +1073,14 @@ async function loadWeeklyView() {
   const studioMap = {};
   allStudios.forEach(s => { studioMap[s.id] = s.name; });
 
-  // Group by date
+  // Group by date — merge lessonStudents into each occurrence
   const byDate = {};
   days.forEach(d => { byDate[toISODate(d)] = []; });
   allOccurrences.forEach(o => {
-    const k = toISODate(new Date(o.date));
-    if (byDate[k]) byDate[k].push(o);
+    const k      = o.date?.slice(0, 10);
+    const lId    = o.lessons?.id ?? o.lesson_id;
+    const merged = { ...o, lessonStudents: lsMap[lId] ?? [] };
+    if (byDate[k]) byDate[k].push(merged);
   });
 
   const today = toISODate(new Date());
