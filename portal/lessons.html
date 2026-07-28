@@ -565,11 +565,44 @@ const INSTRUMENTS = ['Guitar','Bass','Drums','Piano','Voice / Singing','Violin',
 const DAY_NAMES   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const DAY_SHORT   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
-// Time slots: 8am to 9pm in 30-min blocks
-const TIME_SLOTS = [];
+// Time slots: computed dynamically based on lessons for the day
+// Falls back to 8am-9pm if no lessons exist
+const ALL_TIME_SLOTS = [];
 for (let h = 8; h <= 20; h++) {
-  TIME_SLOTS.push(`${String(h).padStart(2,'0')}:00`);
-  if (h < 20) TIME_SLOTS.push(`${String(h).padStart(2,'0')}:30`);
+  ALL_TIME_SLOTS.push(`${String(h).padStart(2,'0')}:00`);
+  if (h < 20) ALL_TIME_SLOTS.push(`${String(h).padStart(2,'0')}:30`);
+}
+
+function computeTimeSlots(occurrences) {
+  if (!occurrences || occurrences.length === 0) return ALL_TIME_SLOTS;
+
+  // Find earliest start and latest end across all lessons
+  let minMins = 999, maxMins = 0;
+  occurrences.forEach(o => {
+    const start = o.lessons?.start_time;
+    const dur   = o.lessons?.duration_mins ?? 30;
+    if (!start) return;
+    const [h, m] = start.split(':').map(Number);
+    const startMins = h * 60 + m;
+    const endMins   = startMins + dur;
+    if (startMins < minMins) minMins = startMins;
+    if (endMins   > maxMins) maxMins = endMins;
+  });
+
+  // Also include teacher availability slots
+  // Add 30-min buffer before and after
+  minMins = Math.max(8 * 60,  minMins - 30);
+  maxMins = Math.min(21 * 60, maxMins + 30);
+
+  // Round down to nearest 30 min
+  minMins = Math.floor(minMins / 30) * 30;
+  maxMins = Math.ceil(maxMins  / 30) * 30;
+
+  const slots = [];
+  for (let m = minMins; m < maxMins; m += 30) {
+    slots.push(`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`);
+  }
+  return slots.length > 0 ? slots : ALL_TIME_SLOTS;
 }
 
 // ============================================================
@@ -816,6 +849,31 @@ async function loadDailyView() {
             </tr>
           </thead>
           <tbody>`;
+
+    // Compute time slots dynamically based on lessons at this studio
+    const studioOccs = allOccurrences.filter(o => o.lessons?.studio_id === studio.id);
+    const TIME_SLOTS  = computeTimeSlots(studioOccs);
+
+    // Extend time range to cover teacher availability on this day
+    // so empty grids still show the working hours
+    const availSlots = [];
+    teachers.forEach(t => {
+      (t.teacher_availability ?? [])
+        .filter(a => a.studio_id === studio.id && a.day_of_week === dayOfWeek)
+        .forEach(a => {
+          const [sh, sm] = a.start_time.split(':').map(Number);
+          const [eh, em] = a.end_time.split(':').map(Number);
+          const startMins = sh * 60 + sm;
+          const endMins   = eh * 60 + em;
+          for (let m = startMins; m < endMins; m += 30) {
+            const slot = `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+            if (!availSlots.includes(slot)) availSlots.push(slot);
+          }
+        });
+    });
+    // Merge availability slots into TIME_SLOTS
+    availSlots.forEach(s => { if (!TIME_SLOTS.includes(s)) TIME_SLOTS.push(s); });
+    TIME_SLOTS.sort();
 
     // Build occupied slots map: teacherId → Set of slot strings
     const occupied = {}; // teacherId → { slotKey: occurrenceId }
@@ -1444,19 +1502,41 @@ async function previewAgenda() {
     return;
   }
 
+  // Show loading state while fetching
+  preview.innerHTML = `<div class="loading" style="padding:1rem;"><div class="spinner"></div> Loading…</div>`;
+
   const teacher = allTeachers.find(t => t.id === teacherId);
   const tName   = teacher ? `${teacher.profile?.first_name ?? ''} ${teacher.profile?.last_name ?? ''}`.trim() : '—';
   const dateObj = new Date(dateStr);
   const dateLabel = dateObj.toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
 
   // Load occurrences for this teacher on this date
-  const { data: occs } = await db
-    .from('lesson_occurrences')
-    .select(`id,status,is_online,occurrence_notes,lessons(id,teacher_id,start_time,duration_mins,lesson_type,instrument,studio_id)`)
-    .eq('date', dateStr)
-    .eq('lessons.teacher_id', teacherId)
-    .neq('status','cancelled')
-    .order('lessons(start_time)');
+  // Fetch via lessons table first to avoid nested filter issues
+  const { data: teacherLessons } = await db
+    .from('lessons')
+    .select('id,teacher_id,start_time,duration_mins,lesson_type,instrument,studio_id,status')
+    .eq('teacher_id', teacherId)
+    .eq('status','active');
+
+  const teacherLessonIds = (teacherLessons ?? []).map(l => l.id);
+
+  const { data: occs } = teacherLessonIds.length > 0
+    ? await db
+        .from('lesson_occurrences')
+        .select('id,status,is_online,occurrence_notes,lesson_id')
+        .eq('date', dateStr)
+        .in('lesson_id', teacherLessonIds)
+        .neq('status','cancelled')
+        .order('lesson_id')
+    : { data: [] };
+
+  // Merge lesson details into occurrences
+  const occsWithLessons = (occs ?? []).map(o => ({
+    ...o,
+    lessons: (teacherLessons ?? []).find(l => l.id === o.lesson_id) ?? null,
+  })).sort((a, b) => (a.lessons?.start_time ?? '').localeCompare(b.lessons?.start_time ?? ''));
+
+  const occs = occsWithLessons;
 
   // Load students for each lesson
   const lessonIds = [...new Set((occs ?? []).map(o => o.lessons?.id).filter(Boolean))];
@@ -1486,7 +1566,7 @@ async function previewAgenda() {
   if (!occs || occs.length === 0) {
     preview.innerHTML = `<div class="agenda-heading">${tName}</div>
       <div class="agenda-subheading">${dateLabel}</div>
-      <div class="text-sm text-muted">No lessons scheduled for this date.</div>`;
+      <div class="text-sm text-muted" style="margin-top:0.5rem;">No lessons scheduled for this date.</div>`;
     return;
   }
 
