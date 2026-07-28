@@ -362,7 +362,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">Instrument *</label>
-          <select class="form-select" id="lInstrument"></select>
+          <select class="form-select" id="lInstrument" onchange="onInstrumentChange()"></select>
         </div>
       </div>
 
@@ -544,7 +544,9 @@
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Teacher *</label>
-          <select class="form-select" id="agendaTeacher" onchange="previewAgenda()"></select>
+          <select class="form-select" id="agendaTeacher" onchange="previewAgenda()">
+            <option value="">— Select teacher —</option>
+          </select>
         </div>
         <div class="form-group">
           <label class="form-label">Date *</label>
@@ -714,16 +716,15 @@ function populateInstruments() {
   INSTRUMENTS.forEach(i => { sel.innerHTML += `<option value="${i}">${i}</option>`; });
 }
 
-// Auto-switch to group when Band is selected
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('lInstrument').addEventListener('change', function() {
-    if (this.value === 'Band') {
-      document.getElementById('lType').value = 'group';
-      onTypeChange();
-      showToast('Band lessons are automatically set to Group.', 'warning');
-    }
-  });
-});
+// Band instrument auto-switches to group — called from lInstrument onchange in HTML
+function onInstrumentChange() {
+  const inst = document.getElementById('lInstrument').value;
+  if (inst === 'Band') {
+    document.getElementById('lType').value = 'group';
+    onTypeChange();
+    showToast('Band lessons are automatically set to Group.', 'warning');
+  }
+}
 
 // ============================================================
 // VIEW SWITCHING
