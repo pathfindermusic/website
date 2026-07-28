@@ -137,10 +137,6 @@ function showEmpty(containerId, title = 'No results', message = '') {
 
 /** Returns an ISO date string (YYYY-MM-DD) for a given Date */
 function toISODate(date) {
-  // Guard against non-Date inputs
-  if (!date || typeof date.getFullYear !== 'function') {
-    date = new Date(date);
-  }
   // Use local date parts to avoid UTC timezone shift in Australian timezones
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
