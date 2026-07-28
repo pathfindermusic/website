@@ -658,16 +658,28 @@ let allOccurrences  = []; // cached occurrences for current view
   await loadView();
 
   // Auto-open occurrence modal if redirected from dashboard
-  const openOccId = sessionStorage.getItem('openOccurrence');
+  const openOccId   = sessionStorage.getItem('openOccurrence');
+  const openOccDate = sessionStorage.getItem('openOccurrenceDate');
   if (openOccId) {
     sessionStorage.removeItem('openOccurrence');
-    // Find the occurrence in the loaded data and open it
+    sessionStorage.removeItem('openOccurrenceDate');
+
+    // Navigate to the correct date if provided
+    if (openOccDate) {
+      const [y, m, d] = openOccDate.split('-').map(Number);
+      currentDate = new Date(y, m - 1, d);
+      currentView = 'daily';
+      document.getElementById('btnDaily').classList.add('active');
+      document.getElementById('btnWeekly').classList.remove('active');
+      await loadView();
+    }
+
+    // Now find and open the occurrence
     const occ = allOccurrences.find(o => o.id === openOccId);
     if (occ) {
       openOccurrenceModal(openOccId);
     } else {
-      // Navigate to the correct date first
-      showToast('Navigating to lesson…', 'warning');
+      showToast('Could not find the selected lesson. Try navigating to the correct date.', 'warning');
     }
   }
 })();

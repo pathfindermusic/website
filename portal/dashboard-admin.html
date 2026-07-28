@@ -435,8 +435,8 @@ function openLessonModal(lesson) {
     </div>`;
 
   document.getElementById('modalEditBtn').onclick = () => {
-    // Store occurrence ID in sessionStorage so lessons.html can auto-open the modal
     sessionStorage.setItem('openOccurrence', lesson.occurrence_id);
+    sessionStorage.setItem('openOccurrenceDate', lesson.date?.slice(0, 10));
     window.location.href = `lessons.html`;
   };
   document.getElementById('lessonModal').classList.remove('hidden');
