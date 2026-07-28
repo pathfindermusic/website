@@ -553,6 +553,41 @@ async function saveTeacher() {
     end_time:    slot.querySelector('.avail-end').value   + ':00',
   }));
 
+  // ---- Validate availability slots ----
+  const timeToMins = t => { const [h,m] = t.split(':').map(Number); return h*60+m; };
+
+  for (let i = 0; i < availability.length; i++) {
+    const a = availability[i];
+    const aStart = timeToMins(a.start_time);
+    const aEnd   = timeToMins(a.end_time);
+
+    if (aStart >= aEnd) {
+      showToast(`Availability slot ${i+1}: end time must be after start time.`, 'error'); return;
+    }
+
+    for (let j = i + 1; j < availability.length; j++) {
+      const b = availability[j];
+      if (a.day_of_week !== b.day_of_week) continue;
+
+      const bStart = timeToMins(b.start_time);
+      const bEnd   = timeToMins(b.end_time);
+      const overlaps = aStart < bEnd && aEnd > bStart;
+
+      if (!overlaps) continue;
+
+      const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][a.day_of_week];
+      const studioA = allStudios.find(s => s.id === a.studio_id)?.name ?? 'Studio';
+      const studioB = allStudios.find(s => s.id === b.studio_id)?.name ?? 'Studio';
+
+      if (a.studio_id === b.studio_id) {
+        showToast(`Availability clash: Two overlapping slots at ${studioA} on ${dayName}. Please fix before saving.`, 'error');
+      } else {
+        showToast(`Availability clash: ${studioA} and ${studioB} overlap on ${dayName}. A teacher can't be at two studios at the same time.`, 'error');
+      }
+      return;
+    }
+  }
+
   try {
     let teacherId = editId;
     let userId    = editUserId;
