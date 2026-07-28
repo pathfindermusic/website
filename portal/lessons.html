@@ -737,9 +737,13 @@ async function loadDailyView() {
     .from('lesson_occurrences')
     .select(`
       id, date, status, is_online, occurrence_notes,
-      lessons(id, teacher_id, studio_id, instrument, start_time, duration_mins, lesson_type, max_students, series_notes)
+      lessons(id, teacher_id, studio_id, instrument, start_time, duration_mins, lesson_type, max_students, series_notes, status)
     `)
-    .eq('date', dateStr);
+    .eq('date', dateStr)
+    .or('status.eq.scheduled,status.eq.cancelled');
+
+  // Filter: hide cancelled occurrences where the whole series is also cancelled
+  // Only show cancelled occurrences where the series (lesson) is still active
 
   if (error) { wrap.innerHTML = `<div class="empty-state"><p style="color:#dc2626;">${error.message}</p></div>`; return; }
 
@@ -773,7 +777,14 @@ async function loadDailyView() {
 
   allOccurrences = (occData ?? []).map(o => ({
     ...o, lessonStudents: lsMap[o.lessons?.id] ?? [],
-  }));
+  })).filter(o => {
+    // Always show scheduled occurrences
+    if (o.status === 'scheduled') return true;
+    // Only show cancelled occurrences if the lesson series itself is still active
+    // (i.e. this was a one-off cancellation, not a series cancellation)
+    if (o.status === 'cancelled' && o.lessons?.status === 'active') return true;
+    return false;
+  });
 
   // Render one grid per studio
   if (studios.length === 0) {
@@ -909,7 +920,7 @@ async function loadWeeklyView() {
 
   let query = db.from('lesson_occurrences')
     .select(`id,date,status,is_online,occurrence_notes,
-      lessons(id,teacher_id,studio_id,instrument,start_time,duration_mins,lesson_type,max_students,series_notes)`)
+      lessons(id,teacher_id,studio_id,instrument,start_time,duration_mins,lesson_type,max_students,series_notes,status)`)
     .gte('date', wStart).lte('date', wEnd).order('date').order('lessons(start_time)');
 
   if (studioFilter) query = query.eq('lessons.studio_id', studioFilter);
@@ -918,7 +929,12 @@ async function loadWeeklyView() {
   const { data, error } = await query;
   if (error) { wrap.innerHTML = `<div class="empty-state"><p style="color:#dc2626;">${error.message}</p></div>`; return; }
 
-  allOccurrences = data ?? [];
+  // Filter: hide cancelled occurrences where the whole series is also cancelled
+  allOccurrences = (data ?? []).filter(o => {
+    if (o.status === 'scheduled') return true;
+    if (o.status === 'cancelled' && o.lessons?.status === 'active') return true;
+    return false;
+  });
 
   if (!allOccurrences.length) {
     wrap.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📅</div><h3>No lessons this week</h3><p>Navigate to another week or add a lesson.</p></div>`;
@@ -1039,6 +1055,7 @@ function openLessonModal(lesson = null) {
   document.getElementById('lSeriesNotes').value = '';
   toggleRecurrenceFields();
   onTypeChange();
+  onTeacherChange(); // filter instruments + studios for default teacher
 
   if (!lesson) {
     document.getElementById('lessonModalTitle').textContent = 'Add Lesson';
@@ -1056,6 +1073,28 @@ function onTypeChange() {
 }
 
 function onTeacherChange() {
+  const teacherId = document.getElementById('lTeacher').value;
+  const teacher   = allTeachers.find(t => t.id === teacherId);
+
+  // Filter instruments to only those the teacher teaches
+  const instSel = document.getElementById('lInstrument');
+  instSel.innerHTML = '';
+  const teacherInstruments = teacher?.instruments ?? INSTRUMENTS;
+  teacherInstruments.forEach(i => {
+    instSel.innerHTML += `<option value="${i}">${i}</option>`;
+  });
+
+  // Filter studios to only those the teacher is assigned to
+  const studioSel = document.getElementById('lStudio');
+  studioSel.innerHTML = '';
+  const teacherStudios = allStudios.filter(s => (teacher?.studio_ids ?? []).includes(s.id));
+  if (teacherStudios.length === 0) {
+    // Fallback to all studios if no studio_ids set
+    allStudios.forEach(s => { studioSel.innerHTML += `<option value="${s.id}">${s.name}</option>`; });
+  } else {
+    teacherStudios.forEach(s => { studioSel.innerHTML += `<option value="${s.id}">${s.name}</option>`; });
+  }
+
   checkAvailability();
 }
 
@@ -1102,43 +1141,10 @@ function renderLessonStudents() {
   }).join('');
 }
 
-// Availability soft warning
-async function checkAvailability() {
-  const teacherId = document.getElementById('lTeacher').value;
-  const studioId  = document.getElementById('lStudio').value;
-  const day       = parseInt(document.getElementById('lDay').value);
-  const time      = document.getElementById('lTime').value;
-  const warn      = document.getElementById('availWarning');
-
-  if (!teacherId || !studioId || !time) { warn.classList.remove('show'); return; }
-
-  const teacher = allTeachers.find(t => t.id === teacherId);
-  if (!teacher) { warn.classList.remove('show'); return; }
-
-  const avail = (teacher.teacher_availability ?? []).filter(
-    a => a.day_of_week === day && a.studio_id === studioId
-  );
-
-  if (avail.length === 0) {
-    document.getElementById('availWarningText').textContent =
-      `This teacher has no availability listed for ${DAY_NAMES[day]} at this studio.`;
-    warn.classList.add('show'); return;
-  }
-
-  const lessonMins = time.split(':').reduce((acc, v, i) => acc + (i === 0 ? +v * 60 : +v), 0);
-  const inSlot = avail.some(a => {
-    const start = a.start_time.split(':').reduce((acc, v, i) => acc + (i === 0 ? +v * 60 : +v), 0);
-    const end   = a.end_time.split(':').reduce((acc, v, i)   => acc + (i === 0 ? +v * 60 : +v), 0);
-    return lessonMins >= start && lessonMins < end;
-  });
-
-  if (!inSlot) {
-    document.getElementById('availWarningText').textContent =
-      `${time} is outside this teacher's availability on ${DAY_NAMES[day]}.`;
-    warn.classList.add('show');
-  } else {
-    warn.classList.remove('show');
-  }
+// Availability check — now informational only, hard block happens on save
+function checkAvailability() {
+  // No-op — availability is enforced as a hard block in saveLesson()
+  // The avail-warning div is kept in HTML but no longer used
 }
 
 function toggleRecurrenceFields() {
@@ -1175,6 +1181,44 @@ async function saveLesson() {
   }
   if (lType === 'private' && lessonStudents.length > 1) {
     showToast('Private lessons can only have one student.', 'error'); return;
+  }
+
+  // ---- HARD BLOCK: Teacher must teach this instrument ----
+  const teacher = allTeachers.find(t => t.id === teacherId);
+  if (teacher && (teacher.instruments ?? []).length > 0) {
+    if (!teacher.instruments.includes(instrument)) {
+      const tName = `${teacher.profile?.first_name ?? ''} ${teacher.profile?.last_name ?? ''}`.trim();
+      showToast(`${tName} does not teach ${instrument}. Please select a different teacher or instrument.`, 'error');
+      return;
+    }
+  }
+
+  // ---- HARD BLOCK: Teacher must be available at this studio + day + time ----
+  if (teacher) {
+    const day        = parseInt(document.getElementById('lDay').value);
+    const lessonMins = timeToMins(time);
+    const avail      = (teacher.teacher_availability ?? []).filter(
+      a => a.day_of_week === day && a.studio_id === studioId
+    );
+
+    if (avail.length === 0) {
+      const studio  = allStudios.find(s => s.id === studioId);
+      const tName   = `${teacher.profile?.first_name ?? ''} ${teacher.profile?.last_name ?? ''}`.trim();
+      showToast(`${tName} has no availability at ${studio?.name ?? 'this studio'} on ${DAY_NAMES[day]}. Please check the teacher's availability.`, 'error');
+      return;
+    }
+
+    const inSlot = avail.some(a => {
+      const start = timeToMins(a.start_time);
+      const end   = timeToMins(a.end_time);
+      return lessonMins >= start && lessonMins < end;
+    });
+
+    if (!inSlot) {
+      const tName = `${teacher.profile?.first_name ?? ''} ${teacher.profile?.last_name ?? ''}`.trim();
+      showToast(`${tName} is not available at ${time.slice(0,5)} on ${DAY_NAMES[day]}. Please choose a time within their availability.`, 'error');
+      return;
+    }
   }
 
   // ---- CLASH DETECTION ----
