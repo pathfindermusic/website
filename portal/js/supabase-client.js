@@ -137,11 +137,7 @@ function showEmpty(containerId, title = 'No results', message = '') {
 
 /** Returns an ISO date string (YYYY-MM-DD) for a given Date */
 function toISODate(date) {
-  // Use local date parts to avoid UTC timezone shift in Australian timezones
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return date.toISOString().split('T')[0];
 }
 
 // Parse a date string as LOCAL time to avoid UTC timezone day shifts
