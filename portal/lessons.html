@@ -1537,7 +1537,7 @@ async function previewAgenda() {
   })).sort((a, b) => (a.lessons?.start_time ?? '').localeCompare(b.lessons?.start_time ?? ''));
 
   // Load students for each lesson
-  const lessonIds = [...new Set((occs ?? []).map(o => o.lessons?.id).filter(Boolean))];
+  const lessonIds = [...new Set((occsWithLessons ?? []).map(o => o.lesson_id).filter(Boolean))];
   const { data: lsData } = lessonIds.length > 0
     ? await db.from('lesson_students').select('lesson_id,student_id').in('lesson_id', lessonIds)
     : { data: [] };
@@ -1574,7 +1574,7 @@ async function previewAgenda() {
   (occsWithLessons ?? []).forEach(o => {
     const l       = o.lessons ?? {};
     const lType   = l.lesson_type ?? 'private';
-    const sIds    = lsMap[l.id] ?? [];
+    const sIds    = lsMap[o.lesson_id] ?? [];
     const sNames  = sIds.map(id => spMap[id]).filter(Boolean);
     const studio  = allStudios.find(s => s.id === l.studio_id);
     const location = o.is_online
