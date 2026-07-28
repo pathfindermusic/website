@@ -488,6 +488,18 @@
         <div id="occStudentsList" style="font-size:0.875rem;color:var(--dark-grey);"></div>
       </div>
 
+      <!-- Add student to group lesson -->
+      <div class="form-group hidden" id="occAddStudentWrap">
+        <label class="form-label">Add student to this lesson</label>
+        <div class="add-student-row">
+          <select class="form-select" id="occStudentPicker">
+            <option value="">— Select student —</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="addStudentToOccurrence()">Add</button>
+        </div>
+        <div class="form-hint">Group lessons: up to 6 students</div>
+      </div>
+
       <!-- Online toggle -->
       <div class="form-group">
         <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.845rem;cursor:pointer;">
@@ -701,6 +713,17 @@ function populateInstruments() {
   const sel = document.getElementById('lInstrument');
   INSTRUMENTS.forEach(i => { sel.innerHTML += `<option value="${i}">${i}</option>`; });
 }
+
+// Auto-switch to group when Band is selected
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('lInstrument').addEventListener('change', function() {
+    if (this.value === 'Band') {
+      document.getElementById('lType').value = 'group';
+      onTypeChange();
+      showToast('Band lessons are automatically set to Group.', 'warning');
+    }
+  });
+});
 
 // ============================================================
 // VIEW SWITCHING
@@ -1125,9 +1148,25 @@ function openLessonModal(lesson = null) {
 function closeLessonModal() { document.getElementById('lessonModal').classList.add('hidden'); }
 
 function onTypeChange() {
-  const type = document.getElementById('lType').value;
+  const type       = document.getElementById('lType').value;
+  const instrument = document.getElementById('lInstrument').value;
+
+  // Band must always be group
+  if (instrument === 'Band' && type === 'private') {
+    document.getElementById('lType').value = 'group';
+    showToast('Band lessons must be Group lessons.', 'warning');
+    return;
+  }
+
   document.getElementById('studentsLabel').textContent = type === 'group' ? 'Students (up to 6)' : 'Student *';
   document.getElementById('groupCapacityNote').style.display = type === 'group' ? 'block' : 'none';
+
+  // If switching back to private, keep only first student
+  if (type === 'private' && lessonStudents.length > 1) {
+    lessonStudents = [lessonStudents[0]];
+    renderLessonStudents();
+    showToast('Switched to Private — only one student kept.', 'warning');
+  }
 }
 
 function onTeacherChange() {
@@ -1434,14 +1473,78 @@ async function openOccurrenceModal(occId) {
     </div>
     ${l.series_notes ? `<div style="margin-top:0.65rem;padding-top:0.65rem;border-top:1px solid var(--border);font-size:0.82rem;color:var(--dark-grey);">📋 Series note: ${l.series_notes}</div>` : ''}`;
 
-  document.getElementById('occStudentsList').innerHTML = sNames.length > 0
-    ? sNames.map(n => `<div class="student-tag"><span class="student-tag-name">${n}</span></div>`).join('')
+  // Render students with remove button for group lessons
+  const isGroup = l.lesson_type === 'group';
+  document.getElementById('occStudentsList').innerHTML = sIds.length > 0
+    ? sIds.map((sid, i) => `
+        <div class="student-tag">
+          <span class="student-tag-name">${sNames[i] ?? '—'}</span>
+          ${isGroup ? `<button class="student-tag-remove" onclick="removeStudentFromOccurrence('${l.id}','${sid}')">✕</button>` : ''}
+        </div>`).join('')
     : '<div class="text-sm text-muted">No students assigned.</div>';
+
+  // Show add student section for group lessons
+  const addWrap  = document.getElementById('occAddStudentWrap');
+  const occPicker = document.getElementById('occStudentPicker');
+  if (isGroup && sIds.length < 6) {
+    addWrap.classList.remove('hidden');
+    // Populate picker with students not already in this lesson
+    occPicker.innerHTML = '<option value="">— Select student —</option>';
+    allStudents
+      .filter(s => !sIds.includes(s.id))
+      .forEach(s => {
+        const name = `${s.profile?.first_name ?? ''} ${s.profile?.last_name ?? ''}`.trim();
+        occPicker.innerHTML += `<option value="${s.id}">${name}</option>`;
+      });
+  } else {
+    addWrap.classList.add('hidden');
+  }
+
+  // Store lesson_id and current student ids for add/remove operations
+  document.getElementById('occurrenceModal').dataset.lessonId   = l.id ?? '';
+  document.getElementById('occurrenceModal').dataset.lessonType = l.lesson_type ?? 'private';
 
   document.getElementById('occurrenceModal').classList.remove('hidden');
 }
 
 function closeOccModal() { document.getElementById('occurrenceModal').classList.add('hidden'); }
+
+async function addStudentToOccurrence() {
+  const lessonId = document.getElementById('occurrenceModal').dataset.lessonId;
+  const picker   = document.getElementById('occStudentPicker');
+  const sid      = picker.value;
+  if (!sid) { showToast('Please select a student.', 'warning'); return; }
+
+  // Check capacity
+  const currentCount = document.querySelectorAll('#occStudentsList .student-tag').length;
+  if (currentCount >= 6) { showToast('Group lessons can have a maximum of 6 students.', 'warning'); return; }
+
+  // Check student not already in another lesson at this time (clash detection)
+  const { error } = await db.from('lesson_students').insert({ lesson_id: lessonId, student_id: sid });
+  if (error) {
+    showToast('Could not add student: ' + error.message, 'error'); return;
+  }
+
+  showToast('Student added to lesson.', 'success');
+  // Reload the occurrence modal
+  const occId = document.getElementById('occId').value;
+  closeOccModal();
+  await loadView();
+  // Re-fetch allOccurrences and reopen
+  openOccurrenceModal(occId);
+}
+
+async function removeStudentFromOccurrence(lessonId, studentId) {
+  if (!confirm('Remove this student from the lesson?')) return;
+  const { error } = await db.from('lesson_students')
+    .delete().eq('lesson_id', lessonId).eq('student_id', studentId);
+  if (error) { showToast('Could not remove student: ' + error.message, 'error'); return; }
+  showToast('Student removed from lesson.', 'success');
+  const occId = document.getElementById('occId').value;
+  closeOccModal();
+  await loadView();
+  openOccurrenceModal(occId);
+}
 
 async function saveOccurrence() {
   const occId   = document.getElementById('occId').value;
