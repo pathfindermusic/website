@@ -647,10 +647,8 @@ let allOccurrences  = []; // cached occurrences for current view
   }
   if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
 
-  // Set default start date to next Monday
-  const nextMon = new Date();
-  nextMon.setDate(nextMon.getDate() + ((1 + 7 - nextMon.getDay()) % 7 || 7));
-  document.getElementById('lStartDate').value = toISODate(nextMon);
+  // Set default start date to today (overridden when clicking a cell)
+  document.getElementById('lStartDate').value = toISODate(currentDate);
   document.getElementById('agendaDate').value  = toISODate(new Date());
 
   await Promise.all([loadStudios(), loadTeachers(), loadStudents()]);
@@ -1149,11 +1147,15 @@ async function loadWeeklyView() {
 // ============================================================
 function openLessonModalFromCell(teacherId, studioId, slot, dayOfWeek) {
   openLessonModal();
+  // Set teacher first so onTeacherChange can filter instruments and studios correctly
   document.getElementById('lTeacher').value = teacherId;
+  onTeacherChange(); // filters instruments + studios for this teacher
+  // Now set studio and other fields (after teacher filter has run)
   document.getElementById('lStudio').value  = studioId;
   document.getElementById('lDay').value     = dayOfWeek;
   document.getElementById('lTime').value    = slot;
-  checkAvailability();
+  // Set start date to the current date shown on the grid
+  document.getElementById('lStartDate').value = toISODate(currentDate);
 }
 
 function openLessonModal(lesson = null) {
@@ -1170,6 +1172,8 @@ function openLessonModal(lesson = null) {
   if (!lesson) {
     document.getElementById('lessonModalTitle').textContent = 'Add Lesson';
     document.getElementById('editLessonId').value = '';
+    // Default start date to the current date shown on the grid
+    document.getElementById('lStartDate').value = toISODate(currentDate);
   }
   document.getElementById('lessonModal').classList.remove('hidden');
 }
