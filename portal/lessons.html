@@ -409,7 +409,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">First lesson date *</label>
-          <input class="form-input" type="date" id="lStartDate">
+          <input class="form-input" type="date" id="lStartDate" onchange="autoPopulateSeriesNotes()">
         </div>
       </div>
 
@@ -443,11 +443,11 @@
         </div>
         <div class="form-group hidden" id="recurrenceCountWrap">
           <label class="form-label">Number of lessons</label>
-          <input class="form-input" type="number" id="lCount" min="1" max="52" value="10">
+          <input class="form-input" type="number" id="lCount" min="1" max="52" value="10" oninput="autoPopulateSeriesNotes()">
         </div>
         <div class="form-group hidden" id="recurrenceEndWrap">
           <label class="form-label">End date</label>
-          <input class="form-input" type="date" id="lEndDate">
+          <input class="form-input" type="date" id="lEndDate" onchange="autoPopulateSeriesNotes()">
         </div>
       </div>
 
@@ -1281,6 +1281,43 @@ function toggleRecurrenceFields() {
   const val = document.getElementById('lRecurrence').value;
   document.getElementById('recurrenceCountWrap').classList.toggle('hidden', val !== 'occurrences');
   document.getElementById('recurrenceEndWrap').classList.toggle('hidden',   val !== 'date_range');
+  autoPopulateSeriesNotes();
+}
+
+function autoPopulateSeriesNotes() {
+  const recurrence  = document.getElementById('lRecurrence').value;
+  const startDate   = document.getElementById('lStartDate').value;
+  const count       = document.getElementById('lCount').value;
+  const endDate     = document.getElementById('lEndDate').value;
+  const notesField  = document.getElementById('lSeriesNotes');
+
+  // Only auto-populate if the field is empty or was previously auto-populated
+  if (recurrence === 'indefinite') {
+    // Clear auto-populated note if switching back to indefinite
+    if (notesField.dataset.autoPopulated === 'true') {
+      notesField.value = '';
+      notesField.dataset.autoPopulated = 'false';
+    }
+    return;
+  }
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '?';
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
+  let note = '';
+  if (recurrence === 'occurrences' && count && startDate) {
+    note = `${count}-lesson series, starting ${formatDate(startDate)}`;
+  } else if (recurrence === 'date_range' && startDate && endDate) {
+    note = `Recurring lessons from ${formatDate(startDate)} to ${formatDate(endDate)}`;
+  }
+
+  if (note) {
+    notesField.value = note;
+    notesField.dataset.autoPopulated = 'true';
+  }
 }
 
 // ============================================================
