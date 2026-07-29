@@ -1721,11 +1721,13 @@ async function previewAgenda() {
     const endMins   = startMins + (l.duration_mins ?? 30);
     const endTime   = `${String(Math.floor(endMins/60)).padStart(2,'0')}:${String(endMins%60).padStart(2,'0')}:00`;
 
-    html += `<div class="agenda-item">
+    const notes = [o.occurrence_notes, l.series_notes].filter(Boolean).join(' · ');
+    html += `<div class="agenda-item" style="grid-template-columns:90px 1fr 80px 1fr;">
       <div class="agenda-time">${formatTime(l.start_time)}–${formatTime(endTime)}</div>
       <div class="agenda-student">${lType === 'group' ? sNames.join(', ') : (sNames[0] ?? '—')}</div>
       <div class="agenda-type">${lType === 'private' ? 'Private' : 'Group'}</div>
       <div class="agenda-location">${location}</div>
+      ${notes ? `<div></div><div class="agenda-notes" style="grid-column:2/-1;font-size:0.75rem;color:var(--mid-grey);font-style:italic;padding-bottom:0.35rem;">📝 ${notes}</div>` : ''}
     </div>`;
   });
 
@@ -1749,12 +1751,14 @@ async function downloadAgendaPDF() {
   // Build printable HTML and open in new window for printing/saving as PDF
   let tableRows = '';
   items.forEach(item => {
-    const cells = item.querySelectorAll('div');
+    const cells    = item.querySelectorAll('div:not(.agenda-notes)');
+    const noteEl   = item.querySelector('.agenda-notes');
+    const noteText = noteEl ? noteEl.textContent.replace('📝', '').trim() : '';
     tableRows += `<tr>
       <td style="padding:8px 12px;border-bottom:1px solid #eee;font-weight:600;">${cells[0]?.textContent ?? ''}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #eee;">${cells[1]?.textContent ?? ''}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#666;">${cells[2]?.textContent ?? ''}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;font-size:12px;">${cells[3]?.textContent ?? ''}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;font-size:12px;">${cells[3]?.textContent ?? ''}${noteText ? `<div style="color:#999;font-style:italic;margin-top:3px;font-size:11px;">${noteText}</div>` : ''}</td>
     </tr>`;
   });
 
