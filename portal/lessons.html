@@ -1650,7 +1650,7 @@ async function previewAgenda() {
   // Fetch via lessons table first to avoid nested filter issues
   const { data: teacherLessons } = await db
     .from('lessons')
-    .select('id,teacher_id,start_time,duration_mins,lesson_type,instrument,studio_id,status')
+    .select('id,teacher_id,start_time,duration_mins,lesson_type,instrument,studio_id,status,series_notes')
     .eq('teacher_id', teacherId)
     .eq('status','active');
 
