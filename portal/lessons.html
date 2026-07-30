@@ -274,6 +274,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Lessons
     </a>
+    <a class="nav-item" href="notifications.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/></svg>
+      Notifications
+    </a>
     <div class="sidebar-section">Reports</div>
     <a class="nav-item" href="attendance-report.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
@@ -1639,6 +1643,13 @@ async function cancelOccurrence(scope) {
   const occ      = allOccurrences.find(o => o.id === occId);
   const occDate  = occ?.date ?? today;
 
+  // Ask whether to notify the student(s) before cancelling
+  const notify = confirm(
+    'Email the student(s) to let them know this lesson has been cancelled?\n\n' +
+    'OK = cancel and send the notification\n' +
+    'Cancel = cancel the lesson silently'
+  );
+
   if (scope === 'single') {
     await db.from('lesson_occurrences').update({ status: 'cancelled' }).eq('id', occId);
     showToast('Lesson occurrence cancelled.', 'success');
@@ -1652,8 +1663,54 @@ async function cancelOccurrence(scope) {
     showToast('Entire lesson series cancelled.', 'success');
   }
 
+  if (notify) await sendCancellationEmail(occId, occ);
+
   closeOccModal();
   loadView();
+}
+
+// Scenario 5 — automatic cancellation notice
+async function sendCancellationEmail(occId, occ) {
+  const studioId = occ?.lessons?.studio_id;
+  const studio   = allStudios.find(s => s.id === studioId);
+
+  if (!studio?.email) {
+    showToast('Lesson cancelled, but no notice sent — the studio has no email address set.', 'warning');
+    return;
+  }
+
+  const bodyText =
+    'Dear {{student_name}},\n\n' +
+    'Your {{instrument}} lesson with {{teacher_name}} at {{lesson_time}} on {{lesson_day}} has been cancelled.\n\n' +
+    'Our admin will contact you shortly to arrange makeup lessons if applicable.\n\n' +
+    'Kind regards,\nPathfinder Music Lessons';
+
+  try {
+    const res = await fetch('/.netlify/functions/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action:       'send',
+        mode:         'occurrence',
+        occurrenceId: occId,
+        from:         studio.email,
+        fromName:     `Pathfinder Music Lessons (${studio.name})`,
+        subject:      'Your lesson on {{lesson_day}} has been cancelled',
+        bodyText,
+        sentBy:       currentProfile?.id ?? null,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showToast('Lesson cancelled, but the notice failed: ' + (data.error ?? ''), 'warning');
+    } else if (data.sent > 0) {
+      showToast(`Cancellation notice sent to ${data.sent} student${data.sent !== 1 ? 's' : ''}.`, 'success');
+    } else {
+      showToast('Lesson cancelled — no contactable student email found.', 'warning');
+    }
+  } catch (err) {
+    showToast('Lesson cancelled, but the notice failed: ' + err.message, 'warning');
+  }
 }
 
 // ============================================================

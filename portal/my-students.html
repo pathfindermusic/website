@@ -162,6 +162,38 @@
   </div>
 </div>
 
+<!-- MESSAGE STUDENT MODAL -->
+<div class="modal-overlay hidden" id="messageModal">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <span class="modal-title" id="msgTitle">Message Student</span>
+      <button class="modal-close" onclick="closeMessageModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="msgStudentId">
+      <div class="form-group">
+        <label class="form-label">Send from studio *</label>
+        <select class="form-select" id="msgStudio"></select>
+        <div class="form-hint">A copy is BCC'd to this studio's inbox, and replies go there too.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Subject *</label>
+        <input class="form-input" type="text" id="msgSubject" placeholder="e.g. Practice for next lesson">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Message *</label>
+        <textarea class="form-textarea" id="msgBody" style="min-height:160px;"
+          placeholder="Hi {{first_name}},&#10;&#10;Please practise the G minor scale before our next lesson.&#10;&#10;Thanks!"></textarea>
+        <div class="form-hint">You can use {{first_name}} and {{student_name}} to personalise.</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeMessageModal()">Cancel</button>
+      <button class="btn btn-primary" id="msgSendBtn" onclick="sendStudentMessage()">Send email</button>
+    </div>
+  </div>
+</div>
+
 <div id="toastWrap" class="toast-wrap"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -170,6 +202,7 @@
 let currentProfile = null;
 let teacherRecord  = null;
 let activeSkillEdit = null; // { studentId, instrument, currentLevel }
+let teacherStudios  = [];
 
 (async () => {
   currentProfile = await requireAuth(['teacher']);
@@ -179,6 +212,14 @@ let activeSkillEdit = null; // { studentId, instrument, currentLevel }
 
   const { data: t } = await db.from('teachers').select('*').eq('user_id', currentProfile.id).single();
   teacherRecord = t;
+
+  // Studios this teacher works at — used as the "send from" address
+  const sIds = teacherRecord?.studio_ids ?? [];
+  if (sIds.length > 0) {
+    const { data: sData } = await db.from('studios')
+      .select('id,name,email').in('id', sIds).eq('status','active').order('name');
+    teacherStudios = sData ?? [];
+  }
 
   await loadStudents();
 })();
@@ -270,6 +311,12 @@ async function loadStudents() {
         </div>
       </div>
       <div class="student-card-body">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:0.5rem;">
+          <button class="btn btn-secondary btn-sm"
+            onclick="openMessageModal('${s.id}','${(p.first_name ?? '').replace(/'/g,"&#39;")} ${(p.last_name ?? '').replace(/'/g,"&#39;")}')">
+            ✉ Message
+          </button>
+        </div>
         <div class="form-label mb-1">Skill levels</div>
         ${skillRows || '<div class="text-sm text-muted">No instruments on file</div>'}
         ${latestNote ? `
@@ -321,6 +368,79 @@ async function saveSkillLevel() {
   }
 }
 
+// ---- Scenario 6: message an individual student ----
+function openMessageModal(studentId, studentName) {
+  const sel = document.getElementById('msgStudio');
+  sel.innerHTML = '';
+  teacherStudios.forEach(s => {
+    const label = s.email ? `${s.name} — ${s.email}` : `${s.name} (no email set)`;
+    sel.innerHTML += `<option value="${s.id}" ${s.email ? '' : 'disabled'}>${label}</option>`;
+  });
+
+  if (!teacherStudios.some(s => s.email)) {
+    showToast('None of your studios has an email address set — ask an admin to add one.', 'warning');
+    return;
+  }
+
+  document.getElementById('msgStudentId').value = studentId;
+  document.getElementById('msgTitle').textContent = `Message ${studentName.trim()}`;
+  document.getElementById('msgSubject').value = '';
+  document.getElementById('msgBody').value    = '';
+  document.getElementById('messageModal').classList.remove('hidden');
+}
+
+function closeMessageModal() {
+  document.getElementById('messageModal').classList.add('hidden');
+}
+
+async function sendStudentMessage() {
+  const studentId = document.getElementById('msgStudentId').value;
+  const studioId  = document.getElementById('msgStudio').value;
+  const subject   = document.getElementById('msgSubject').value.trim();
+  const bodyText  = document.getElementById('msgBody').value.trim();
+  const studio    = teacherStudios.find(s => s.id === studioId);
+
+  if (!subject)      { showToast('Please enter a subject.', 'error'); return; }
+  if (!bodyText)     { showToast('Please enter a message.', 'error'); return; }
+  if (!studio?.email) { showToast('The selected studio has no email address.', 'error'); return; }
+
+  const btn = document.getElementById('msgSendBtn');
+  btn.textContent = 'Sending…';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/.netlify/functions/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action:     'send',
+        mode:       'students',
+        studentIds: [studentId],
+        from:       studio.email,
+        fromName:   `Pathfinder Music Lessons (${studio.name})`,
+        subject, bodyText,
+        bccStudioId: studio.id,
+        sentBy:     currentProfile.id,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showToast(data.error ?? 'Send failed.', 'error');
+    } else if (data.sent > 0) {
+      showToast('Message sent.', 'success');
+      closeMessageModal();
+    } else {
+      showToast('No contactable email address found for this student.', 'warning');
+    }
+  } catch (err) {
+    showToast('Error: ' + err.message, 'error');
+  }
+
+  btn.textContent = 'Send email';
+  btn.disabled = false;
+}
+
+document.getElementById('messageModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeMessageModal(); });
 document.getElementById('skillModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeSkillModal(); });
 function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
 </script>

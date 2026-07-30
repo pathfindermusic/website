@@ -55,6 +55,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Lessons
     </a>
+    <a class="nav-item" href="notifications.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/></svg>
+      Notifications
+    </a>
     <div class="sidebar-section">Reports</div>
     <a class="nav-item" href="attendance-report.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
@@ -256,6 +260,7 @@ async function loadAdmins() {
             ${p.status === 'active' ? 'Deactivate' : 'Activate'}
           </button>
           <button class="btn btn-ghost btn-sm" onclick="resetAdminPassword('${a.user_id}','${p.first_name ?? ''} ${p.last_name ?? ''}')">Reset PW</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteAdmin('${a.id}','${a.user_id}','${p.first_name ?? ''} ${p.last_name ?? ''}')">Delete</button>
         </div>
       </td>
     </tr>`;
@@ -416,6 +421,32 @@ function showPasswordModal(name, email, password) {
 function closePasswordModal() {
   document.getElementById('passwordModal').classList.add('hidden');
   loadAdmins();
+}
+
+async function deleteAdmin(adminId, userId, name) {
+  if (!confirm(`Are you sure you want to permanently delete ${name.trim()}? This cannot be undone.`)) return;
+
+  // Delete admin record
+  const { error: aErr } = await db.from('admins').delete().eq('id', adminId);
+  if (aErr) { showToast('Error deleting admin record: ' + aErr.message, 'error'); return; }
+
+  // Delete profile
+  const { error: pErr } = await db.from('profiles').delete().eq('id', userId);
+  if (pErr) { showToast('Error deleting profile: ' + pErr.message, 'error'); return; }
+
+  // Delete auth user via Netlify Function
+  const res  = await fetch('/.netlify/functions/create-user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'delete-user', userId }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    showToast('Admin profile deleted but auth account may remain: ' + (data.error ?? ''), 'warning');
+  } else {
+    showToast(`${name.trim()} deleted successfully.`, 'success');
+  }
+  await loadAdmins();
 }
 
 async function resetAdminPassword(userId, name) {

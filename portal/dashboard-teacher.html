@@ -234,6 +234,8 @@ function nextWeek() { weekStart = new Date(weekStart.getTime() + 7 * 86400000); 
 function goToday()  { weekStart = getWeekStart(new Date()); loadSchedule(); }
 
 // ---- Load schedule ----
+let scheduleRows = [];
+
 async function loadSchedule() {
   if (!teacherRecord) return;
   const wrap   = document.getElementById('scheduleWrap');
@@ -260,6 +262,8 @@ async function loadSchedule() {
     return;
   }
 
+  scheduleRows = data ?? [];   // used by the lesson-note notification
+
   if (!data || data.length === 0) {
     wrap.innerHTML = `<div class="card"><div class="empty-state">
       <div class="empty-state-icon">🎵</div>
@@ -272,7 +276,7 @@ async function loadSchedule() {
   // Group by date
   const byDate = {};
   days.forEach(d => byDate[toISODate(d)] = []);
-  data.forEach(r => { const k = toISODate(new Date(r.date)); if (byDate[k]) byDate[k].push(r); });
+  data.forEach(r => { const k = r.date?.slice(0, 10); if (byDate[k]) byDate[k].push(r); });
 
   const today = toISODate(new Date());
   let html = '';
@@ -405,10 +409,57 @@ async function saveNote() {
 
   if (error) {
     showToast('Could not save note. Please try again.', 'error');
-  } else {
-    showToast('Note saved — student can now see it.', 'success');
-    closeNoteModal();
-    loadSchedule();
+    return;
+  }
+
+  showToast('Note saved — student can now see it.', 'success');
+  const occIdForEmail = activeOccurrenceId;
+  closeNoteModal();
+  loadSchedule();
+
+  // Scenario 7 — let the student know a new note is available
+  if (noteText) await notifyStudentOfNote(occIdForEmail, noteText, driveLink);
+}
+
+// Scenario 7 — automatic "new lesson note" email
+async function notifyStudentOfNote(occurrenceId, noteText, driveLink) {
+  const row = scheduleRows.find(r => r.occurrence_id === occurrenceId);
+  if (!row?.studio_email) {
+    showToast('Note saved, but no email sent — the studio has no email address set.', 'warning');
+    return;
+  }
+
+  let bodyText =
+    'Dear {{student_name}},\n\n' +
+    `Your teacher has added a note from your {{instrument}} lesson on {{lesson_day}}.\n\n` +
+    `${noteText}\n\n`;
+  if (driveLink) bodyText += `Lesson materials: ${driveLink}\n\n`;
+  bodyText += 'You can also view this any time in your student portal.\n\n' +
+              'Kind regards,\nPathfinder Music Lessons';
+
+  try {
+    const res = await fetch('/.netlify/functions/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action:       'send',
+        mode:         'occurrence',
+        occurrenceId,
+        from:         row.studio_email,
+        fromName:     `Pathfinder Music Lessons (${row.studio_name ?? ''})`.trim(),
+        subject:      'A new note from your {{instrument}} lesson',
+        bodyText,
+        sentBy:       currentProfile?.id ?? null,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showToast('Note saved, but the email failed: ' + (data.error ?? ''), 'warning');
+    } else if (data.sent > 0) {
+      showToast(`Student notified by email.`, 'success');
+    }
+  } catch (err) {
+    showToast('Note saved, but the email failed: ' + err.message, 'warning');
   }
 }
 

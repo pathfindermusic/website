@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Notifications — Pathfinder Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/portal.css">
+  <style>
+    .compose-grid { display: grid; grid-template-columns: 1fr 300px; gap: 1.25rem; align-items: start; }
+    @media (max-width: 980px) { .compose-grid { grid-template-columns: 1fr; } }
+
+    .mode-options { display: flex; flex-direction: column; gap: 0.5rem; }
+    .mode-opt {
+      display: flex; align-items: flex-start; gap: 0.6rem;
+      padding: 0.7rem 0.85rem; border: 1px solid var(--border);
+      border-radius: var(--r-sm); cursor: pointer; transition: all 0.15s;
+      background: var(--white);
+    }
+    .mode-opt:hover { border-color: var(--orange); background: rgba(232,73,30,0.03); }
+    .mode-opt.active { border-color: var(--orange); background: rgba(232,73,30,0.06); }
+    .mode-opt input { accent-color: var(--orange); margin-top: 2px; }
+    .mode-opt-label { font-size: 0.86rem; font-weight: 600; color: var(--charcoal); }
+    .mode-opt-desc  { font-size: 0.76rem; color: var(--mid-grey); line-height: 1.5; }
+
+    .mode-params {
+      margin-top: 0.75rem; padding: 0.85rem;
+      background: var(--off-white); border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+    }
+
+    .recipient-box {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 1.1rem; box-shadow: var(--shadow);
+    }
+    .recipient-count {
+      font-size: 2rem; font-weight: 800; color: var(--orange); line-height: 1;
+    }
+    .recipient-list {
+      margin-top: 0.85rem; max-height: 220px; overflow-y: auto;
+      font-size: 0.8rem; color: var(--dark-grey);
+    }
+    .recipient-row {
+      padding: 0.35rem 0; border-bottom: 1px solid var(--border);
+    }
+    .recipient-row:last-child { border-bottom: none; }
+    .recipient-email { font-size: 0.72rem; color: var(--mid-grey); }
+
+    .placeholder-help {
+      font-size: 0.75rem; color: var(--mid-grey); line-height: 1.7;
+      background: var(--off-white); border-radius: var(--r-sm);
+      padding: 0.65rem 0.8rem; margin-top: 0.5rem;
+    }
+    .placeholder-help code {
+      background: rgba(232,73,30,0.1); color: var(--orange);
+      padding: 1px 5px; border-radius: 3px; font-size: 0.72rem;
+    }
+    .bcc-note {
+      font-size: 0.76rem; color: var(--mid-grey);
+      display: flex; align-items: flex-start; gap: 0.4rem; margin-top: 0.4rem;
+    }
+  </style>
+</head>
+<body>
+<div class="portal-shell">
+
+  <nav class="topnav">
+    <a href="#" class="topnav-logo"><img src="../Logo_-_long.png" alt="Pathfinder Music Lessons"></a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">–</span>
+        </div>
+      </div>
+      <a href="change-password.html" class="btn-logout" style="text-decoration:none;">🔑 Password</a>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Main</div>
+    <a class="nav-item" href="dashboard-admin.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Schedule
+    </a>
+    <a class="nav-item" href="students.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      Students
+    </a>
+    <a class="nav-item" href="teachers.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+      Teachers
+    </a>
+    <a class="nav-item" href="lessons.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Lessons
+    </a>
+    <a class="nav-item active" href="notifications.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/></svg>
+      Notifications
+    </a>
+    <div class="sidebar-section">Reports</div>
+    <a class="nav-item" href="attendance-report.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Attendance
+    </a>
+    <div class="sidebar-section hidden" id="superuserSection">Super User</div>
+    <a class="nav-item hidden" href="studios.html" id="studiosLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      Studios
+    </a>
+    <a class="nav-item hidden" href="admins.html" id="adminsLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Admins
+    </a>
+  </aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Notifications</div>
+        <div class="page-sub">Send an email to a group of students</div>
+      </div>
+    </div>
+
+    <div class="compose-grid">
+      <!-- LEFT: compose form -->
+      <div class="card" style="padding:1.25rem;">
+
+        <!-- Who -->
+        <div class="form-label" style="margin-bottom:0.6rem;">1 · Who should receive this?</div>
+        <div class="mode-options" id="modeOptions">
+          <label class="mode-opt active" data-mode="studios">
+            <input type="radio" name="mode" value="studios" checked onchange="onModeChange()">
+            <div>
+              <div class="mode-opt-label">All students at one or more studios</div>
+              <div class="mode-opt-desc">e.g. year-end concert announcement, studio maintenance</div>
+            </div>
+          </label>
+          <label class="mode-opt" data-mode="teacher">
+            <input type="radio" name="mode" value="teacher" onchange="onModeChange()">
+            <div>
+              <div class="mode-opt-label">All students of one teacher</div>
+              <div class="mode-opt-desc">e.g. news about the teacher</div>
+            </div>
+          </label>
+          <label class="mode-opt" data-mode="day">
+            <input type="radio" name="mode" value="day" onchange="onModeChange()">
+            <div>
+              <div class="mode-opt-label">All students who have lessons on a given weekday</div>
+              <div class="mode-opt-desc">e.g. studio closed on a public holiday</div>
+            </div>
+          </label>
+          <label class="mode-opt" data-mode="teacher_date">
+            <input type="radio" name="mode" value="teacher_date" onchange="onModeChange()">
+            <div>
+              <div class="mode-opt-label">Students of one teacher on a specific date</div>
+              <div class="mode-opt-desc">e.g. teacher unavailable that day</div>
+            </div>
+          </label>
+        </div>
+
+        <!-- Mode-specific params -->
+        <div class="mode-params" id="modeParams"></div>
+
+        <!-- Message -->
+        <div class="form-label" style="margin:1.25rem 0 0.6rem;">2 · Your message</div>
+        <div class="form-group">
+          <label class="form-label">Send from studio *</label>
+          <select class="form-select" id="fromStudio" onchange="refreshPreview()"></select>
+          <div class="bcc-note">
+            <span>📥</span>
+            <span id="bccNote">A copy is BCC'd to this studio's inbox so you have a record.</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Subject *</label>
+          <input class="form-input" type="text" id="subject" placeholder="e.g. Kilsyth studio closed Monday 5 October">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Message *</label>
+          <textarea class="form-textarea" id="bodyText" style="min-height:190px;"
+            placeholder="Hi {{first_name}},&#10;&#10;Write your message here.&#10;&#10;Kind regards,&#10;Pathfinder Music Lessons"></textarea>
+          <div class="placeholder-help">
+            You can personalise using <code>{{first_name}}</code> and <code>{{student_name}}</code>.
+            Each student receives their own individual email — no one sees anyone else's address.
+          </div>
+        </div>
+
+        <div class="flex gap-1" style="justify-content:flex-end;margin-top:1rem;">
+          <button class="btn btn-secondary" onclick="refreshPreview()">Refresh recipients</button>
+          <button class="btn btn-primary" id="sendBtn" onclick="confirmSend()">Send email</button>
+        </div>
+      </div>
+
+      <!-- RIGHT: recipient preview -->
+      <div class="recipient-box">
+        <div class="text-sm text-muted">Recipients</div>
+        <div class="recipient-count" id="recipientCount">–</div>
+        <div class="text-sm text-muted" id="recipientHint">Choose an audience to preview.</div>
+        <div class="recipient-list" id="recipientList"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay hidden" id="confirmModal">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-header">
+      <span class="modal-title">Confirm send</span>
+      <button class="modal-close" onclick="closeConfirm()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-sm" style="line-height:1.7;" id="confirmText"></p>
+      <div style="background:var(--off-white);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.85rem;margin-top:0.85rem;font-size:0.82rem;">
+        <div class="text-muted text-sm">Subject</div>
+        <div class="font-bold" id="confirmSubject"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeConfirm()">Cancel</button>
+      <button class="btn btn-primary" id="confirmSendBtn" onclick="doSend()">Yes, send now</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastWrap" class="toast-wrap"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script>
+const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+let currentProfile = null;
+let allStudios     = [];
+let allTeachers    = [];
+let lastPreview    = null;
+
+(async () => {
+  currentProfile = await requireAuth(['superuser','admin']);
+  if (!currentProfile) return;
+  renderTopNavUser(currentProfile);
+  if (currentProfile.role === 'superuser') {
+    document.getElementById('superuserSection').classList.remove('hidden');
+    document.getElementById('studiosLink').classList.remove('hidden');
+    document.getElementById('adminsLink').classList.remove('hidden');
+  }
+  if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
+
+  await Promise.all([loadStudios(), loadTeachers()]);
+  onModeChange();
+})();
+
+async function loadStudios() {
+  const { data } = await db.from('studios')
+    .select('id,name,email').eq('status','active').order('name');
+  allStudios = data ?? [];
+
+  const fromSel = document.getElementById('fromStudio');
+  fromSel.innerHTML = '';
+  allStudios.forEach(s => {
+    const label = s.email ? `${s.name} — ${s.email}` : `${s.name} (no email set)`;
+    fromSel.innerHTML += `<option value="${s.id}" ${s.email ? '' : 'disabled'}>${label}</option>`;
+  });
+  if (!allStudios.some(s => s.email)) {
+    showToast('No studio has an email address set. Add one on the Studios page first.', 'warning');
+  }
+}
+
+async function loadTeachers() {
+  const { data: tData } = await db.from('teachers').select('id,user_id');
+  const userIds = (tData ?? []).map(t => t.user_id).filter(Boolean);
+  const { data: pData } = userIds.length
+    ? await db.from('profiles').select('id,first_name,last_name,status').in('id', userIds)
+    : { data: [] };
+  const pMap = {};
+  (pData ?? []).forEach(p => { pMap[p.id] = p; });
+  allTeachers = (tData ?? [])
+    .map(t => ({ ...t, profile: pMap[t.user_id] ?? null }))
+    .filter(t => t.profile?.status === 'active');
+}
+
+// ============================================================
+// MODE HANDLING
+// ============================================================
+function currentMode() {
+  return document.querySelector('input[name="mode"]:checked')?.value ?? 'studios';
+}
+
+function onModeChange() {
+  const mode = currentMode();
+  document.querySelectorAll('.mode-opt').forEach(el => {
+    el.classList.toggle('active', el.dataset.mode === mode);
+  });
+
+  const box = document.getElementById('modeParams');
+  const teacherOpts = allTeachers.map(t =>
+    `<option value="${t.id}">${t.profile?.first_name ?? ''} ${t.profile?.last_name ?? ''}</option>`
+  ).join('');
+  const studioChecks = allStudios.map(s =>
+    `<label style="display:flex;align-items:center;gap:0.4rem;font-size:0.84rem;cursor:pointer;">
+      <input type="checkbox" class="studio-check" value="${s.id}" onchange="refreshPreview()" style="accent-color:var(--orange);">
+      ${s.name}
+    </label>`
+  ).join('');
+
+  if (mode === 'studios') {
+    box.innerHTML = `<div class="form-label" style="margin-bottom:0.5rem;">Select studios</div>
+      <div style="display:flex;flex-wrap:wrap;gap:0.85rem;">${studioChecks}</div>`;
+
+  } else if (mode === 'teacher') {
+    box.innerHTML = `<div class="form-group" style="margin-bottom:0;">
+      <label class="form-label">Teacher</label>
+      <select class="form-select" id="pTeacher" onchange="refreshPreview()">
+        <option value="">— Select teacher —</option>${teacherOpts}
+      </select></div>`;
+
+  } else if (mode === 'day') {
+    box.innerHTML = `<div class="form-row" style="margin-bottom:0.75rem;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Weekday</label>
+          <select class="form-select" id="pDay" onchange="refreshPreview()">
+            ${DAY_NAMES.map((d,i) => `<option value="${i}" ${i===1?'selected':''}>${d}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="form-label" style="margin-bottom:0.5rem;">Limit to studios (optional)</div>
+      <div style="display:flex;flex-wrap:wrap;gap:0.85rem;">${studioChecks}</div>`;
+
+  } else if (mode === 'teacher_date') {
+    box.innerHTML = `<div class="form-row" style="margin-bottom:0;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Teacher</label>
+          <select class="form-select" id="pTeacher" onchange="refreshPreview()">
+            <option value="">— Select teacher —</option>${teacherOpts}
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Date</label>
+          <input class="form-input" type="date" id="pDate" value="${toISODate(new Date())}" onchange="refreshPreview()">
+        </div>
+      </div>`;
+  }
+
+  clearPreview('Choose an audience to preview.');
+}
+
+function buildSpec() {
+  const mode = currentMode();
+  const spec = { mode };
+  const checked = [...document.querySelectorAll('.studio-check:checked')].map(c => c.value);
+
+  if (mode === 'studios') {
+    spec.studioIds = checked;
+    if (checked.length === 0) return { error: 'Select at least one studio.' };
+  } else if (mode === 'teacher') {
+    spec.teacherId = document.getElementById('pTeacher')?.value;
+    if (!spec.teacherId) return { error: 'Select a teacher.' };
+  } else if (mode === 'day') {
+    spec.dayOfWeek = parseInt(document.getElementById('pDay')?.value ?? '1');
+    if (checked.length) spec.studioIds = checked;
+  } else if (mode === 'teacher_date') {
+    spec.teacherId = document.getElementById('pTeacher')?.value;
+    spec.date      = document.getElementById('pDate')?.value;
+    if (!spec.teacherId) return { error: 'Select a teacher.' };
+    if (!spec.date)      return { error: 'Select a date.' };
+  }
+  return spec;
+}
+
+// ============================================================
+// PREVIEW
+// ============================================================
+function clearPreview(hint) {
+  lastPreview = null;
+  document.getElementById('recipientCount').textContent = '–';
+  document.getElementById('recipientHint').textContent  = hint ?? '';
+  document.getElementById('recipientList').innerHTML    = '';
+}
+
+async function refreshPreview() {
+  const spec = buildSpec();
+  if (spec.error) { clearPreview(spec.error); return; }
+
+  document.getElementById('recipientCount').textContent = '…';
+  document.getElementById('recipientHint').textContent  = 'Looking up recipients…';
+  document.getElementById('recipientList').innerHTML    = '';
+
+  const studioId = document.getElementById('fromStudio').value;
+
+  try {
+    const res = await fetch('/.netlify/functions/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'preview', ...spec, bccStudioId: studioId }),
+    });
+    const data = await res.json();
+    if (!res.ok) { clearPreview(data.error ?? 'Could not resolve recipients.'); return; }
+
+    lastPreview = data;
+    document.getElementById('recipientCount').textContent = data.count;
+    document.getElementById('recipientHint').textContent  =
+      data.count === 1 ? 'student will receive this' : 'students will receive this';
+
+    document.getElementById('recipientList').innerHTML = (data.recipients ?? [])
+      .map(r => `<div class="recipient-row">
+        <div>${r.name}</div>
+        <div class="recipient-email">${r.addresses.join(', ')}</div>
+      </div>`).join('');
+
+    document.getElementById('bccNote').textContent = data.bcc
+      ? `A copy is BCC'd to ${data.bcc} so you have a record.`
+      : `This studio has no email address set — no BCC copy will be kept.`;
+
+  } catch (err) {
+    clearPreview('Error: ' + err.message);
+  }
+}
+
+// ============================================================
+// SEND
+// ============================================================
+function confirmSend() {
+  const spec    = buildSpec();
+  const subject = document.getElementById('subject').value.trim();
+  const bodyTxt = document.getElementById('bodyText').value.trim();
+
+  if (spec.error)  { showToast(spec.error, 'error'); return; }
+  if (!subject)    { showToast('Please enter a subject.', 'error'); return; }
+  if (!bodyTxt)    { showToast('Please enter a message.', 'error'); return; }
+  if (!lastPreview) { showToast('Please refresh recipients first.', 'warning'); refreshPreview(); return; }
+  if (lastPreview.count === 0) { showToast('No recipients match this selection.', 'warning'); return; }
+
+  const studio = allStudios.find(s => s.id === document.getElementById('fromStudio').value);
+  if (!studio?.email) { showToast('The selected studio has no email address set.', 'error'); return; }
+
+  document.getElementById('confirmText').innerHTML =
+    `This will send <strong>${lastPreview.count}</strong> individual email${lastPreview.count !== 1 ? 's' : ''} ` +
+    `from <strong>${studio.email}</strong>` +
+    (lastPreview.bcc ? `, with a BCC copy to <strong>${lastPreview.bcc}</strong>` : '') + `.`;
+  document.getElementById('confirmSubject').textContent = subject;
+  document.getElementById('confirmModal').classList.remove('hidden');
+}
+
+function closeConfirm() { document.getElementById('confirmModal').classList.add('hidden'); }
+
+async function doSend() {
+  const spec    = buildSpec();
+  const subject = document.getElementById('subject').value.trim();
+  const bodyTxt = document.getElementById('bodyText').value.trim();
+  const studio  = allStudios.find(s => s.id === document.getElementById('fromStudio').value);
+
+  const btn = document.getElementById('confirmSendBtn');
+  btn.textContent = 'Sending…';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/.netlify/functions/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'send', ...spec,
+        from: studio.email, fromName: `Pathfinder Music Lessons (${studio.name})`,
+        subject, bodyText: bodyTxt,
+        bccStudioId: studio.id,
+        sentBy: currentProfile.id,
+      }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      showToast(data.error ?? 'Send failed.', 'error');
+    } else if (data.partial) {
+      showToast(`Sent ${data.sent} of ${data.total} — some failed. Check Resend dashboard.`, 'warning');
+    } else {
+      showToast(`Sent to ${data.sent} student${data.sent !== 1 ? 's' : ''}.`, 'success');
+      document.getElementById('subject').value  = '';
+      document.getElementById('bodyText').value = '';
+      clearPreview('Choose an audience to preview.');
+    }
+  } catch (err) {
+    showToast('Error: ' + err.message, 'error');
+  }
+
+  btn.textContent = 'Yes, send now';
+  btn.disabled = false;
+  closeConfirm();
+}
+
+document.getElementById('confirmModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeConfirm();
+});
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+</script>
+</body>
+</html>
