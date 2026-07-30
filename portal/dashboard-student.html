@@ -317,7 +317,7 @@ async function loadStats() {
 
   // Next lesson
   const { data: nextLesson } = await db
-    .from('schedule_view')
+    .from('student_schedule_view')
     .select('date, start_time, instrument, teacher_name')
     .eq('student_id', studentRecord.id)
     .gte('date', today)
@@ -335,7 +335,7 @@ async function loadStats() {
 
   // This week
   const { count: weekCount } = await db
-    .from('schedule_view')
+    .from('student_schedule_view')
     .select('occurrence_id', { count: 'exact' })
     .eq('student_id', studentRecord.id)
     .gte('date', wStart).lte('date', wEnd)
@@ -344,7 +344,7 @@ async function loadStats() {
 
   // Attendance rate (last 10 lessons)
   const { data: recent } = await db
-    .from('schedule_view')
+    .from('student_schedule_view')
     .select('attendance_status')
     .eq('student_id', studentRecord.id)
     .lt('date', today)
@@ -367,7 +367,7 @@ async function loadStats() {
     .select('id', { count: 'exact' })
     .gte('created_at', sevenDaysAgo.toISOString())
     .in('lesson_occurrence_id',
-      (await db.from('schedule_view').select('occurrence_id').eq('student_id', studentRecord.id))
+      (await db.from('student_schedule_view').select('occurrence_id').eq('student_id', studentRecord.id))
         .data?.map(r => r.occurrence_id) ?? []
     );
   document.getElementById('statNotes').textContent = noteCount ?? '0';
@@ -392,7 +392,7 @@ async function loadSchedule() {
   wrap.innerHTML = `<div class="loading"><div class="spinner"></div> Loading…</div>`;
 
   const { data, error } = await db
-    .from('schedule_view')
+    .from('student_schedule_view')
     .select('*')
     .eq('student_id', studentRecord.id)
     .gte('date', wStart)
@@ -477,7 +477,7 @@ async function loadNotes() {
   wrap.innerHTML = `<div class="loading"><div class="spinner"></div> Loading…</div>`;
 
   const { data, error } = await db
-    .from('schedule_view')
+    .from('student_schedule_view')
     .select('*')
     .eq('student_id', studentRecord.id)
     .not('note_text', 'is', null)
@@ -521,7 +521,7 @@ async function loadAttendance() {
   wrap.innerHTML = `<div class="loading"><div class="spinner"></div> Loading…</div>`;
 
   const { data, error } = await db
-    .from('schedule_view')
+    .from('student_schedule_view')
     .select('*')
     .eq('student_id', studentRecord.id)
     .lt('date', toISODate(new Date()))
