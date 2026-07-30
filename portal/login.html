@@ -263,7 +263,7 @@
     }
 
     const { error } = await db.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/portal/reset-password.html`,
+      redirectTo: `${window.location.origin}/portal/change-password.html`,
     });
 
     if (error) {
