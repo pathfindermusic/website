@@ -101,10 +101,6 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
       My Students
     </a>
-    <a class="nav-item" href="my-notes.html">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      Lesson Notes
-    </a>
   </aside>
 
   <!-- MAIN -->
@@ -228,56 +224,113 @@ async function loadStudents() {
   if (!teacherRecord) return;
   const grid = document.getElementById('studentGrid');
 
-  // Get all students assigned to this teacher
-  const { data: assignments, error } = await db
-    .from('student_teachers')
-    .select(`
-      instrument,
-      students(
-        id, status,
-        profiles(first_name, last_name),
-        student_instruments(instrument, skill_level)
-      )
-    `)
-    .eq('teacher_id', teacherRecord.id);
-
-  if (error || !assignments || assignments.length === 0) {
+  const emptyState = (msg) => {
     grid.innerHTML = `<div style="grid-column:1/-1;"><div class="empty-state">
       <div class="empty-state-icon">🎵</div>
-      <h3>No students yet</h3>
-      <p>Students assigned to you will appear here once an admin sets up their lessons.</p>
+      <h3>No students yet</h3><p>${msg}</p>
     </div></div>`;
     document.getElementById('studentCount').textContent = '0 students';
+  };
+
+  // Students are derived from this teacher's active lessons via the
+  // lesson_students junction table (student_teachers is no longer used).
+  const { data: lessons, error: lErr } = await db.from('lessons')
+    .select('id,instrument')
+    .eq('teacher_id', teacherRecord.id)
+    .eq('status','active');
+
+  if (lErr) { emptyState('Could not load your lessons: ' + lErr.message); return; }
+  const lessonIds = (lessons ?? []).map(l => l.id);
+  if (lessonIds.length === 0) {
+    emptyState('Students will appear here once an admin sets up your lessons.');
     return;
   }
 
-  // Group by student (a student can appear multiple times if multiple instruments)
-  const studentMap = {};
-  assignments.forEach(a => {
-    const s = a.students;
-    if (!s) return;
-    if (!studentMap[s.id]) studentMap[s.id] = { ...s, myInstruments: [] };
-    studentMap[s.id].myInstruments.push(a.instrument);
+  const instByLesson = {};
+  (lessons ?? []).forEach(l => { instByLesson[l.id] = l.instrument; });
+
+  const { data: ls } = await db.from('lesson_students')
+    .select('lesson_id,student_id').in('lesson_id', lessonIds);
+
+  // studentId -> instruments this teacher teaches them
+  const instByStudent = {};
+  const lessonsByStudent = {};
+  (ls ?? []).forEach(r => {
+    if (!instByStudent[r.student_id]) instByStudent[r.student_id] = new Set();
+    const inst = instByLesson[r.lesson_id];
+    if (inst) instByStudent[r.student_id].add(inst);
+    if (!lessonsByStudent[r.student_id]) lessonsByStudent[r.student_id] = [];
+    lessonsByStudent[r.student_id].push(r.lesson_id);
   });
 
-  const students = Object.values(studentMap);
-  const active   = students.filter(s => s.status === 'active').length;
-  document.getElementById('studentCount').textContent = `${active} active · ${students.length} total`;
+  const studentIds = Object.keys(instByStudent);
+  if (studentIds.length === 0) {
+    emptyState('No students are enrolled in your lessons yet.');
+    return;
+  }
 
-  // Get most recent lesson note per student
-  const studentIds = students.map(s => s.id);
-  const { data: recentNotes } = await db
-    .from('lesson_notes')
-    .select('note_text, created_at, lesson_occurrence_id, lesson_occurrences(lessons(student_id))')
+  // Student records, profiles and recorded skill levels
+  const [sRes, siRes] = await Promise.all([
+    db.from('students').select('id,user_id,status').in('id', studentIds),
+    db.from('student_instruments').select('student_id,instrument,skill_level').in('student_id', studentIds),
+  ]);
+
+  const userIds = (sRes.data ?? []).map(s => s.user_id).filter(Boolean);
+  const { data: pData } = userIds.length
+    ? await db.from('profiles').select('id,first_name,last_name').in('id', userIds)
+    : { data: [] };
+  const pMap = {};
+  (pData ?? []).forEach(p => { pMap[p.id] = p; });
+
+  const siMap = {};
+  (siRes.data ?? []).forEach(r => {
+    if (!siMap[r.student_id]) siMap[r.student_id] = [];
+    siMap[r.student_id].push(r);
+  });
+
+  const students = (sRes.data ?? []).map(s => ({
+    id:                  s.id,
+    status:              s.status,
+    profiles:            pMap[s.user_id] ?? {},
+    myInstruments:       [...(instByStudent[s.id] ?? [])],
+    student_instruments: siMap[s.id] ?? [],
+  })).sort((a, b) =>
+    (a.profiles.first_name ?? '').localeCompare(b.profiles.first_name ?? '')
+  );
+
+  const active = students.filter(s => s.status === 'active').length;
+  document.getElementById('studentCount').textContent =
+    `${active} active · ${students.length} total`;
+
+  // Most recent lesson note per student
+  const { data: notes } = await db.from('lesson_notes')
+    .select('note_text,created_at,lesson_occurrence_id')
     .eq('teacher_id', teacherRecord.id)
-    .in('lesson_occurrences.lessons.student_id', studentIds)
     .order('created_at', { ascending: false });
 
   const latestNoteByStudent = {};
-  (recentNotes ?? []).forEach(n => {
-    const sId = n.lesson_occurrences?.lessons?.student_id;
-    if (sId && !latestNoteByStudent[sId]) latestNoteByStudent[sId] = n;
-  });
+  if (notes?.length) {
+    const occIds = notes.map(n => n.lesson_occurrence_id).filter(Boolean);
+    const { data: occs } = occIds.length
+      ? await db.from('lesson_occurrences').select('id,lesson_id').in('id', occIds)
+      : { data: [] };
+    const lessonByOcc = {};
+    (occs ?? []).forEach(o => { lessonByOcc[o.id] = o.lesson_id; });
+
+    // lesson -> students, so a note can be attributed back
+    const studentsByLesson = {};
+    (ls ?? []).forEach(r => {
+      if (!studentsByLesson[r.lesson_id]) studentsByLesson[r.lesson_id] = [];
+      studentsByLesson[r.lesson_id].push(r.student_id);
+    });
+
+    notes.forEach(n => {
+      const lId = lessonByOcc[n.lesson_occurrence_id];
+      (studentsByLesson[lId] ?? []).forEach(sid => {
+        if (!latestNoteByStudent[sid]) latestNoteByStudent[sid] = n;
+      });
+    });
+  }
 
   grid.innerHTML = students.map(s => {
     const p         = s.profiles ?? {};

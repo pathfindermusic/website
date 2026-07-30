@@ -94,10 +94,6 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
       My Students
     </a>
-    <a class="nav-item" href="my-notes.html">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-      Lesson Notes
-    </a>
   </aside>
 
   <!-- MAIN CONTENT -->
@@ -218,14 +214,25 @@ async function loadStats() {
   const [todayRes, weekRes, studentsRes, unmarkedRes] = await Promise.all([
     db.from('schedule_view').select('occurrence_id', {count:'exact'}).eq('teacher_id', teacherRecord.id).eq('date', today).neq('occurrence_status','cancelled'),
     db.from('schedule_view').select('occurrence_id', {count:'exact'}).eq('teacher_id', teacherRecord.id).gte('date', wStart).lte('date', wEnd).neq('occurrence_status','cancelled'),
-    db.from('student_teachers').select('student_id', {count:'exact'}).eq('teacher_id', teacherRecord.id),
+    countMyStudents(),
     db.from('schedule_view').select('occurrence_id', {count:'exact'}).eq('teacher_id', teacherRecord.id).lt('date', today).eq('occurrence_status','scheduled'),
   ]);
 
   document.getElementById('statToday').textContent    = todayRes.count  ?? '–';
   document.getElementById('statWeek').textContent     = weekRes.count   ?? '–';
-  document.getElementById('statStudents').textContent = studentsRes.count ?? '–';
+  document.getElementById('statStudents').textContent = studentsRes ?? '–';
   document.getElementById('statUnmarked').textContent = unmarkedRes.count ?? '–';
+}
+
+// Distinct students across this teacher's active lessons
+async function countMyStudents() {
+  const { data: lessons } = await db.from('lessons')
+    .select('id').eq('teacher_id', teacherRecord.id).eq('status','active');
+  const ids = (lessons ?? []).map(l => l.id);
+  if (ids.length === 0) return 0;
+  const { data: ls } = await db.from('lesson_students')
+    .select('student_id').in('lesson_id', ids);
+  return new Set((ls ?? []).map(r => r.student_id)).size;
 }
 
 // ---- Week navigation ----
@@ -320,7 +327,7 @@ async function loadSchedule() {
             <option value="absent_notice"     ${attStatus==='absent_notice'     ? 'selected' : ''}>Absent — Notice Given</option>
             <option value="teacher_cancelled" ${attStatus==='teacher_cancelled' ? 'selected' : ''}>Teacher Cancelled</option>
           </select>
-          <button class="btn btn-ghost btn-sm" onclick="openNoteModal('${l.occurrence_id}', '${l.student_name}', ${JSON.stringify(l.note_text ?? '').replace(/'/g,"&#39;")}, ${JSON.stringify(l.drive_link ?? '').replace(/'/g,"&#39;")})">
+          <button class="btn btn-ghost btn-sm" onclick="openNoteByOccurrence('${l.occurrence_id}')">
             ${l.note_text ? 'Edit Note' : '+ Add Note'}
           </button>` : '<span class="text-sm text-muted">Cancelled</span>'}
         </div>
@@ -367,6 +374,17 @@ async function markAttendance(occurrenceId, status) {
 }
 
 // ---- Note modal ----
+// Look the row up from state rather than passing note text through an
+// HTML attribute — quotes in the note used to break the onclick.
+function openNoteByOccurrence(occurrenceId) {
+  const r = scheduleRows.find(x => x.occurrence_id === occurrenceId);
+  if (!r) { showToast('Could not load that lesson. Please refresh.', 'error'); return; }
+  const label = (r.lesson_type === 'group')
+    ? `Group lesson (${r.student_count} students)`
+    : (r.student_name ?? 'Student');
+  openNoteModal(occurrenceId, label, r.note_text ?? '', r.drive_link ?? '');
+}
+
 function openNoteModal(occurrenceId, studentName, noteText, driveLink) {
   activeOccurrenceId = occurrenceId;
   document.getElementById('noteModalTitle').textContent = `Lesson Note — ${studentName}`;
