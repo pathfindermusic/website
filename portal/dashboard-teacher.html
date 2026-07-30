@@ -409,7 +409,7 @@ async function markAttendance(occurrenceId, status) {
     .from('attendance')
     .select('id')
     .eq('lesson_occurrence_id', occurrenceId)
-    .single();
+    .maybeSingle();
 
   let error;
   if (existing) {
@@ -429,6 +429,9 @@ async function markAttendance(occurrenceId, status) {
     await db.from('lesson_occurrences')
       .update({ status: status === 'teacher_cancelled' ? 'cancelled' : 'completed' })
       .eq('id', occurrenceId);
+
+    // Refresh so the attendance pill and the Unmarked count reflect the change
+    await Promise.all([loadSchedule(), loadStats()]);
   }
 }
 
@@ -518,7 +521,7 @@ async function saveNote() {
     .from('lesson_notes')
     .select('id')
     .eq('lesson_occurrence_id', activeOccurrenceId)
-    .single();
+    .maybeSingle();
 
   let error;
   const payload = {
@@ -557,10 +560,13 @@ async function notifyStudentOfNote(occurrenceId, noteText, driveLink) {
     return;
   }
 
+  // The note itself is wrapped in ** so the email template renders it
+  // as a highlighted callout block.
   let bodyText =
     'Dear {{student_name}},\n\n' +
-    `Your teacher has added a note from your {{instrument}} lesson on {{lesson_day}}.\n\n` +
-    `${noteText}\n\n`;
+    'Your teacher, {{teacher_name}}, has added a note from your ' +
+    '{{instrument}} lesson on {{lesson_day}}.\n\n' +
+    `**${noteText}**\n\n`;
   if (driveLink) bodyText += `Lesson materials: ${driveLink}\n\n`;
   bodyText += 'You can also view this any time in your student portal.\n\n' +
               'Kind regards,\nPathfinder Music Lessons';
