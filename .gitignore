@@ -1,0 +1,9 @@
+# Local Netlify folder
+.netlify
+.env
+.env.local
+.netlify/
+node_modules/
+.vscode/
+.DS_Store
+Thumbs.db
