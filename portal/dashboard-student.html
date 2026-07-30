@@ -524,8 +524,8 @@ async function loadAttendance() {
     .from('student_schedule_view')
     .select('*')
     .eq('student_id', studentRecord.id)
-    .lt('date', toISODate(new Date()))
-    .neq('occurrence_status', 'scheduled')
+    .lte('date', toISODate(new Date()))
+    .or('attendance_status.not.is.null,occurrence_status.eq.cancelled')
     .order('date', { ascending: false })
     .limit(60);
 
