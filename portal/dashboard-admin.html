@@ -241,10 +241,11 @@ async function loadStats() {
     db.from('lesson_occurrences').select('id', { count: 'exact' }).eq('date', today).neq('status','cancelled'),
     db.from('lesson_occurrences').select('id', { count: 'exact' }).gte('date', wStart).lte('date', wEnd).neq('status','cancelled'),
     db.from('students').select('id', { count: 'exact' }).eq('status','active'),
-    db.from('lesson_occurrences')
-      .select('id', { count: 'exact' })
+    db.from('schedule_view')
+      .select('occurrence_id', { count: 'exact' })
       .lt('date', today)
-      .eq('status','scheduled'),
+      .neq('occurrence_status','cancelled')
+      .is('attendance_status', null),
   ]);
 
   document.getElementById('statToday').textContent    = todayRes.count ?? '–';

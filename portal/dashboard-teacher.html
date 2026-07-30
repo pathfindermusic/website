@@ -215,7 +215,7 @@ async function loadStats() {
     db.from('schedule_view').select('occurrence_id', {count:'exact'}).eq('teacher_id', teacherRecord.id).eq('date', today).neq('occurrence_status','cancelled'),
     db.from('schedule_view').select('occurrence_id', {count:'exact'}).eq('teacher_id', teacherRecord.id).gte('date', wStart).lte('date', wEnd).neq('occurrence_status','cancelled'),
     countMyStudents(),
-    db.from('schedule_view').select('occurrence_id', {count:'exact'}).eq('teacher_id', teacherRecord.id).lt('date', today).eq('occurrence_status','scheduled'),
+    db.from('schedule_view').select('occurrence_id', {count:'exact'}).eq('teacher_id', teacherRecord.id).lt('date', today).neq('occurrence_status','cancelled').is('attendance_status', null),
   ]);
 
   document.getElementById('statToday').textContent    = todayRes.count  ?? '–';
