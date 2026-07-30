@@ -406,11 +406,14 @@ async function saveSkillLevel() {
   const level = parseInt(document.getElementById('skillRange').value);
   const { studentId, instrument } = activeSkillEdit;
 
+  // Upsert, not update: the instrument may come from the lesson without
+  // a matching student_instruments row existing yet.
   const { error } = await db
     .from('student_instruments')
-    .update({ skill_level: level })
-    .eq('student_id', studentId)
-    .eq('instrument', instrument);
+    .upsert(
+      { student_id: studentId, instrument, skill_level: level },
+      { onConflict: 'student_id,instrument' }
+    );
 
   if (error) {
     showToast('Could not save skill level.', 'error');

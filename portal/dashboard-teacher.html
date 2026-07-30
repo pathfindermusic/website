@@ -178,6 +178,20 @@
   </div>
 </div>
 
+<!-- READ-ONLY LESSON VIEW -->
+<div class="modal-overlay hidden" id="lessonViewModal">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <span class="modal-title" id="lvTitle">Lesson</span>
+      <button class="modal-close" onclick="closeLessonView()">✕</button>
+    </div>
+    <div class="modal-body" id="lvBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeLessonView()">Close</button>
+    </div>
+  </div>
+</div>
+
 <div id="toastWrap" class="toast-wrap"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -243,6 +257,41 @@ function goToday()  { weekStart = getWeekStart(new Date()); loadSchedule(); }
 // ---- Load schedule ----
 let scheduleRows = [];
 
+// schedule_view only exposes the first student's name, which is wrong for
+// group lessons — pull the full roster per lesson.
+async function attachStudentNames(rows) {
+  rows.forEach(r => { r.studentNames = []; });
+  const lessonIds = [...new Set(rows.map(r => r.lesson_id).filter(Boolean))];
+  if (lessonIds.length === 0) return;
+
+  const { data: ls } = await db.from('lesson_students')
+    .select('lesson_id,student_id').in('lesson_id', lessonIds);
+  const sIds = [...new Set((ls ?? []).map(r => r.student_id))];
+  if (sIds.length === 0) return;
+
+  const { data: sData } = await db.from('students').select('id,user_id').in('id', sIds);
+  const uIds = (sData ?? []).map(s => s.user_id).filter(Boolean);
+  const { data: pData } = uIds.length
+    ? await db.from('profiles').select('id,first_name,last_name').in('id', uIds)
+    : { data: [] };
+  const pMap = {};
+  (pData ?? []).forEach(p => { pMap[p.id] = p; });
+
+  const nameById = {};
+  (sData ?? []).forEach(s => {
+    const p = pMap[s.user_id];
+    if (p) nameById[s.id] = `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim();
+  });
+
+  const byLesson = {};
+  (ls ?? []).forEach(r => {
+    if (!byLesson[r.lesson_id]) byLesson[r.lesson_id] = [];
+    const n = nameById[r.student_id];
+    if (n) byLesson[r.lesson_id].push(n);
+  });
+  rows.forEach(r => { r.studentNames = (byLesson[r.lesson_id] ?? []).sort(); });
+}
+
 async function loadSchedule() {
   if (!teacherRecord) return;
   const wrap   = document.getElementById('scheduleWrap');
@@ -270,6 +319,7 @@ async function loadSchedule() {
   }
 
   scheduleRows = data ?? [];   // used by the lesson-note notification
+  await attachStudentNames(scheduleRows);
 
   if (!data || data.length === 0) {
     wrap.innerHTML = `<div class="card"><div class="empty-state">
@@ -305,20 +355,29 @@ async function loadSchedule() {
       const isPast      = key < today;
       const attStatus   = l.attendance_status ?? '';
 
-      html += `<div class="lesson-row-teacher ${isCancelled ? 'cancelled' : ''}">
+      const isGroup     = l.lesson_type === 'group';
+      const names       = l.studentNames ?? [];
+      const nameCount   = names.length || l.student_count || 0;
+      const displayName = isGroup
+        ? `Group lesson (${nameCount} student${nameCount !== 1 ? 's' : ''})`
+        : (names[0] ?? l.student_name ?? '—');
+
+      html += `<div class="lesson-row-teacher ${isCancelled ? 'cancelled' : ''}"
+        onclick="openLessonView('${l.occurrence_id}')" style="cursor:pointer;">
         <div>
           <div class="time-cell">${formatTime(l.start_time)}</div>
           <div class="duration-label">${formatDuration(l.duration_mins)}</div>
         </div>
         <div>
-          <div class="lesson-name">${l.student_name}</div>
+          <div class="lesson-name">${displayName}</div>
           <div class="lesson-instrument">${l.instrument}</div>
+          ${isGroup && names.length ? `<div class="lesson-meta">${names.join(' · ')}</div>` : ''}
           <div class="lesson-meta">${l.studio_name}${l.is_online ? ' · <span class="pill pill-online" style="font-size:0.65rem;">Online</span>' : ''}</div>
           <div style="margin-top:4px;">${attendancePill(attStatus)}</div>
           ${l.note_text ? `<div class="text-sm text-muted mt-1">📝 Note saved</div>` : ''}
-          ${l.drive_link ? `<a href="${l.drive_link}" target="_blank" class="text-sm text-orange mt-1" style="display:inline-block;">📁 Drive link</a>` : ''}
+          ${l.drive_link ? `<a href="${l.drive_link}" target="_blank" class="text-sm text-orange mt-1" style="display:inline-block;" onclick="event.stopPropagation()">📁 Drive link</a>` : ''}
         </div>
-        <div class="lesson-actions">
+        <div class="lesson-actions" onclick="event.stopPropagation()">
           ${!isCancelled ? `
           <select class="att-select" id="att-${l.occurrence_id}" onchange="markAttendance('${l.occurrence_id}', this.value)">
             <option value="" ${!attStatus ? 'selected' : ''}>Mark attendance…</option>
@@ -372,6 +431,57 @@ async function markAttendance(occurrenceId, status) {
       .eq('id', occurrenceId);
   }
 }
+
+// ---- Read-only lesson view ----
+function openLessonView(occurrenceId) {
+  const l = scheduleRows.find(r => r.occurrence_id === occurrenceId);
+  if (!l) { showToast('Could not load that lesson. Please refresh.', 'error'); return; }
+
+  const isGroup = l.lesson_type === 'group';
+  const names   = l.studentNames ?? [];
+
+  document.getElementById('lvTitle').textContent =
+    `${formatShortDate(parseLocalDate(l.date))} · ${formatTime(l.start_time)}`;
+
+  document.getElementById('lvBody').innerHTML = `
+    <div style="background:var(--off-white);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.85rem;margin-bottom:1rem;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.65rem;font-size:0.875rem;">
+        <div><div class="text-sm text-muted">Instrument</div><div class="font-bold">${l.instrument ?? '—'}</div></div>
+        <div><div class="text-sm text-muted">Studio</div><div class="font-bold">${l.studio_name ?? '—'}</div></div>
+        <div><div class="text-sm text-muted">Time</div><div class="font-bold">${formatTime(l.start_time)} · ${formatDuration(l.duration_mins)}</div></div>
+        <div><div class="text-sm text-muted">Type</div><div class="font-bold">${isGroup ? 'Group' : 'Private'}</div></div>
+        <div><div class="text-sm text-muted">Attendance</div><div>${attendancePill(l.attendance_status)}</div></div>
+        <div><div class="text-sm text-muted">Mode</div><div class="font-bold">${l.is_online ? 'Online' : 'In studio'}</div></div>
+      </div>
+      ${l.series_notes ? `<div style="margin-top:0.65rem;padding-top:0.65rem;border-top:1px solid var(--border);font-size:0.82rem;color:var(--dark-grey);">📋 ${l.series_notes}</div>` : ''}
+      ${l.occurrence_notes ? `<div style="margin-top:0.4rem;font-size:0.82rem;color:var(--dark-grey);font-style:italic;">📝 ${l.occurrence_notes}</div>` : ''}
+    </div>
+
+    <div class="form-label" style="margin-bottom:0.4rem;">${isGroup ? `Students (${names.length})` : 'Student'}</div>
+    <div style="font-size:0.875rem;color:var(--dark-grey);">
+      ${names.length
+        ? names.map(n => `<div style="padding:0.3rem 0;border-bottom:1px solid var(--border);">${n}</div>`).join('')
+        : '<span class="text-muted">No students listed.</span>'}
+    </div>
+
+    ${l.note_text ? `
+      <div class="form-label" style="margin:1rem 0 0.4rem;">Your lesson note</div>
+      <div style="background:var(--off-white);border-left:3px solid var(--orange);padding:0.65rem 0.85rem;font-size:0.845rem;line-height:1.6;color:var(--dark-grey);">
+        ${l.note_text}
+      </div>` : ''}
+    ${l.drive_link ? `<div style="margin-top:0.6rem;"><a href="${l.drive_link}" target="_blank" style="color:var(--orange);font-size:0.845rem;text-decoration:none;">📁 Open lesson materials</a></div>` : ''}
+  `;
+
+  document.getElementById('lessonViewModal').classList.remove('hidden');
+}
+
+function closeLessonView() {
+  document.getElementById('lessonViewModal').classList.add('hidden');
+}
+
+document.getElementById('lessonViewModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeLessonView();
+});
 
 // ---- Note modal ----
 // Look the row up from state rather than passing note text through an
