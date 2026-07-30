@@ -267,7 +267,17 @@
     });
 
     if (error) {
-      showError(errorEl, 'Something went wrong. Please try again.');
+      // Supabase caps recovery emails per address. The generic
+      // "try again" wording made users retry immediately, which
+      // only extends the lockout — so name the real problem.
+      const msg = (error.message ?? '').toLowerCase();
+      if (error.status === 429 || msg.includes('rate limit') || msg.includes('security purposes')) {
+        showError(errorEl,
+          'Too many reset requests for this email address. ' +
+          'Please wait about an hour before trying again.');
+      } else {
+        showError(errorEl, error.message || 'Something went wrong. Please try again.');
+      }
     } else {
       successEl.style.display = 'block';
       errorEl.style.display   = 'none';
