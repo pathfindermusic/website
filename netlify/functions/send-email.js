@@ -336,11 +336,30 @@ function escapeHtml(s) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-// Plain text → branded HTML email
+// Plain text → branded HTML email.
+// A paragraph wrapped entirely in **double asterisks** becomes a
+// highlighted callout block; **bold** works inline elsewhere.
 function emailTemplate(bodyText, studioEmail) {
+  const inlineBold = (s) => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
   const paragraphs = escapeHtml(bodyText)
     .split(/\n\s*\n/)
-    .map(p => `<p style="margin:0 0 14px;">${p.replace(/\n/g, '<br>')}</p>`)
+    .map(p => {
+      const trimmed = p.trim();
+      const callout = trimmed.match(/^\*\*([\s\S]+)\*\*$/);
+      if (callout) {
+        const inner = callout[1].trim().replace(/\n/g, '<br>');
+        return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;">
+          <tr>
+            <td style="width:4px;background:#E8491E;border-radius:2px 0 0 2px;">&nbsp;</td>
+            <td style="background:#f5f5f7;padding:14px 16px;border-radius:0 2px 2px 0;font-size:15px;line-height:1.6;color:#1c1c1e;font-weight:600;">
+              ${inner}
+            </td>
+          </tr>
+        </table>`;
+      }
+      return `<p style="margin:0 0 14px;">${inlineBold(trimmed.replace(/\n/g, '<br>'))}</p>`;
+    })
     .join('');
 
   return `<!DOCTYPE html>
