@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Schedule — Pathfinder Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/portal.css">
+  <style>
+    .day-block { margin-bottom: 1.5rem; }
+    .day-heading {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--mid-grey);
+      padding: 0 0 0.5rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .day-heading.today { color: var(--orange); }
+    .day-heading.today::after {
+      content: 'Today';
+      font-size: 0.65rem;
+      background: rgba(232,73,30,0.12);
+      color: var(--orange);
+      border: 1px solid rgba(232,73,30,0.25);
+      border-radius: 20px;
+      padding: 0.1rem 0.5rem;
+    }
+    .lesson-row-teacher {
+      display: grid;
+      grid-template-columns: 90px 1fr auto;
+      gap: 1rem;
+      align-items: start;
+      padding: 0.9rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.12s;
+    }
+    .lesson-row-teacher:last-child { border-bottom: none; }
+    .lesson-row-teacher:hover { background: var(--off-white); }
+    .lesson-row-teacher.cancelled { opacity: 0.4; }
+    .lesson-actions { display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-end; }
+    .att-select {
+      font-size: 0.78rem;
+      font-family: 'Inter', sans-serif;
+      padding: 0.35rem 0.65rem;
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      background: var(--white);
+      color: var(--charcoal);
+      cursor: pointer;
+      -webkit-appearance: none;
+    }
+    .att-select:focus { outline: none; border-color: var(--orange); }
+  </style>
+</head>
+<body>
+
+<div class="portal-shell">
+
+  <!-- TOP NAV -->
+  <nav class="topnav">
+    <a href="#" class="topnav-logo">
+      <img src="../Logo_-_long.png" alt="Pathfinder Music Lessons">
+    </a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">Teacher</span>
+        </div>
+      </div>
+      <a href="change-password.html" class="btn-logout" style="text-decoration:none;">🔑 Password</a>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Main</div>
+    <a class="nav-item active" href="dashboard-teacher.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      My Schedule
+    </a>
+    <a class="nav-item" href="my-students.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      My Students
+    </a>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+
+    <!-- Stats row -->
+    <div class="stats-row" id="statsRow">
+      <div class="stat-card">
+        <div class="stat-card-top">
+          <span class="stat-label">Today's lessons</span>
+          <div class="stat-icon">📅</div>
+        </div>
+        <div class="stat-value" id="statToday">–</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-top">
+          <span class="stat-label">This week</span>
+          <div class="stat-icon">📊</div>
+        </div>
+        <div class="stat-value" id="statWeek">–</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-top">
+          <span class="stat-label">My students</span>
+          <div class="stat-icon">👥</div>
+        </div>
+        <div class="stat-value" id="statStudents">–</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-top">
+          <span class="stat-label">Unmarked</span>
+          <div class="stat-icon">⚠️</div>
+        </div>
+        <div class="stat-value" id="statUnmarked">–</div>
+        <div class="stat-sub">past lessons</div>
+      </div>
+    </div>
+
+    <!-- Page header -->
+    <div class="page-header">
+      <div>
+        <div class="page-title">My Schedule</div>
+        <div class="page-sub" id="weekRangeLabel">Loading…</div>
+      </div>
+      <div class="week-nav">
+        <button class="week-nav-btn" onclick="prevWeek()">‹</button>
+        <button class="btn btn-ghost btn-sm" onclick="goToday()">Today</button>
+        <button class="week-nav-btn" onclick="nextWeek()">›</button>
+      </div>
+    </div>
+
+    <!-- Schedule by day -->
+    <div id="scheduleWrap">
+      <div class="loading"><div class="spinner"></div> Loading schedule…</div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Note modal -->
+<div class="modal-overlay hidden" id="noteModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="noteModalTitle">Lesson Note</span>
+      <button class="modal-close" onclick="closeNoteModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Practice notes for student</label>
+        <textarea class="form-textarea" id="noteText" placeholder="What did you work on? What should the student practice before next lesson?"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Google Drive link (optional)</label>
+        <input class="form-input" type="url" id="driveLink" placeholder="https://drive.google.com/...">
+        <div class="form-hint">Paste a link to any shared recordings, sheet music or materials.</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeNoteModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveNote()">Save Note</button>
+    </div>
+  </div>
+</div>
+
+<!-- READ-ONLY LESSON VIEW -->
+<div class="modal-overlay hidden" id="lessonViewModal">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <span class="modal-title" id="lvTitle">Lesson</span>
+      <button class="modal-close" onclick="closeLessonView()">✕</button>
+    </div>
+    <div class="modal-body" id="lvBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeLessonView()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastWrap" class="toast-wrap"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script>
+
+let currentProfile = null;
+let teacherRecord  = null;
+let weekStart      = getWeekStart(new Date());
+let activeOccurrenceId = null;
+
+// ---- Init ----
+(async () => {
+  currentProfile = await requireAuth(['teacher']);
+  if (!currentProfile) return;
+
+  renderTopNavUser(currentProfile);
+  if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
+
+  // Get teacher record
+  const { data: t } = await db.from('teachers').select('*').eq('user_id', currentProfile.id).single();
+  teacherRecord = t;
+
+  await Promise.all([loadStats(), loadSchedule()]);
+})();
+
+// ---- Stats ----
+async function loadStats() {
+  if (!teacherRecord) return;
+  const today  = toISODate(new Date());
+  const wEnd   = toISODate(new Date(weekStart.getTime() + 6 * 86400000));
+  const wStart = toISODate(weekStart);
+
+  const [todayRes, weekRes, studentsRes, unmarkedRes] = await Promise.all([
+    db.from('schedule_view').select('occurrence_id', {count:'exact'}).eq('teacher_id', teacherRecord.id).eq('date', today).neq('occurrence_status','cancelled'),
+    db.from('schedule_view').select('occurrence_id', {count:'exact'}).eq('teacher_id', teacherRecord.id).gte('date', wStart).lte('date', wEnd).neq('occurrence_status','cancelled'),
+    countMyStudents(),
+    db.from('schedule_view').select('occurrence_id', {count:'exact'}).eq('teacher_id', teacherRecord.id).lt('date', today).neq('occurrence_status','cancelled').is('attendance_status', null),
+  ]);
+
+  document.getElementById('statToday').textContent    = todayRes.count  ?? '–';
+  document.getElementById('statWeek').textContent     = weekRes.count   ?? '–';
+  document.getElementById('statStudents').textContent = studentsRes ?? '–';
+  document.getElementById('statUnmarked').textContent = unmarkedRes.count ?? '–';
+}
+
+// Distinct students across this teacher's active lessons
+async function countMyStudents() {
+  const { data: lessons } = await db.from('lessons')
+    .select('id').eq('teacher_id', teacherRecord.id).eq('status','active');
+  const ids = (lessons ?? []).map(l => l.id);
+  if (ids.length === 0) return 0;
+  const { data: ls } = await db.from('lesson_students')
+    .select('student_id').in('lesson_id', ids);
+  return new Set((ls ?? []).map(r => r.student_id)).size;
+}
+
+// ---- Week navigation ----
+function prevWeek() { weekStart = new Date(weekStart.getTime() - 7 * 86400000); loadSchedule(); }
+function nextWeek() { weekStart = new Date(weekStart.getTime() + 7 * 86400000); loadSchedule(); }
+function goToday()  { weekStart = getWeekStart(new Date()); loadSchedule(); }
+
+// ---- Load schedule ----
+let scheduleRows = [];
+
+// schedule_view only exposes the first student's name, which is wrong for
+// group lessons — pull the full roster per lesson.
+async function attachStudentNames(rows) {
+  rows.forEach(r => { r.studentNames = []; });
+  const lessonIds = [...new Set(rows.map(r => r.lesson_id).filter(Boolean))];
+  if (lessonIds.length === 0) return;
+
+  const { data: ls } = await db.from('lesson_students')
+    .select('lesson_id,student_id').in('lesson_id', lessonIds);
+  const sIds = [...new Set((ls ?? []).map(r => r.student_id))];
+  if (sIds.length === 0) return;
+
+  const { data: sData } = await db.from('students').select('id,user_id').in('id', sIds);
+  const uIds = (sData ?? []).map(s => s.user_id).filter(Boolean);
+  const { data: pData } = uIds.length
+    ? await db.from('profiles').select('id,first_name,last_name').in('id', uIds)
+    : { data: [] };
+  const pMap = {};
+  (pData ?? []).forEach(p => { pMap[p.id] = p; });
+
+  const nameById = {};
+  (sData ?? []).forEach(s => {
+    const p = pMap[s.user_id];
+    if (p) nameById[s.id] = `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim();
+  });
+
+  const byLesson = {};
+  (ls ?? []).forEach(r => {
+    if (!byLesson[r.lesson_id]) byLesson[r.lesson_id] = [];
+    const n = nameById[r.student_id];
+    if (n) byLesson[r.lesson_id].push(n);
+  });
+  rows.forEach(r => { r.studentNames = (byLesson[r.lesson_id] ?? []).sort(); });
+}
+
+async function loadSchedule() {
+  if (!teacherRecord) return;
+  const wrap   = document.getElementById('scheduleWrap');
+  const days   = getWeekDays(weekStart);
+  const wStart = toISODate(days[0]);
+  const wEnd   = toISODate(days[days.length - 1]);
+
+  document.getElementById('weekRangeLabel').textContent =
+    `${formatShortDate(days[0])} – ${formatShortDate(days[days.length - 1])}`;
+
+  wrap.innerHTML = `<div class="loading"><div class="spinner"></div> Loading…</div>`;
+
+  const { data, error } = await db
+    .from('schedule_view')
+    .select('*')
+    .eq('teacher_id', teacherRecord.id)
+    .gte('date', wStart)
+    .lte('date', wEnd)
+    .order('date')
+    .order('start_time');
+
+  if (error) {
+    wrap.innerHTML = `<div class="empty-state"><p style="color:#dc2626;">${error.message}</p></div>`;
+    return;
+  }
+
+  scheduleRows = data ?? [];   // used by the lesson-note notification
+  await attachStudentNames(scheduleRows);
+
+  if (!data || data.length === 0) {
+    wrap.innerHTML = `<div class="card"><div class="empty-state">
+      <div class="empty-state-icon">🎵</div>
+      <h3>No lessons this week</h3>
+      <p>Enjoy the break! Check another week using the navigation above.</p>
+    </div></div>`;
+    return;
+  }
+
+  // Group by date
+  const byDate = {};
+  days.forEach(d => byDate[toISODate(d)] = []);
+  data.forEach(r => { const k = r.date?.slice(0, 10); if (byDate[k]) byDate[k].push(r); });
+
+  const today = toISODate(new Date());
+  let html = '';
+
+  days.forEach(d => {
+    const key     = toISODate(d);
+    const lessons = byDate[key];
+    if (!lessons || lessons.length === 0) return;
+
+    const isToday = key === today;
+    html += `<div class="day-block card">
+      <div class="card-header">
+        <div class="day-heading ${isToday ? 'today' : ''}">${formatShortDate(d).toUpperCase()}</div>
+        <div class="text-sm text-muted">${lessons.length} lesson${lessons.length !== 1 ? 's' : ''}</div>
+      </div>`;
+
+    lessons.forEach(l => {
+      const isCancelled = l.occurrence_status === 'cancelled';
+      const isPast      = key < today;
+      const attStatus   = l.attendance_status ?? '';
+
+      const isGroup     = l.lesson_type === 'group';
+      const names       = l.studentNames ?? [];
+      const nameCount   = names.length || l.student_count || 0;
+      const displayName = isGroup
+        ? `Group lesson (${nameCount} student${nameCount !== 1 ? 's' : ''})`
+        : (names[0] ?? l.student_name ?? '—');
+
+      html += `<div class="lesson-row-teacher ${isCancelled ? 'cancelled' : ''}"
+        onclick="openLessonView('${l.occurrence_id}')" style="cursor:pointer;">
+        <div>
+          <div class="time-cell">${formatTime(l.start_time)}</div>
+          <div class="duration-label">${formatDuration(l.duration_mins)}</div>
+        </div>
+        <div>
+          <div class="lesson-name">${displayName}</div>
+          <div class="lesson-instrument">${l.instrument}</div>
+          ${isGroup && names.length ? `<div class="lesson-meta">${names.join(' · ')}</div>` : ''}
+          <div class="lesson-meta">${l.studio_name}${l.is_online ? ' · <span class="pill pill-online" style="font-size:0.65rem;">Online</span>' : ''}</div>
+          <div style="margin-top:4px;">${attendancePill(attStatus)}</div>
+          ${l.note_text ? `<div class="text-sm text-muted mt-1">📝 Note saved</div>` : ''}
+          ${l.drive_link ? `<a href="${l.drive_link}" target="_blank" class="text-sm text-orange mt-1" style="display:inline-block;" onclick="event.stopPropagation()">📁 Drive link</a>` : ''}
+        </div>
+        <div class="lesson-actions" onclick="event.stopPropagation()">
+          ${!isCancelled ? `
+          <select class="att-select" id="att-${l.occurrence_id}" onchange="markAttendance('${l.occurrence_id}', this.value)">
+            <option value="" ${!attStatus ? 'selected' : ''}>Mark attendance…</option>
+            <option value="present"           ${attStatus==='present'           ? 'selected' : ''}>Present</option>
+            <option value="absent_no_credit"  ${attStatus==='absent_no_credit'  ? 'selected' : ''}>Absent — No Credit</option>
+            <option value="absent_notice"     ${attStatus==='absent_notice'     ? 'selected' : ''}>Absent — Notice Given</option>
+            <option value="teacher_cancelled" ${attStatus==='teacher_cancelled' ? 'selected' : ''}>Teacher Cancelled</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="openNoteByOccurrence('${l.occurrence_id}')">
+            ${l.note_text ? 'Edit Note' : '+ Add Note'}
+          </button>` : '<span class="text-sm text-muted">Cancelled</span>'}
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+
+  wrap.innerHTML = html || `<div class="card"><div class="empty-state">
+    <div class="empty-state-icon">📅</div><h3>No lessons this week</h3>
+  </div></div>`;
+}
+
+// ---- Mark attendance ----
+async function markAttendance(occurrenceId, status) {
+  if (!status) return;
+
+  // Check if attendance record exists
+  const { data: existing } = await db
+    .from('attendance')
+    .select('id')
+    .eq('lesson_occurrence_id', occurrenceId)
+    .single();
+
+  let error;
+  if (existing) {
+    ({ error } = await db.from('attendance')
+      .update({ status, marked_by: currentProfile.id, marked_at: new Date().toISOString() })
+      .eq('id', existing.id));
+  } else {
+    ({ error } = await db.from('attendance')
+      .insert({ lesson_occurrence_id: occurrenceId, status, marked_by: currentProfile.id, marked_at: new Date().toISOString() }));
+  }
+
+  if (error) {
+    showToast('Could not save attendance. Please try again.', 'error');
+  } else {
+    showToast('Attendance saved.', 'success');
+    // Update lesson occurrence status to completed if not cancelled
+    await db.from('lesson_occurrences')
+      .update({ status: status === 'teacher_cancelled' ? 'cancelled' : 'completed' })
+      .eq('id', occurrenceId);
+  }
+}
+
+// ---- Read-only lesson view ----
+function openLessonView(occurrenceId) {
+  const l = scheduleRows.find(r => r.occurrence_id === occurrenceId);
+  if (!l) { showToast('Could not load that lesson. Please refresh.', 'error'); return; }
+
+  const isGroup = l.lesson_type === 'group';
+  const names   = l.studentNames ?? [];
+
+  document.getElementById('lvTitle').textContent =
+    `${formatShortDate(parseLocalDate(l.date))} · ${formatTime(l.start_time)}`;
+
+  document.getElementById('lvBody').innerHTML = `
+    <div style="background:var(--off-white);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.85rem;margin-bottom:1rem;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.65rem;font-size:0.875rem;">
+        <div><div class="text-sm text-muted">Instrument</div><div class="font-bold">${l.instrument ?? '—'}</div></div>
+        <div><div class="text-sm text-muted">Studio</div><div class="font-bold">${l.studio_name ?? '—'}</div></div>
+        <div><div class="text-sm text-muted">Time</div><div class="font-bold">${formatTime(l.start_time)} · ${formatDuration(l.duration_mins)}</div></div>
+        <div><div class="text-sm text-muted">Type</div><div class="font-bold">${isGroup ? 'Group' : 'Private'}</div></div>
+        <div><div class="text-sm text-muted">Attendance</div><div>${attendancePill(l.attendance_status)}</div></div>
+        <div><div class="text-sm text-muted">Mode</div><div class="font-bold">${l.is_online ? 'Online' : 'In studio'}</div></div>
+      </div>
+      ${l.series_notes ? `<div style="margin-top:0.65rem;padding-top:0.65rem;border-top:1px solid var(--border);font-size:0.82rem;color:var(--dark-grey);">📋 ${l.series_notes}</div>` : ''}
+      ${l.occurrence_notes ? `<div style="margin-top:0.4rem;font-size:0.82rem;color:var(--dark-grey);font-style:italic;">📝 ${l.occurrence_notes}</div>` : ''}
+    </div>
+
+    <div class="form-label" style="margin-bottom:0.4rem;">${isGroup ? `Students (${names.length})` : 'Student'}</div>
+    <div style="font-size:0.875rem;color:var(--dark-grey);">
+      ${names.length
+        ? names.map(n => `<div style="padding:0.3rem 0;border-bottom:1px solid var(--border);">${n}</div>`).join('')
+        : '<span class="text-muted">No students listed.</span>'}
+    </div>
+
+    ${l.note_text ? `
+      <div class="form-label" style="margin:1rem 0 0.4rem;">Your lesson note</div>
+      <div style="background:var(--off-white);border-left:3px solid var(--orange);padding:0.65rem 0.85rem;font-size:0.845rem;line-height:1.6;color:var(--dark-grey);">
+        ${l.note_text}
+      </div>` : ''}
+    ${l.drive_link ? `<div style="margin-top:0.6rem;"><a href="${l.drive_link}" target="_blank" style="color:var(--orange);font-size:0.845rem;text-decoration:none;">📁 Open lesson materials</a></div>` : ''}
+  `;
+
+  document.getElementById('lessonViewModal').classList.remove('hidden');
+}
+
+function closeLessonView() {
+  document.getElementById('lessonViewModal').classList.add('hidden');
+}
+
+document.getElementById('lessonViewModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeLessonView();
+});
+
+// ---- Note modal ----
+// Look the row up from state rather than passing note text through an
+// HTML attribute — quotes in the note used to break the onclick.
+function openNoteByOccurrence(occurrenceId) {
+  const r = scheduleRows.find(x => x.occurrence_id === occurrenceId);
+  if (!r) { showToast('Could not load that lesson. Please refresh.', 'error'); return; }
+  const label = (r.lesson_type === 'group')
+    ? `Group lesson (${r.student_count} students)`
+    : (r.student_name ?? 'Student');
+  openNoteModal(occurrenceId, label, r.note_text ?? '', r.drive_link ?? '');
+}
+
+function openNoteModal(occurrenceId, studentName, noteText, driveLink) {
+  activeOccurrenceId = occurrenceId;
+  document.getElementById('noteModalTitle').textContent = `Lesson Note — ${studentName}`;
+  document.getElementById('noteText').value  = noteText  ?? '';
+  document.getElementById('driveLink').value = driveLink ?? '';
+  document.getElementById('noteModal').classList.remove('hidden');
+}
+
+function closeNoteModal() {
+  document.getElementById('noteModal').classList.add('hidden');
+  activeOccurrenceId = null;
+}
+
+async function saveNote() {
+  const noteText  = document.getElementById('noteText').value.trim();
+  const driveLink = document.getElementById('driveLink').value.trim();
+
+  if (!activeOccurrenceId) return;
+
+  const { data: existing } = await db
+    .from('lesson_notes')
+    .select('id')
+    .eq('lesson_occurrence_id', activeOccurrenceId)
+    .single();
+
+  let error;
+  const payload = {
+    lesson_occurrence_id: activeOccurrenceId,
+    teacher_id:           teacherRecord.id,
+    note_text:            noteText   || null,
+    drive_link:           driveLink  || null,
+    updated_at:           new Date().toISOString(),
+  };
+
+  if (existing) {
+    ({ error } = await db.from('lesson_notes').update(payload).eq('id', existing.id));
+  } else {
+    ({ error } = await db.from('lesson_notes').insert(payload));
+  }
+
+  if (error) {
+    showToast('Could not save note. Please try again.', 'error');
+    return;
+  }
+
+  showToast('Note saved — student can now see it.', 'success');
+  const occIdForEmail = activeOccurrenceId;
+  closeNoteModal();
+  loadSchedule();
+
+  // Scenario 7 — let the student know a new note is available
+  if (noteText) await notifyStudentOfNote(occIdForEmail, noteText, driveLink);
+}
+
+// Scenario 7 — automatic "new lesson note" email
+async function notifyStudentOfNote(occurrenceId, noteText, driveLink) {
+  const row = scheduleRows.find(r => r.occurrence_id === occurrenceId);
+  if (!row?.studio_email) {
+    showToast('Note saved, but no email sent — the studio has no email address set.', 'warning');
+    return;
+  }
+
+  // The note itself is wrapped in ** so the email template renders it
+  // as a highlighted callout block.
+  let bodyText =
+    'Dear {{student_name}},\n\n' +
+    'Your teacher, {{teacher_name}}, has added a note from your ' +
+    '{{instrument}} lesson on {{lesson_day}}.\n\n' +
+    `**${noteText}**\n\n`;
+  if (driveLink) bodyText += `Lesson materials: ${driveLink}\n\n`;
+  bodyText += 'You can also view this any time in your student portal.\n\n' +
+              'Kind regards,\nPathfinder Music Lessons';
+
+  try {
+    const res = await fetch('/.netlify/functions/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action:       'send',
+        mode:         'occurrence',
+        occurrenceId,
+        from:         row.studio_email,
+        fromName:     `Pathfinder Music Lessons (${row.studio_name ?? ''})`.trim(),
+        subject:      'A new note from your {{instrument}} lesson',
+        bodyText,
+        sentBy:       currentProfile?.id ?? null,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showToast('Note saved, but the email failed: ' + (data.error ?? ''), 'warning');
+    } else if (data.sent > 0) {
+      showToast(`Student notified by email.`, 'success');
+    }
+  } catch (err) {
+    showToast('Note saved, but the email failed: ' + err.message, 'warning');
+  }
+}
+
+document.getElementById('noteModal').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeNoteModal();
+});
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+</script>
+</body>
+</html>
