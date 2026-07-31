@@ -309,29 +309,50 @@ function switchTab(tab) {
 }
 
 // ---- Stats ----
+// A lesson counts as having occurred once it has ENDED — a lesson
+// currently in progress hasn't happened yet, so it must not be
+// counted as missed.
+function hasOccurred(row, todayStr, nowHM) {
+  const d = row.date?.slice(0, 10);
+  if (!d) return false;
+  if (d < todayStr) return true;
+  if (d > todayStr) return false;
+
+  // Same day: compare the lesson's end time with now
+  const [sh, sm] = (row.start_time ?? '00:00:00').split(':').map(Number);
+  const endMins  = sh * 60 + sm + (row.duration_mins ?? 0);
+  const [nh, nm] = nowHM.split(':').map(Number);
+  return endMins <= (nh * 60 + nm);
+}
+
 async function loadStats() {
   if (!studentRecord) return;
   const today  = toISODate(new Date());
   const wEnd   = toISODate(new Date(weekStart.getTime() + 6 * 86400000));
   const wStart = toISODate(weekStart);
 
-  // Next lesson
-  const { data: nextLesson } = await db
+  // Next lesson — today's earlier lessons must not count, so filter on
+  // time of day as well as date.
+  const nowT = new Date();
+  const nowHM = `${String(nowT.getHours()).padStart(2,'0')}:${String(nowT.getMinutes()).padStart(2,'0')}:00`;
+
+  const { data: upcoming } = await db
     .from('student_schedule_view')
     .select('date, start_time, instrument, teacher_name')
     .eq('student_id', studentRecord.id)
     .gte('date', today)
     .neq('occurrence_status', 'cancelled')
     .order('date').order('start_time')
-    .limit(1);
+    .limit(30);
 
-  if (nextLesson && nextLesson.length > 0) {
-    const n = nextLesson[0];
-    document.getElementById('statNext').textContent =
-      `${formatShortDate(new Date(n.date))} · ${formatTime(n.start_time)}`;
-  } else {
-    document.getElementById('statNext').textContent = 'None scheduled';
-  }
+  const next = (upcoming ?? []).find(r => {
+    const d = r.date?.slice(0, 10);
+    return d > today || (d === today && (r.start_time ?? '') > nowHM);
+  });
+
+  document.getElementById('statNext').textContent = next
+    ? `${formatShortDate(parseLocalDate(next.date))} · ${formatTime(next.start_time)}`
+    : 'None scheduled';
 
   // This week
   const { count: weekCount } = await db
@@ -342,21 +363,31 @@ async function loadStats() {
     .neq('occurrence_status','cancelled');
   document.getElementById('statWeek').textContent = weekCount ?? '–';
 
-  // Attendance rate (last 10 lessons)
-  const { data: recent } = await db
+  // Attendance rate — present divided by every lesson that has actually
+  // happened, so an unmarked lesson counts as not attended. Lessons later
+  // today have not occurred yet and are excluded; cancelled occurrences
+  // are excluded because they never ran.
+  const { data: pastRows } = await db
     .from('student_schedule_view')
-    .select('attendance_status')
+    .select('date, start_time, duration_mins, attendance_status')
     .eq('student_id', studentRecord.id)
-    .lt('date', today)
-    .neq('occurrence_status','cancelled')
+    .lte('date', today)
+    .neq('occurrence_status', 'cancelled')
     .order('date', { ascending: false })
-    .limit(10);
+    .order('start_time', { ascending: false })
+    .limit(40);
 
-  if (recent && recent.length > 0) {
-    const present = recent.filter(r => r.attendance_status === 'present').length;
-    const rate    = Math.round((present / recent.length) * 100);
+  const occurred = (pastRows ?? []).filter(r => hasOccurred(r, today, nowHM)).slice(0, 10);
+
+  if (occurred.length > 0) {
+    const present = occurred.filter(r => r.attendance_status === 'present').length;
+    const rate    = Math.round((present / occurred.length) * 100);
     document.getElementById('statAttRate').textContent = `${rate}%`;
-    document.getElementById('statAttSub').textContent  = `last ${recent.length} lessons`;
+    document.getElementById('statAttSub').textContent  =
+      `last ${occurred.length} lesson${occurred.length !== 1 ? 's' : ''}`;
+  } else {
+    document.getElementById('statAttRate').textContent = '–';
+    document.getElementById('statAttSub').textContent  = 'no lessons yet';
   }
 
   // Unread notes — notes created in last 7 days
@@ -520,13 +551,14 @@ async function loadAttendance() {
   const wrap = document.getElementById('attendanceWrap');
   wrap.innerHTML = `<div class="loading"><div class="spinner"></div> Loading…</div>`;
 
-  const { data, error } = await db
+  let { data, error } = await db
     .from('student_schedule_view')
     .select('*')
     .eq('student_id', studentRecord.id)
     .lte('date', toISODate(new Date()))
-    .or('attendance_status.not.is.null,occurrence_status.eq.cancelled')
+    .neq('occurrence_status', 'cancelled')
     .order('date', { ascending: false })
+    .order('start_time', { ascending: false })
     .limit(60);
 
   if (error || !data || data.length === 0) {
@@ -538,15 +570,21 @@ async function loadAttendance() {
     return;
   }
 
-  // Summary
+  // Only lessons that have actually taken place
+  const nowA  = new Date();
+  const nowHMa = `${String(nowA.getHours()).padStart(2,'0')}:${String(nowA.getMinutes()).padStart(2,'0')}:00`;
+  const todayA = toISODate(nowA);
+  data = data.filter(r => hasOccurred(r, todayA, nowHMa));
+
+  // Summary — same basis as the stat card: present over all occurred
   const present  = data.filter(r => r.attendance_status === 'present').length;
-  const total    = data.filter(r => r.attendance_status).length;
+  const total    = data.length;
   const rate     = total > 0 ? Math.round((present / total) * 100) : 0;
 
   let html = `
     <div class="stats-row" style="grid-template-columns:repeat(3,1fr);margin-bottom:1.25rem;">
       <div class="stat-card"><div class="stat-card-top"><span class="stat-label">Lessons attended</span></div><div class="stat-value">${present}</div></div>
-      <div class="stat-card"><div class="stat-card-top"><span class="stat-label">Total recorded</span></div><div class="stat-value">${total}</div></div>
+      <div class="stat-card"><div class="stat-card-top"><span class="stat-label">Lessons held</span></div><div class="stat-value">${total}</div></div>
       <div class="stat-card"><div class="stat-card-top"><span class="stat-label">Attendance rate</span></div><div class="stat-value">${rate}%</div></div>
     </div>
     <div class="card">

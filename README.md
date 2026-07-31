@@ -1,6 +1,276 @@
-http://pathfindermusiclessons.com.au/ website
-static html pages
-integration with Zoho CRM via Contact Form
-integration with eWay via paynow button scripts
-teachers' pictures
-images of logo, background
+# Pathfinder Music Lessons — Website & Student Portal
+
+Public site plus a custom student portal replacing MyMusicStaff.
+
+- **Live site:** https://www.pathfindermusiclessons.com.au
+- **Portal:** https://www.pathfindermusiclessons.com.au/portal/login.html
+- **Hosting:** Netlify (auto-deploys from `main` unless auto-publish is off)
+- **Database & auth:** Supabase — project `oxuyzcjgxmohpqyijpip`
+- **Outbound email:** Resend, sending as the domain
+
+---
+
+## ⚠️ Read this first: the two Supabase keys
+
+These are both JWTs starting `eyJ...` from the same Supabase page, and confusing
+them is the single easiest way to break things or leak data.
+
+| | anon key | service_role key |
+|---|---|---|
+| Stored in | `portal/js/supabase-client.js` | Netlify env vars + local `.env` |
+| Visible to | everyone — it ships to the browser | server only, never the browser |
+| Permissions | respects Row Level Security | **bypasses all RLS** |
+| `role` claim | `anon` | `service_role` |
+
+The anon key being public is fine and by design — RLS decides what it can reach.
+
+**The service_role key must never appear in any file under `portal/`.** If it did,
+every visitor would have unrestricted read/write to every student record. It lives
+only in Netlify's env vars and in the gitignored `.env`.
+
+Both are at: Supabase → Project Settings → API Keys → **Legacy anon, service_role
+API keys**. Use the *legacy* tab — the newer `sb_publishable_...` / `sb_secret_...`
+formats are **not** compatible with the Supabase JS v2 client or the Admin REST API
+we call from the Functions.
+
+To check which key you're holding, decode the JWT payload and read the `role` claim.
+
+---
+
+## Local development
+
+This is how to work on the portal. **Do not develop by deploying** — see the cost
+warning below.
+
+### One-time setup
+
+Requires Node.js and Git.
+
+```bash
+git clone https://github.com/pathfindermusic/website.git pathfinder
+cd pathfinder
+npm install -g netlify-cli
+netlify login
+netlify link --name pathfindermusic
+```
+
+Then create `.env` in the repo root (already gitignored):
+
+```
+SUPABASE_URL=https://oxuyzcjgxmohpqyijpip.supabase.co
+SUPABASE_SERVICE_KEY=eyJ...      # service_role, NOT anon. No quotes.
+RESEND_API_KEY=re_...
+```
+
+No quotes around values — Netlify's parser doesn't strip them and the key
+arrives malformed. Keep each on one line.
+
+Netlify's *secret* env vars cannot be read back out, so these must be copied
+from their original source (Supabase / Resend), not from the Netlify UI.
+
+### Daily use
+
+```bash
+netlify dev
+```
+
+Then http://localhost:8888/portal/login.html
+
+Serves the static files and runs `/.netlify/functions/*` locally against the
+**real** Supabase and **real** Resend. Functions hot-reload on save; static files
+just need a browser refresh.
+
+**PowerShell shows stderr in red.** Git progress, npm warnings and the Netlify
+CLI's startup output all appear as red "errors" and are usually fine. The real
+signal of failure is the prompt returning with nothing working, or the literal
+word `error` rather than `warn`.
+
+### Two cautions when running locally
+
+- **Emails are real.** They go through Resend to actual inboxes and count against
+  the daily quota. There is no sandbox — test sends to your own address.
+- **The database is production.** Deleting a student locally deletes them for real.
+
+For password-reset testing from localhost, add
+`http://localhost:8888/portal/change-password.html` to Supabase → Authentication →
+URL Configuration → Redirect URLs.
+
+---
+
+## 💸 Deploys cost money — batch them
+
+Netlify bills roughly **15 credits per production deploy**, flat, regardless of how
+much changed. One development session burned 1,005 of 1,015 credits across 67
+deploys, nearly all single-file changes. Everything else — bandwidth, functions,
+compute — came to under 10 credits combined.
+
+**So:** develop locally, commit freely, and deploy **once** when a batch is
+confirmed working.
+
+Consider turning off auto-publish (Netlify → Site configuration → Build & deploy →
+Continuous deployment) so pushing to GitHub doesn't trigger a build. If you do,
+remember production will lag behind `main` until you deploy manually.
+
+---
+
+## Architecture
+
+```
+/                          repo root
+├── index.html, teachers.html, pricing.html …   public marketing site
+├── netlify.toml
+├── netlify/functions/
+│   ├── create-user.js     admin ops needing service_role:
+│   │                        create / get-email / reset-password / delete-user
+│   └── send-email.js      resolves recipients server-side, sends via Resend
+└── portal/
+    ├── login.html, change-password.html
+    ├── dashboard-admin.html    dashboard-teacher.html    dashboard-student.html
+    ├── students.html  teachers.html  lessons.html  notifications.html
+    ├── studios.html   admins.html      (super user only)
+    ├── my-students.html            (teacher's roster + skill grading)
+    ├── css/portal.css
+    └── js/supabase-client.js       shared helpers + anon key
+```
+
+No build step. Static HTML with vanilla JS talking directly to Supabase.
+The Functions use plain `fetch` — no npm dependencies, nothing to bundle.
+
+### Why the Functions exist
+
+Student emails live in `auth.users`, not `profiles`, and the browser can't read
+that table. Anything needing admin rights or recipient resolution has to run
+server-side with the service_role key. That's the only reason these two
+Functions exist.
+
+### Roles
+
+`superuser` → `admin` → `teacher` / `student`, stored as a single `role` on
+`profiles`. **One role per account** — see Known limitations.
+
+---
+
+## Data model notes that bite
+
+**Email is not in `profiles`.** It lives in `auth.users`. Any page needing an
+email calls `create-user.js` with `action: 'get-email'`. This is why the edit
+modals show "Loading…" briefly.
+
+**Lesson membership is `lesson_students`, not `lessons.student_id`.** Group
+lessons made the old single-column approach impossible. `lessons.student_id`
+still exists as a nullable legacy column — nothing reads it. Several bugs
+traced back to code still assuming the old shape; `student_teachers` is
+likewise orphaned and unused.
+
+**Attendance is per (occurrence, student).** So an individual absence in a group
+lesson can be recorded. **Lesson notes are per occurrence** — deliberately
+shared across a band.
+
+**Dates: never `new Date("2026-07-29")`.** That parses as UTC midnight, which is
+the previous day in AEST, and silently shifts lessons a day earlier. Use
+`parseLocalDate()` from `supabase-client.js`, or compare the `YYYY-MM-DD` strings
+directly. `toISODate()` builds from local date parts for the same reason.
+This caused a real bug where Wednesday lessons appeared on Thursday.
+
+### Views
+
+- **`schedule_view`** — one row per occurrence. Admin and teacher dashboards.
+  Exposes `student_count`, `attendance_marked_count`, `fully_marked`.
+  `attendance_status` is only meaningful for single-student lessons.
+- **`student_schedule_view`** — one row per (occurrence × student), so students
+  can filter by `student_id` and group lessons appear for every member.
+
+Attendance is joined by **subquery** in `schedule_view`, not `LEFT JOIN` —
+a join would fan the view out to one row per student and duplicate every group
+lesson on the admin grid.
+
+---
+
+## Email: two separate systems
+
+| | Sends | From | Templates | Limit |
+|---|---|---|---|---|
+| **Resend** (via `send-email.js`) | portal notifications | the studio's address | in `send-email.js` | Resend plan: free = 100/day |
+| **Supabase Auth** (via Resend SMTP) | password resets | `info@` | Supabase → Auth → Email Templates | 30/hour, configurable |
+
+Supabase Auth was switched to Resend's SMTP so resets are branded and no longer
+capped at 2/hour. Consequence: **a Resend outage now blocks password resets too.**
+Fallback is setting a password directly in Supabase → Authentication → Users.
+
+### DNS
+
+Root domain verified in Resend. Records live alongside Google Workspace without
+conflict because they're on different hostnames:
+
+- `resend._domainkey` (DKIM) coexists with `google._domainkey`
+- `send.` MX and SPF are scoped to the subdomain, so the apex Google SPF is untouched
+- **Never add a second SPF record to the same hostname** — it breaks auth for both
+
+`info@pathfindermusiclessons.com.au` is a **Google Group** with both studio
+mailboxes as members, which is why it doesn't appear under Users. Replies to
+portal email reach whichever studio is working.
+
+### Notification template conventions
+
+`{{first_name}}`, `{{student_name}}`, `{{instrument}}`, `{{teacher_name}}`,
+`{{lesson_time}}`, `{{lesson_day}}`, `{{studio}}` substitute in subject and body.
+
+A paragraph wrapped entirely in `**double asterisks**` renders as a highlighted
+callout block; `**bold**` works inline. Used for lesson notes in emails.
+
+Every recipient gets an individual email — no shared To lists. Where a student
+has `parent_email`, both addresses receive it. A BCC copy goes to the sending
+studio as the only record of what went out (it lands in Inbox, not Sent).
+
+---
+
+## Known limitations & open decisions
+
+- **One role per account.** Miranda teaches *and* administers; ~3 such cases.
+  Workaround is a separate email per role. Proper fix is `role` → `roles[]`
+  plus RLS and login changes.
+- **RLS is not enforced on views.** Supabase views run as owner by default. The
+  frontend always filters correctly, so the dashboards are right — but the views
+  would return other students' rows if queried directly with the anon key.
+  Fixing needs `security_invoker = on` plus read policies across ~8 underlying
+  tables. **Should be closed before go-live.**
+- **Not built:** attendance report (sidebar link is dead), `teacher-detail.html`
+  (View button shows a toast), teacher Lesson Notes page.
+- **Resend free tier is 100/day.** A studio-wide announcement to ~500 students
+  exceeds it. Budget for the paid tier before first bulk send.
+- **Bulk migration.** MyMusicStaff only exports PDF; Zoho CRM covers only students
+  who came via enquiry, since admins enrolled some walk-ins directly. Imported
+  students get no auth account — created on demand. `zoho-migration.sql` drops the
+  `profiles.id → auth.users` FK to allow this.
+- **Google Workspace DKIM** is enabled but worth confirming the selector matches.
+
+---
+
+## Applied SQL migrations
+
+Run in order. All are re-runnable.
+
+1. Initial schema — tables, RLS, `get_my_role()`, `get_my_teacher_id()`
+2. `zoho-migration.sql` — Zoho CRM leads import
+3. v0.3 — `lesson_type`, `max_students`, `series_notes`, `occurrence_notes`,
+   `lesson_students`, `teachers.teaching_room`, `profiles.must_change_password`,
+   `students.studio_id`
+4. `ALTER TABLE lessons ALTER COLUMN student_id DROP NOT NULL`
+5. `phase3-email.sql` — `email_log`, rebuilt `schedule_view`
+6. Teacher RLS — read own students / profiles / instruments, plus insert & update
+   on `student_instruments`
+7. `student-schedule-view.sql`
+8. `per-student-attendance.sql` — `attendance.student_id`, both views rebuilt
+
+---
+
+## Testing status
+
+**Working:** super user, admin and studio management; teacher and student CRUD
+with temp-password modal and duplicate detection; forced password change on first
+login; password reset both paths; lessons daily grid with clash detection; group
+lessons; agenda PDF; teacher dashboard incl. per-student group attendance,
+notes and skill grading; student dashboard; notification email scenarios 6 and 7.
+
+**Untested:** notification scenarios 1–5 (admin bulk sends, cancellation notice);
+CSV import through the portal UI.

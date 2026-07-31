@@ -383,7 +383,7 @@ function renderTeachers() {
         <button class="btn btn-danger btn-sm" onclick="toggleTeacherStatus('${t.profiles?.id}','${p.status}')">
           ${p.status === 'inactive' ? 'Activate' : 'Deactivate'}
         </button>
-        <button class="btn btn-secondary btn-sm" onclick="showToast('Teacher detail page coming soon.', 'warning')">View</button>
+        <a class="btn btn-secondary btn-sm" href="teacher-detail.html?id=${t.id}">View</a>
         <button class="btn btn-ghost btn-sm" onclick="resetPassword('${t.profiles?.id}',${allTeachers.indexOf(t)})">Reset PW</button>
         <button class="btn btn-danger btn-sm" onclick="deleteTeacher('${t.id}','${t.user_id}',${allTeachers.indexOf(t)})">Delete</button>
       </div>

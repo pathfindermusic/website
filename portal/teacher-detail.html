@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Teacher — Pathfinder Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/portal.css">
+  <style>
+    .back-link {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      font-size: 0.82rem; color: var(--mid-grey); text-decoration: none;
+      margin-bottom: 0.75rem;
+    }
+    .back-link:hover { color: var(--orange); }
+
+    .t-hero {
+      background: var(--charcoal); border-radius: var(--r);
+      padding: 1.5rem 1.75rem; margin-bottom: 1.25rem;
+      display: flex; align-items: center; gap: 1.1rem; flex-wrap: wrap;
+      border-bottom: 3px solid var(--orange);
+    }
+    .t-hero-avatar {
+      width: 58px; height: 58px; border-radius: 50%;
+      background: var(--orange); color: var(--white);
+      font-size: 1.3rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .t-hero-name { font-size: 1.4rem; font-weight: 800; color: var(--white); line-height: 1.2; }
+    .t-hero-meta { font-size: 0.82rem; color: rgba(255,255,255,0.55); margin-top: 0.2rem; }
+    .t-hero-actions { margin-left: auto; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start; }
+    @media (max-width: 1000px) { .detail-grid { grid-template-columns: 1fr; } }
+
+    .kv { display: grid; grid-template-columns: 130px 1fr; gap: 0.5rem 0.85rem; font-size: 0.875rem; }
+    .kv dt { color: var(--mid-grey); font-size: 0.8rem; }
+    .kv dd { margin: 0; color: var(--charcoal); font-weight: 500; word-break: break-word; }
+    .kv dd a { color: var(--orange); text-decoration: none; }
+    .kv dd a:hover { text-decoration: underline; }
+
+    .chip {
+      display: inline-block; font-size: 0.72rem; font-weight: 500;
+      padding: 0.15rem 0.55rem; border-radius: 3px; margin: 0 0.25rem 0.25rem 0;
+      background: rgba(232,73,30,0.08); color: var(--orange);
+      border: 1px solid rgba(232,73,30,0.2);
+    }
+
+    /* Availability grid */
+    .avail-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .avail-table th {
+      text-align: left; font-size: 0.7rem; text-transform: uppercase;
+      letter-spacing: 0.07em; color: var(--mid-grey); font-weight: 600;
+      padding: 0 0.65rem 0.5rem 0;
+    }
+    .avail-table td {
+      padding: 0.45rem 0.65rem 0.45rem 0;
+      border-top: 1px solid var(--border); vertical-align: top;
+    }
+    .avail-day { font-weight: 600; color: var(--charcoal); white-space: nowrap; width: 90px; }
+    .avail-none { color: var(--light-grey); font-style: italic; }
+    .avail-slot-chip {
+      display: inline-block; background: var(--off-white);
+      border: 1px solid var(--border); border-radius: 3px;
+      padding: 0.12rem 0.45rem; margin: 0 0.3rem 0.25rem 0;
+      font-size: 0.76rem; color: var(--dark-grey);
+    }
+    .avail-slot-chip strong { color: var(--charcoal); }
+
+    /* Schedule list */
+    .sched-day { border-top: 1px solid var(--border); padding: 0.6rem 0; }
+    .sched-day:first-child { border-top: none; }
+    .sched-day-label {
+      font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--mid-grey); margin-bottom: 0.4rem;
+    }
+    .sched-row {
+      display: grid; grid-template-columns: 76px 1fr auto;
+      gap: 0.75rem; align-items: center; padding: 0.35rem 0; font-size: 0.845rem;
+    }
+    .sched-time { font-weight: 600; color: var(--charcoal); font-size: 0.82rem; }
+    .sched-sub  { font-size: 0.75rem; color: var(--mid-grey); }
+    .sched-cancelled { opacity: 0.5; text-decoration: line-through; }
+
+    /* Students */
+    .stu-row { padding: 0.6rem 0; border-top: 1px solid var(--border); }
+    .stu-row:first-child { border-top: none; }
+    .stu-name { font-weight: 600; color: var(--charcoal); font-size: 0.875rem; }
+    .skill-line { display: flex; align-items: center; gap: 0.55rem; margin-top: 0.3rem; font-size: 0.78rem; }
+    .skill-inst { min-width: 96px; color: var(--dark-grey); }
+    .skill-track { flex: 1; background: var(--light-grey); border-radius: 20px; height: 4px; }
+    .skill-fill  { height: 4px; border-radius: 20px; }
+    .skill-text  { min-width: 104px; text-align: right; color: var(--mid-grey); font-size: 0.72rem; }
+  </style>
+</head>
+<body>
+<div class="portal-shell">
+
+  <nav class="topnav">
+    <a href="#" class="topnav-logo"><img src="../Logo_-_long.png" alt="Pathfinder Music Lessons"></a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">–</span>
+        </div>
+      </div>
+      <a href="change-password.html" class="btn-logout" style="text-decoration:none;">🔑 Password</a>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Main</div>
+    <a class="nav-item" href="dashboard-admin.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Schedule
+    </a>
+    <a class="nav-item" href="students.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      Students
+    </a>
+    <a class="nav-item active" href="teachers.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+      Teachers
+    </a>
+    <a class="nav-item" href="lessons.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Lessons
+    </a>
+    <a class="nav-item" href="notifications.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/></svg>
+      Notifications
+    </a>
+    <div class="sidebar-section">Reports</div>
+    <a class="nav-item" href="attendance-report.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Attendance
+    </a>
+    <div class="sidebar-section hidden" id="superuserSection">Super User</div>
+    <a class="nav-item hidden" href="studios.html" id="studiosLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      Studios
+    </a>
+    <a class="nav-item hidden" href="admins.html" id="adminsLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Admins
+    </a>
+  </aside>
+
+  <main class="main">
+    <a class="back-link" href="teachers.html">‹ Back to Teachers</a>
+
+    <div id="pageBody">
+      <div class="loading"><div class="spinner"></div> Loading teacher…</div>
+    </div>
+  </main>
+</div>
+
+<div id="toastWrap" class="toast-wrap"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script>
+const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const WEEK_ORDER = [1,2,3,4,5,6,0];   // Mon first, Sun last
+
+let currentProfile = null;
+let teacherId      = null;
+let teacher        = null;
+let weekStart      = getWeekStart(new Date());
+
+(async () => {
+  currentProfile = await requireAuth(['superuser','admin']);
+  if (!currentProfile) return;
+  renderTopNavUser(currentProfile);
+  if (currentProfile.role === 'superuser') {
+    document.getElementById('superuserSection').classList.remove('hidden');
+    document.getElementById('studiosLink').classList.remove('hidden');
+    document.getElementById('adminsLink').classList.remove('hidden');
+  }
+  if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
+
+  teacherId = new URLSearchParams(window.location.search).get('id');
+  if (!teacherId) {
+    document.getElementById('pageBody').innerHTML =
+      `<div class="empty-state"><div class="empty-state-icon">👩‍🏫</div>
+        <h3>No teacher selected</h3><p>Pick a teacher from the Teachers page.</p></div>`;
+    return;
+  }
+  await loadTeacher();
+})();
+
+async function loadTeacher() {
+  // Teacher record + profile
+  const { data: tRows, error } = await db.from('teachers')
+    .select('id,user_id,instruments,studio_ids,virtual_room_link,teaching_room')
+    .eq('id', teacherId).limit(1);
+
+  if (error || !tRows?.length) {
+    document.getElementById('pageBody').innerHTML =
+      `<div class="empty-state"><div class="empty-state-icon">⚠️</div>
+        <h3>Teacher not found</h3><p>${error?.message ?? 'This teacher may have been deleted.'}</p></div>`;
+    return;
+  }
+  teacher = tRows[0];
+
+  const [profRes, availRes, studiosRes] = await Promise.all([
+    db.from('profiles').select('*').eq('id', teacher.user_id).maybeSingle(),
+    db.from('teacher_availability')
+      .select('day_of_week,studio_id,start_time,end_time').eq('teacher_id', teacherId),
+    db.from('studios').select('id,name'),
+  ]);
+
+  teacher.profile   = profRes.data ?? {};
+  teacher.avail     = availRes.data ?? [];
+  const studioMap   = {};
+  (studiosRes.data ?? []).forEach(s => { studioMap[s.id] = s.name; });
+  teacher.studioMap = studioMap;
+
+  renderShell();
+  fetchEmail();
+  await Promise.all([loadStats(), loadStudents(), loadSchedule()]);
+}
+
+function renderShell() {
+  const p        = teacher.profile ?? {};
+  const initials = ((p.first_name?.[0] ?? '') + (p.last_name?.[0] ?? '')).toUpperCase();
+  const name     = `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim();
+  const studios  = (teacher.studio_ids ?? []).map(id => teacher.studioMap[id]).filter(Boolean);
+  const room     = teacher.teaching_room
+    || (studios[0] ? `${studios[0]} - ${p.first_name ?? ''}'s Room` : '—');
+
+  document.title = `${name} — Pathfinder Portal`;
+
+  document.getElementById('pageBody').innerHTML = `
+    <div class="t-hero">
+      <div class="t-hero-avatar">${initials || '–'}</div>
+      <div>
+        <div class="t-hero-name">${name || 'Unnamed teacher'}</div>
+        <div class="t-hero-meta">
+          ${(teacher.instruments ?? []).join(' · ') || 'No instruments listed'}
+        </div>
+      </div>
+      <div class="t-hero-actions">
+        <span class="pill pill-${p.status === 'active' ? 'active' : 'inactive'}">
+          ${p.status === 'active' ? 'Active' : 'Inactive'}
+        </span>
+        <button class="btn btn-secondary btn-sm" onclick="resetPassword()">Reset PW</button>
+        <a class="btn btn-primary btn-sm" href="teachers.html">Edit on Teachers page</a>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row" id="statsRow">
+      <div class="stat-card"><div class="stat-label">Active students</div><div class="stat-value" id="statStudents">–</div></div>
+      <div class="stat-card"><div class="stat-label">Lessons this week</div><div class="stat-value" id="statWeek">–</div></div>
+      <div class="stat-card"><div class="stat-label">Unmarked attendance</div><div class="stat-value" id="statUnmarked">–</div><div class="stat-sub" id="statUnmarkedSub">past lessons</div></div>
+    </div>
+
+    <div class="detail-grid" style="margin-top:1.25rem;">
+      <!-- LEFT -->
+      <div>
+        <div class="card" style="padding:1.25rem;margin-bottom:1.25rem;">
+          <div class="card-title" style="margin-bottom:0.85rem;">Profile</div>
+          <dl class="kv">
+            <dt>Email</dt><dd id="tEmail">Loading…</dd>
+            <dt>Phone</dt><dd>${p.phone || '—'}</dd>
+            <dt>Instruments</dt>
+            <dd>${(teacher.instruments ?? []).map(i => `<span class="chip">${i}</span>`).join('') || '—'}</dd>
+            <dt>Studios</dt>
+            <dd>${studios.map(s => `<span class="chip">${s}</span>`).join('') || '—'}</dd>
+            <dt>Teaching room</dt><dd>${room}</dd>
+            <dt>Virtual room</dt>
+            <dd>${teacher.virtual_room_link
+                  ? `<a href="${teacher.virtual_room_link}" target="_blank">${teacher.virtual_room_link}</a>`
+                  : '—'}</dd>
+          </dl>
+        </div>
+
+        <div class="card" style="padding:1.25rem;">
+          <div class="card-title" style="margin-bottom:0.85rem;">Availability</div>
+          ${renderAvailability()}
+        </div>
+      </div>
+
+      <!-- RIGHT -->
+      <div>
+        <div class="card" style="padding:1.25rem;margin-bottom:1.25rem;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.85rem;">
+            <div>
+              <div class="card-title">Schedule</div>
+              <div class="text-sm text-muted" id="weekLabel">–</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+              <div class="week-nav">
+                <button class="week-nav-btn" onclick="prevWeek()">‹</button>
+                <button class="btn btn-ghost btn-sm" onclick="thisWeek()">Today</button>
+                <button class="week-nav-btn" onclick="nextWeek()">›</button>
+              </div>
+              <input type="date" class="filter-select" id="datePicker"
+                     onchange="jumpToDate(this.value)" title="Jump to a week"
+                     style="padding:0.4rem 0.55rem;cursor:pointer;">
+            </div>
+          </div>
+          <div id="scheduleBody"><div class="loading"><div class="spinner"></div> Loading…</div></div>
+        </div>
+
+        <div class="card" style="padding:1.25rem;">
+          <div class="card-title" style="margin-bottom:0.5rem;">Students</div>
+          <div class="text-sm text-muted" style="margin-bottom:0.5rem;" id="studentsSub">–</div>
+          <div id="studentsBody"><div class="loading"><div class="spinner"></div> Loading…</div></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ---- Availability, laid out by day ----
+function renderAvailability() {
+  const byDay = {};
+  (teacher.avail ?? []).forEach(a => {
+    (byDay[a.day_of_week] ??= []).push(a);
+  });
+
+  if (Object.keys(byDay).length === 0) {
+    return `<div class="text-sm text-muted">No availability recorded for this teacher.</div>`;
+  }
+
+  const rows = WEEK_ORDER.map(d => {
+    const slots = (byDay[d] ?? []).sort((a, b) => a.start_time.localeCompare(b.start_time));
+    const cells = slots.length
+      ? slots.map(s => `<span class="avail-slot-chip">
+            <strong>${formatTime(s.start_time)}–${formatTime(s.end_time)}</strong>
+            · ${teacher.studioMap[s.studio_id] ?? 'Unknown studio'}
+          </span>`).join('')
+      : `<span class="avail-none">Not available</span>`;
+    return `<tr><td class="avail-day">${DAY_NAMES[d]}</td><td>${cells}</td></tr>`;
+  }).join('');
+
+  return `<table class="avail-table"><tbody>${rows}</tbody></table>`;
+}
+
+// ---- Email lives in auth.users, so fetch it via the Function ----
+function fetchEmail() {
+  fetch('/.netlify/functions/create-user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'get-email', userId: teacher.user_id }),
+  })
+    .then(r => r.json())
+    .then(d => {
+      const el = document.getElementById('tEmail');
+      if (el) el.innerHTML = d.email
+        ? `<a href="mailto:${d.email}">${d.email}</a>`
+        : '<span class="text-muted">No login account</span>';
+    })
+    .catch(() => {
+      const el = document.getElementById('tEmail');
+      if (el) el.textContent = '—';
+    });
+}
+
+
+// A lesson needs marking once it has ENDED. Mirrors the same helper on
+// the student dashboard so both agree about what counts as "past".
+// (Duplicated rather than shared, to avoid touching supabase-client.js
+// which holds the project keys.)
+function lessonHasEnded(row, todayStr, nowHM) {
+  const d = row.date?.slice(0, 10);
+  if (!d) return false;
+  if (d < todayStr) return true;
+  if (d > todayStr) return false;
+  const [sh, sm] = (row.start_time ?? '00:00:00').split(':').map(Number);
+  const endMins  = sh * 60 + sm + (row.duration_mins ?? 0);
+  const [nh, nm] = nowHM.split(':').map(Number);
+  return endMins <= (nh * 60 + nm);
+}
+
+// Count past-and-finished lessons that still need attendance marked
+async function countUnmarked(teacherIdValue) {
+  const now   = new Date();
+  const today = toISODate(now);
+  const nowHM = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:00`;
+
+  const { data } = await db.from('schedule_view')
+    .select('date,start_time,duration_mins')
+    .eq('teacher_id', teacherIdValue)
+    .lte('date', today)
+    .neq('occurrence_status', 'cancelled')
+    .eq('fully_marked', false);
+
+  return (data ?? []).filter(r => lessonHasEnded(r, today, nowHM)).length;
+}
+
+// ---- Stats ----
+async function loadStats() {
+  const today  = toISODate(new Date());
+  const days   = getWeekDays(weekStart);
+  const wStart = toISODate(days[0]);
+  const wEnd   = toISODate(days[days.length - 1]);
+
+  const { data: lessons } = await db.from('lessons')
+    .select('id').eq('teacher_id', teacherId).eq('status','active');
+  const lessonIds = (lessons ?? []).map(l => l.id);
+
+  // Distinct students across active lessons
+  let studentCount = 0;
+  if (lessonIds.length) {
+    const { data: ls } = await db.from('lesson_students')
+      .select('student_id').in('lesson_id', lessonIds);
+    studentCount = new Set((ls ?? []).map(r => r.student_id)).size;
+  }
+  document.getElementById('statStudents').textContent = studentCount;
+
+  const [weekRes, unmarkedCount] = await Promise.all([
+    db.from('schedule_view').select('occurrence_id', { count: 'exact' })
+      .eq('teacher_id', teacherId).gte('date', wStart).lte('date', wEnd)
+      .neq('occurrence_status','cancelled'),
+    countUnmarked(teacherId),
+  ]);
+
+  document.getElementById('statWeek').textContent = weekRes.count ?? '–';
+
+  const unmarked = unmarkedCount ?? 0;
+  const el = document.getElementById('statUnmarked');
+  el.textContent = unmarked;
+  el.style.color = unmarked > 0 ? '#dc2626' : '';
+  document.getElementById('statUnmarkedSub').textContent =
+    unmarked === 0 ? 'all caught up' : 'past lessons to mark';
+}
+
+// ---- Students with skill levels ----
+async function loadStudents() {
+  const body = document.getElementById('studentsBody');
+
+  const { data: lessons } = await db.from('lessons')
+    .select('id,instrument').eq('teacher_id', teacherId).eq('status','active');
+  const lessonIds = (lessons ?? []).map(l => l.id);
+
+  if (!lessonIds.length) {
+    body.innerHTML = `<div class="text-sm text-muted">No active lessons, so no students yet.</div>`;
+    document.getElementById('studentsSub').textContent = '0 students';
+    return;
+  }
+
+  const instByLesson = {};
+  (lessons ?? []).forEach(l => { instByLesson[l.id] = l.instrument; });
+
+  const { data: ls } = await db.from('lesson_students')
+    .select('lesson_id,student_id').in('lesson_id', lessonIds);
+
+  const instByStudent = {};
+  (ls ?? []).forEach(r => {
+    (instByStudent[r.student_id] ??= new Set()).add(instByLesson[r.lesson_id]);
+  });
+
+  const studentIds = Object.keys(instByStudent);
+  if (!studentIds.length) {
+    body.innerHTML = `<div class="text-sm text-muted">No students enrolled in these lessons.</div>`;
+    document.getElementById('studentsSub').textContent = '0 students';
+    return;
+  }
+
+  const [sRes, siRes] = await Promise.all([
+    db.from('students').select('id,user_id,status').in('id', studentIds),
+    db.from('student_instruments').select('student_id,instrument,skill_level').in('student_id', studentIds),
+  ]);
+
+  const userIds = (sRes.data ?? []).map(s => s.user_id).filter(Boolean);
+  const { data: pData } = userIds.length
+    ? await db.from('profiles').select('id,first_name,last_name').in('id', userIds)
+    : { data: [] };
+  const pMap = {};
+  (pData ?? []).forEach(p => { pMap[p.id] = p; });
+
+  const skillMap = {};
+  (siRes.data ?? []).forEach(r => {
+    (skillMap[r.student_id] ??= {})[r.instrument] = r.skill_level;
+  });
+
+  const students = (sRes.data ?? []).map(s => ({
+    ...s,
+    profile:     pMap[s.user_id] ?? {},
+    instruments: [...(instByStudent[s.id] ?? [])].filter(Boolean).sort(),
+    skills:      skillMap[s.id] ?? {},
+  })).sort((a, b) =>
+    (a.profile.first_name ?? '').localeCompare(b.profile.first_name ?? ''));
+
+  const active = students.filter(s => s.status === 'active').length;
+  document.getElementById('studentsSub').textContent =
+    `${active} active · ${students.length} total`;
+
+  body.innerHTML = students.map(s => {
+    const name = `${s.profile.first_name ?? ''} ${s.profile.last_name ?? ''}`.trim() || '(unnamed)';
+    const skills = s.instruments.map(inst => {
+      const lvl    = s.skills[inst];
+      const pct    = lvl == null ? 0 : Math.round((lvl / 8) * 100);
+      const colour = lvl == null ? 'var(--light-grey)'
+                   : lvl <= 3 ? '#2563eb' : lvl <= 6 ? '#d97706' : '#16a34a';
+      return `<div class="skill-line">
+        <span class="skill-inst">${inst}</span>
+        <span class="skill-track"><span class="skill-fill" style="width:${pct}%;background:${colour};"></span></span>
+        <span class="skill-text">${lvl == null ? 'Not graded' : skillLabel(lvl)}</span>
+      </div>`;
+    }).join('');
+
+    return `<div class="stu-row">
+      <div style="display:flex;align-items:center;gap:0.5rem;">
+        <span class="stu-name">${name}</span>
+        ${s.status !== 'active' ? `<span class="pill pill-inactive" style="font-size:0.65rem;">${s.status}</span>` : ''}
+      </div>
+      ${skills || '<div class="text-sm text-muted">No instruments</div>'}
+    </div>`;
+  }).join('');
+}
+
+// ---- Weekly schedule ----
+async function loadSchedule() {
+  const body   = document.getElementById('scheduleBody');
+  const days   = getWeekDays(weekStart);
+  const wStart = toISODate(days[0]);
+  const wEnd   = toISODate(days[days.length - 1]);
+
+  document.getElementById('weekLabel').textContent =
+    `${formatShortDate(days[0])} – ${formatShortDate(days[days.length - 1])}`;
+  const picker = document.getElementById('datePicker');
+  if (picker) picker.value = toISODate(days[0]);
+
+  body.innerHTML = `<div class="loading"><div class="spinner"></div> Loading…</div>`;
+
+  const { data, error } = await db.from('schedule_view')
+    .select('*').eq('teacher_id', teacherId)
+    .gte('date', wStart).lte('date', wEnd)
+    .order('date').order('start_time');
+
+  if (error) {
+    body.innerHTML = `<div class="text-sm" style="color:#dc2626;">${error.message}</div>`;
+    return;
+  }
+
+  const rows = (data ?? []).filter(r =>
+    r.lesson_status === 'active' ? true : r.occurrence_status !== 'cancelled');
+
+  if (!rows.length) {
+    body.innerHTML = `<div class="text-sm text-muted">No lessons scheduled this week.</div>`;
+    return;
+  }
+
+  const byDate = {};
+  rows.forEach(r => { (byDate[r.date?.slice(0,10)] ??= []).push(r); });
+
+  const today = toISODate(new Date());
+  body.innerHTML = days.map(d => {
+    const key = toISODate(d);
+    const list = byDate[key];
+    if (!list?.length) return '';
+    return `<div class="sched-day">
+      <div class="sched-day-label" style="${key === today ? 'color:var(--orange);' : ''}">
+        ${formatShortDate(d)}${key === today ? ' · Today' : ''}
+      </div>
+      ${list.map(r => {
+        const cancelled = r.occurrence_status === 'cancelled';
+        const isGroup   = r.lesson_type === 'group';
+        const who = isGroup
+          ? `Group (${r.student_count} student${r.student_count !== 1 ? 's' : ''})`
+          : (r.student_name ?? '—');
+        return `<div class="sched-row ${cancelled ? 'sched-cancelled' : ''}">
+          <div>
+            <div class="sched-time">${formatTime(r.start_time)}</div>
+            <div class="sched-sub">${formatDuration(r.duration_mins)}</div>
+          </div>
+          <div>
+            <div style="font-weight:500;color:var(--charcoal);">${cancelled ? '✕ ' : ''}${who}</div>
+            <div class="sched-sub">${r.instrument} · ${r.studio_name ?? ''}</div>
+          </div>
+          <div>${isGroup
+            ? `<span class="pill ${r.fully_marked ? 'pill-present' : 'pill-scheduled'}" style="font-size:0.65rem;">${r.attendance_marked_count ?? 0}/${r.student_count}</span>`
+            : attendancePill(r.attendance_status)}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('') || `<div class="text-sm text-muted">No lessons scheduled this week.</div>`;
+}
+
+// ---- Week navigation ----
+function prevWeek() { weekStart = new Date(weekStart.getTime() - 7 * 86400000); refreshWeek(); }
+function nextWeek() { weekStart = new Date(weekStart.getTime() + 7 * 86400000); refreshWeek(); }
+function thisWeek() { weekStart = getWeekStart(new Date()); refreshWeek(); }
+function jumpToDate(v) { if (!v) return; weekStart = getWeekStart(parseLocalDate(v)); refreshWeek(); }
+function refreshWeek() { loadSchedule(); loadStats(); }
+
+// ---- Reset password ----
+async function resetPassword() {
+  const emailRes = await fetch('/.netlify/functions/create-user', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'get-email', userId: teacher.user_id }),
+  });
+  const emailData = await emailRes.json();
+  if (!emailRes.ok || !emailData.email) {
+    showToast('No login account found for this teacher.', 'error'); return;
+  }
+  const res = await fetch('/.netlify/functions/create-user', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'reset-password', email: emailData.email }),
+  });
+  const data = await res.json();
+  showToast(res.ok ? 'Password reset email sent.' : (data.error ?? 'Could not send reset email.'),
+            res.ok ? 'success' : 'error');
+}
+
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+</script>
+</body>
+</html>

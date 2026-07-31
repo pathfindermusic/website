@@ -124,6 +124,10 @@
           <button class="btn btn-ghost btn-sm" onclick="goToday()">Today</button>
           <button class="week-nav-btn" onclick="nextWeek()" title="Next week">›</button>
         </div>
+        <input type="date" class="filter-select" id="datePicker"
+               onchange="jumpToDate(this.value)"
+               title="Jump to the week containing this date"
+               style="padding:0.42rem 0.6rem;cursor:pointer;">
         <a href="lessons.html#new" class="btn btn-primary btn-sm">+ Add Lesson</a>
       </div>
     </div>
@@ -241,17 +245,13 @@ async function loadStats() {
     db.from('lesson_occurrences').select('id', { count: 'exact' }).eq('date', today).neq('status','cancelled'),
     db.from('lesson_occurrences').select('id', { count: 'exact' }).gte('date', wStart).lte('date', wEnd).neq('status','cancelled'),
     db.from('students').select('id', { count: 'exact' }).eq('status','active'),
-    db.from('schedule_view')
-      .select('occurrence_id', { count: 'exact' })
-      .lt('date', today)
-      .neq('occurrence_status','cancelled')
-      .is('attendance_status', null),
+    countUnmarkedAll(),
   ]);
 
   document.getElementById('statToday').textContent    = todayRes.count ?? '–';
   document.getElementById('statWeek').textContent     = weekRes.count  ?? '–';
   document.getElementById('statStudents').textContent = studentsRes.count ?? '–';
-  document.getElementById('statUnmarked').textContent = unmarkedRes.count ?? '–';
+  document.getElementById('statUnmarked').textContent = unmarkedRes ?? '–';
 }
 
 // ---- Week navigation ----
@@ -265,9 +265,49 @@ function nextWeek() {
   loadSchedule();
 }
 
+// Jump to the week containing a chosen date
+function jumpToDate(value) {
+  if (!value) return;
+  weekStart = getWeekStart(parseLocalDate(value));
+  loadSchedule();
+}
+
+function syncDatePicker(date) {
+  const el = document.getElementById('datePicker');
+  if (el) el.value = toISODate(date);
+}
+
 function goToday() {
   weekStart = getWeekStart(new Date());
   loadSchedule();
+}
+
+
+// Unmarked = every lesson that has ENDED but isn't fully marked.
+// Matches the teacher and student dashboards.
+function lessonHasEnded(row, todayStr, nowHM) {
+  const d = row.date?.slice(0, 10);
+  if (!d) return false;
+  if (d < todayStr) return true;
+  if (d > todayStr) return false;
+  const [sh, sm] = (row.start_time ?? '00:00:00').split(':').map(Number);
+  const endMins  = sh * 60 + sm + (row.duration_mins ?? 0);
+  const [nh, nm] = nowHM.split(':').map(Number);
+  return endMins <= (nh * 60 + nm);
+}
+
+async function countUnmarkedAll() {
+  const now   = new Date();
+  const today = toISODate(now);
+  const nowHM = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:00`;
+
+  const { data } = await db.from('schedule_view')
+    .select('date,start_time,duration_mins')
+    .lte('date', today)
+    .neq('occurrence_status', 'cancelled')
+    .eq('fully_marked', false);
+
+  return (data ?? []).filter(r => lessonHasEnded(r, today, nowHM)).length;
 }
 
 // ---- Load schedule ----
@@ -280,6 +320,7 @@ async function loadSchedule() {
   // Update week label
   document.getElementById('weekRangeLabel').textContent =
     `${formatShortDate(days[0])} – ${formatShortDate(days[days.length - 1])}`;
+  syncDatePicker(days[0]);
 
   wrap.innerHTML = `<div class="loading"><div class="spinner"></div> Loading schedule…</div>`;
 

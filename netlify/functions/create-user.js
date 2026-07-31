@@ -76,7 +76,11 @@ exports.handler = async (event) => {
     try {
       // Use /recover endpoint which actually sends the email
       // (generate_link only creates a link, doesn't send email)
-      const redirectTo = encodeURIComponent('https://www.pathfindermusiclessons.com.au/portal/change-password.html');
+      // redirect_to must be a QUERY parameter — /recover ignores it in
+      // the body and silently falls back to the project's Site URL.
+      const redirectTo = encodeURIComponent(
+        'https://www.pathfindermusiclessons.com.au/portal/change-password.html'
+      );
       const res = await fetch(`${SUPABASE_URL}/auth/v1/recover?redirect_to=${redirectTo}`, {
         method: 'POST',
         headers: {
@@ -87,7 +91,8 @@ exports.handler = async (event) => {
           email,
           gotrue_meta_security: {},
         }),
-      });      
+      });
+
       // /recover returns 200 with empty body on success
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -118,6 +123,18 @@ exports.handler = async (event) => {
     // Check if user already exists
     const listRes  = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=1000`, { headers });
     const listData = await listRes.json();
+    if (!listRes.ok) {
+      console.error('[create-user] Could not list users:',
+        listRes.status, JSON.stringify(listData));
+      return {
+        statusCode: 502,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          error: 'Could not check existing accounts: ' +
+                 (listData?.msg ?? listData?.message ?? listRes.status),
+        }),
+      };
+    }
     const existing = (listData?.users ?? []).find(
       u => u.email?.toLowerCase() === email.toLowerCase()
     );
@@ -153,10 +170,18 @@ exports.handler = async (event) => {
     const createData = await createRes.json();
 
     if (!createRes.ok) {
+      console.error('[create-user] Supabase rejected createUser:',
+        createRes.status, JSON.stringify(createData));
       return {
         statusCode: 400,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: createData?.message ?? 'Could not create user account.' }),
+        body: JSON.stringify({
+          error: createData?.msg
+              ?? createData?.message
+              ?? createData?.error_description
+              ?? `Could not create user account (${createRes.status}).`,
+          detail: createData,
+        }),
       };
     }
 

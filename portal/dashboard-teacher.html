@@ -178,6 +178,26 @@
   </div>
 </div>
 
+<!-- GROUP ATTENDANCE -->
+<div class="modal-overlay hidden" id="groupAttModal">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-header">
+      <span class="modal-title" id="gaTitle">Attendance</span>
+      <button class="modal-close" onclick="closeGroupAttendance()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-sm text-muted" style="margin-bottom:0.75rem;">
+        Mark each student individually. Anyone left as "Not marked" is skipped.
+      </p>
+      <div id="gaBody"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeGroupAttendance()">Cancel</button>
+      <button class="btn btn-primary" id="gaSaveBtn" onclick="saveGroupAttendance()">Save attendance</button>
+    </div>
+  </div>
+</div>
+
 <!-- READ-ONLY LESSON VIEW -->
 <div class="modal-overlay hidden" id="lessonViewModal">
   <div class="modal" style="max-width:480px;">
@@ -229,13 +249,45 @@ async function loadStats() {
     db.from('schedule_view').select('occurrence_id', {count:'exact'}).eq('teacher_id', teacherRecord.id).eq('date', today).neq('occurrence_status','cancelled'),
     db.from('schedule_view').select('occurrence_id', {count:'exact'}).eq('teacher_id', teacherRecord.id).gte('date', wStart).lte('date', wEnd).neq('occurrence_status','cancelled'),
     countMyStudents(),
-    db.from('schedule_view').select('occurrence_id', {count:'exact'}).eq('teacher_id', teacherRecord.id).lt('date', today).neq('occurrence_status','cancelled').is('attendance_status', null),
+    countUnmarked(teacherRecord.id),
   ]);
 
   document.getElementById('statToday').textContent    = todayRes.count  ?? '–';
   document.getElementById('statWeek').textContent     = weekRes.count   ?? '–';
   document.getElementById('statStudents').textContent = studentsRes ?? '–';
-  document.getElementById('statUnmarked').textContent = unmarkedRes.count ?? '–';
+  document.getElementById('statUnmarked').textContent = unmarkedRes ?? '–';
+}
+
+
+// A lesson needs marking once it has ENDED. Mirrors the same helper on
+// the student dashboard so both agree about what counts as "past".
+// (Duplicated rather than shared, to avoid touching supabase-client.js
+// which holds the project keys.)
+function lessonHasEnded(row, todayStr, nowHM) {
+  const d = row.date?.slice(0, 10);
+  if (!d) return false;
+  if (d < todayStr) return true;
+  if (d > todayStr) return false;
+  const [sh, sm] = (row.start_time ?? '00:00:00').split(':').map(Number);
+  const endMins  = sh * 60 + sm + (row.duration_mins ?? 0);
+  const [nh, nm] = nowHM.split(':').map(Number);
+  return endMins <= (nh * 60 + nm);
+}
+
+// Count past-and-finished lessons that still need attendance marked
+async function countUnmarked(teacherIdValue) {
+  const now   = new Date();
+  const today = toISODate(now);
+  const nowHM = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:00`;
+
+  const { data } = await db.from('schedule_view')
+    .select('date,start_time,duration_mins')
+    .eq('teacher_id', teacherIdValue)
+    .lte('date', today)
+    .neq('occurrence_status', 'cancelled')
+    .eq('fully_marked', false);
+
+  return (data ?? []).filter(r => lessonHasEnded(r, today, nowHM)).length;
 }
 
 // Distinct students across this teacher's active lessons
@@ -260,7 +312,7 @@ let scheduleRows = [];
 // schedule_view only exposes the first student's name, which is wrong for
 // group lessons — pull the full roster per lesson.
 async function attachStudentNames(rows) {
-  rows.forEach(r => { r.studentNames = []; });
+  rows.forEach(r => { r.studentNames = []; r.students = []; });
   const lessonIds = [...new Set(rows.map(r => r.lesson_id).filter(Boolean))];
   if (lessonIds.length === 0) return;
 
@@ -287,9 +339,14 @@ async function attachStudentNames(rows) {
   (ls ?? []).forEach(r => {
     if (!byLesson[r.lesson_id]) byLesson[r.lesson_id] = [];
     const n = nameById[r.student_id];
-    if (n) byLesson[r.lesson_id].push(n);
+    if (n) byLesson[r.lesson_id].push({ id: r.student_id, name: n });
   });
-  rows.forEach(r => { r.studentNames = (byLesson[r.lesson_id] ?? []).sort(); });
+  rows.forEach(r => {
+    const list = (byLesson[r.lesson_id] ?? []).slice()
+      .sort((a, b) => a.name.localeCompare(b.name));
+    r.students     = list;
+    r.studentNames = list.map(s => s.name);
+  });
 }
 
 async function loadSchedule() {
@@ -373,19 +430,28 @@ async function loadSchedule() {
           <div class="lesson-instrument">${l.instrument}</div>
           ${isGroup && names.length ? `<div class="lesson-meta">${names.join(' · ')}</div>` : ''}
           <div class="lesson-meta">${l.studio_name}${l.is_online ? ' · <span class="pill pill-online" style="font-size:0.65rem;">Online</span>' : ''}</div>
-          <div style="margin-top:4px;">${attendancePill(attStatus)}</div>
+          <div style="margin-top:4px;">${
+            isGroup
+              ? `<span class="pill ${l.fully_marked ? 'pill-present' : 'pill-scheduled'}">${l.attendance_marked_count ?? 0} of ${nameCount} marked</span>`
+              : attendancePill(attStatus)
+          }</div>
           ${l.note_text ? `<div class="text-sm text-muted mt-1">📝 Note saved</div>` : ''}
           ${l.drive_link ? `<a href="${l.drive_link}" target="_blank" class="text-sm text-orange mt-1" style="display:inline-block;" onclick="event.stopPropagation()">📁 Drive link</a>` : ''}
         </div>
         <div class="lesson-actions" onclick="event.stopPropagation()">
           ${!isCancelled ? `
-          <select class="att-select" id="att-${l.occurrence_id}" onchange="markAttendance('${l.occurrence_id}', this.value)">
-            <option value="" ${!attStatus ? 'selected' : ''}>Mark attendance…</option>
-            <option value="present"           ${attStatus==='present'           ? 'selected' : ''}>Present</option>
-            <option value="absent_no_credit"  ${attStatus==='absent_no_credit'  ? 'selected' : ''}>Absent — No Credit</option>
-            <option value="absent_notice"     ${attStatus==='absent_notice'     ? 'selected' : ''}>Absent — Notice Given</option>
-            <option value="teacher_cancelled" ${attStatus==='teacher_cancelled' ? 'selected' : ''}>Teacher Cancelled</option>
-          </select>
+          ${isGroup ? `
+            <button class="btn btn-secondary btn-sm" onclick="openGroupAttendance('${l.occurrence_id}')">
+              ${l.fully_marked ? 'Edit attendance' : 'Mark attendance'}
+            </button>` : `
+            <select class="att-select" id="att-${l.occurrence_id}"
+              onchange="markAttendance('${l.occurrence_id}', '${(l.students?.[0]?.id) ?? ''}', this.value)">
+              <option value="" ${!attStatus ? 'selected' : ''}>Mark attendance…</option>
+              <option value="present"           ${attStatus==='present'           ? 'selected' : ''}>Present</option>
+              <option value="absent_no_credit"  ${attStatus==='absent_no_credit'  ? 'selected' : ''}>Absent — No Credit</option>
+              <option value="absent_notice"     ${attStatus==='absent_notice'     ? 'selected' : ''}>Absent — Notice Given</option>
+              <option value="teacher_cancelled" ${attStatus==='teacher_cancelled' ? 'selected' : ''}>Teacher Cancelled</option>
+            </select>`}
           <button class="btn btn-ghost btn-sm" onclick="openNoteByOccurrence('${l.occurrence_id}')">
             ${l.note_text ? 'Edit Note' : '+ Add Note'}
           </button>` : '<span class="text-sm text-muted">Cancelled</span>'}
@@ -401,38 +467,117 @@ async function loadSchedule() {
 }
 
 // ---- Mark attendance ----
-async function markAttendance(occurrenceId, status) {
+async function markAttendance(occurrenceId, studentId, status) {
   if (!status) return;
+  if (!studentId) { showToast('Could not identify the student. Please refresh.', 'error'); return; }
 
-  // Check if attendance record exists
-  const { data: existing } = await db
-    .from('attendance')
-    .select('id')
-    .eq('lesson_occurrence_id', occurrenceId)
-    .maybeSingle();
+  const { error } = await saveAttendanceRow(occurrenceId, studentId, status);
+  if (error) { showToast('Could not save attendance. Please try again.', 'error'); return; }
 
-  let error;
-  if (existing) {
-    ({ error } = await db.from('attendance')
-      .update({ status, marked_by: currentProfile.id, marked_at: new Date().toISOString() })
-      .eq('id', existing.id));
-  } else {
-    ({ error } = await db.from('attendance')
-      .insert({ lesson_occurrence_id: occurrenceId, status, marked_by: currentProfile.id, marked_at: new Date().toISOString() }));
+  showToast('Attendance saved.', 'success');
+  await syncOccurrenceStatus(occurrenceId);
+  await Promise.all([loadSchedule(), loadStats()]);
+}
+
+// Upsert one student's attendance for one occurrence
+async function saveAttendanceRow(occurrenceId, studentId, status) {
+  return db.from('attendance').upsert({
+    lesson_occurrence_id: occurrenceId,
+    student_id:           studentId,
+    status,
+    marked_by:            currentProfile.id,
+    marked_at:            new Date().toISOString(),
+  }, { onConflict: 'lesson_occurrence_id,student_id' });
+}
+
+// Occurrence becomes completed once everyone is marked, or cancelled
+// if every student was marked Teacher Cancelled.
+async function syncOccurrenceStatus(occurrenceId) {
+  const row   = scheduleRows.find(r => r.occurrence_id === occurrenceId);
+  const total = row?.students?.length ?? 0;
+  if (total === 0) return;
+
+  const { data: marks } = await db.from('attendance')
+    .select('status').eq('lesson_occurrence_id', occurrenceId);
+  if (!marks || marks.length < total) return;   // not everyone marked yet
+
+  const allCancelled = marks.every(m => m.status === 'teacher_cancelled');
+  await db.from('lesson_occurrences')
+    .update({ status: allCancelled ? 'cancelled' : 'completed' })
+    .eq('id', occurrenceId);
+}
+
+// ---- Group attendance modal ----
+let groupAttOccurrenceId = null;
+
+async function openGroupAttendance(occurrenceId) {
+  const row = scheduleRows.find(r => r.occurrence_id === occurrenceId);
+  if (!row) { showToast('Could not load that lesson. Please refresh.', 'error'); return; }
+
+  groupAttOccurrenceId = occurrenceId;
+  document.getElementById('gaTitle').textContent =
+    `Attendance — ${row.instrument} · ${formatTime(row.start_time)}`;
+
+  const { data: marks } = await db.from('attendance')
+    .select('student_id,status').eq('lesson_occurrence_id', occurrenceId);
+  const byStudent = {};
+  (marks ?? []).forEach(m => { byStudent[m.student_id] = m.status; });
+
+  const opts = [
+    ['',                  'Not marked'],
+    ['present',           'Present'],
+    ['absent_no_credit',  'Absent — No Credit'],
+    ['absent_notice',     'Absent — Notice Given'],
+    ['teacher_cancelled', 'Teacher Cancelled'],
+  ];
+
+  document.getElementById('gaBody').innerHTML = (row.students ?? []).map(s => {
+    const cur = byStudent[s.id] ?? '';
+    return `<div style="display:grid;grid-template-columns:1fr auto;gap:0.75rem;align-items:center;padding:0.55rem 0;border-bottom:1px solid var(--border);">
+      <div style="font-size:0.9rem;font-weight:500;color:var(--charcoal);">${s.name}</div>
+      <select class="att-select ga-select" data-student="${s.id}">
+        ${opts.map(([v, label]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${label}</option>`).join('')}
+      </select>
+    </div>`;
+  }).join('') || '<div class="text-sm text-muted">No students on this lesson.</div>';
+
+  document.getElementById('groupAttModal').classList.remove('hidden');
+}
+
+function closeGroupAttendance() {
+  document.getElementById('groupAttModal').classList.add('hidden');
+  groupAttOccurrenceId = null;
+}
+
+async function saveGroupAttendance() {
+  if (!groupAttOccurrenceId) return;
+  const btn = document.getElementById('gaSaveBtn');
+  btn.textContent = 'Saving…';
+  btn.disabled = true;
+
+  let saved = 0, failed = 0;
+  for (const sel of [...document.querySelectorAll('.ga-select')]) {
+    if (!sel.value) continue;   // left unmarked
+    const { error } = await saveAttendanceRow(groupAttOccurrenceId, sel.dataset.student, sel.value);
+    if (error) failed++; else saved++;
   }
 
-  if (error) {
-    showToast('Could not save attendance. Please try again.', 'error');
-  } else {
-    showToast('Attendance saved.', 'success');
-    // Update lesson occurrence status to completed if not cancelled
-    await db.from('lesson_occurrences')
-      .update({ status: status === 'teacher_cancelled' ? 'cancelled' : 'completed' })
-      .eq('id', occurrenceId);
+  btn.textContent = 'Save attendance';
+  btn.disabled = false;
 
-    // Refresh so the attendance pill and the Unmarked count reflect the change
-    await Promise.all([loadSchedule(), loadStats()]);
+  if (failed) {
+    showToast(`Saved ${saved}, but ${failed} failed. Please try again.`, 'warning');
+  } else if (saved === 0) {
+    showToast('Nothing to save — no students were marked.', 'warning');
+    return;
+  } else {
+    showToast(`Attendance saved for ${saved} student${saved !== 1 ? 's' : ''}.`, 'success');
   }
+
+  const occId = groupAttOccurrenceId;
+  closeGroupAttendance();
+  await syncOccurrenceStatus(occId);
+  await Promise.all([loadSchedule(), loadStats()]);
 }
 
 // ---- Read-only lesson view ----
@@ -484,6 +629,9 @@ function closeLessonView() {
 
 document.getElementById('lessonViewModal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeLessonView();
+});
+document.getElementById('groupAttModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeGroupAttendance();
 });
 
 // ---- Note modal ----

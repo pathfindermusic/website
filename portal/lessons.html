@@ -313,6 +313,10 @@
           <button class="btn btn-ghost btn-sm" onclick="goToday()">Today</button>
           <button class="week-nav-btn" onclick="navForward()">›</button>
         </div>
+        <input type="date" class="filter-select" id="datePicker"
+               onchange="jumpToDate(this.value)"
+               title="Jump to a date"
+               style="padding:0.42rem 0.6rem;cursor:pointer;">
         <button class="btn btn-secondary btn-sm" onclick="openAgendaModal()">📄 Agenda PDF</button>
         <button class="btn btn-primary btn-sm" onclick="openLessonModal()">+ Add Lesson</button>
       </div>
@@ -789,6 +793,25 @@ function goToday() {
   loadView();
 }
 
+// Jump straight to a date. In weekly view this moves to the week
+// containing that date.
+function jumpToDate(value) {
+  if (!value) return;
+  const picked = parseLocalDate(value);
+  if (currentView === 'daily') {
+    currentDate = picked;
+  } else {
+    weekStart = getWeekStart(picked);
+  }
+  loadView();
+}
+
+// Keep the picker showing wherever the view currently sits
+function syncDatePicker(date) {
+  const el = document.getElementById('datePicker');
+  if (el) el.value = toISODate(date);
+}
+
 async function loadView() {
   if (currentView === 'daily') {
     await loadDailyView();
@@ -807,6 +830,7 @@ async function loadDailyView() {
 
   document.getElementById('dateLabel').textContent =
     currentDate.toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  syncDatePicker(currentDate);
 
   wrap.innerHTML = `<div class="loading"><div class="spinner"></div> Loading…</div>`;
 
@@ -824,8 +848,7 @@ async function loadDailyView() {
       id, date, status, is_online, occurrence_notes,
       lessons(id, teacher_id, studio_id, instrument, start_time, duration_mins, lesson_type, max_students, series_notes, status)
     `)
-    .eq('date', dateStr)
-    .or('status.eq.scheduled,status.eq.cancelled');
+    .eq('date', dateStr);
 
   // Filter: hide cancelled occurrences where the whole series is also cancelled
   // Only show cancelled occurrences where the series (lesson) is still active
@@ -863,12 +886,15 @@ async function loadDailyView() {
   allOccurrences = (occData ?? []).map(o => ({
     ...o, lessonStudents: lsMap[o.lessons?.id ?? o.lesson_id] ?? [],
   })).filter(o => {
-    // Always show scheduled occurrences
-    if (o.status === 'scheduled') return true;
-    // Only show cancelled occurrences if the lesson series itself is still active
-    // (i.e. this was a one-off cancellation, not a series cancellation)
-    if (o.status === 'cancelled' && o.lessons?.status === 'active') return true;
-    return false;
+    // Cancelling a series marks every occurrence from the cancellation
+    // point onwards as cancelled. Hide exactly those — earlier lessons
+    // still happened and stay on the grid as history, whether or not
+    // their attendance was ever marked.
+    if (o.lessons?.status !== 'active') return o.status !== 'cancelled';
+
+    // Active series: show everything. A cancelled occurrence here is a
+    // deliberate one-off and renders with a red ✕.
+    return true;
   });
 
   // Render one grid per studio
@@ -1022,6 +1048,7 @@ async function loadWeeklyView() {
 
   document.getElementById('dateLabel').textContent =
     `${formatShortDate(days[0])} – ${formatShortDate(days[days.length - 1])}`;
+  syncDatePicker(days[0]);
 
   wrap.innerHTML = `<div class="loading"><div class="spinner"></div> Loading…</div>`;
 
@@ -1041,9 +1068,15 @@ async function loadWeeklyView() {
 
   // Filter: hide cancelled occurrences where the whole series is also cancelled
   allOccurrences = (data ?? []).filter(o => {
-    if (o.status === 'scheduled') return true;
-    if (o.status === 'cancelled' && o.lessons?.status === 'active') return true;
-    return false;
+    // Cancelling a series marks every occurrence from the cancellation
+    // point onwards as cancelled. Hide exactly those — earlier lessons
+    // still happened and stay on the grid as history, whether or not
+    // their attendance was ever marked.
+    if (o.lessons?.status !== 'active') return o.status !== 'cancelled';
+
+    // Active series: show everything. A cancelled occurrence here is a
+    // deliberate one-off and renders with a red ✕.
+    return true;
   });
 
   if (!allOccurrences.length) {
@@ -1651,26 +1684,49 @@ async function cancelOccurrence(scope) {
   );
 
   if (scope === 'single') {
+    // One-off: the series continues, so this shows with a red ✕
     await db.from('lesson_occurrences').update({ status: 'cancelled' }).eq('id', occId);
     showToast('Lesson occurrence cancelled.', 'success');
+
   } else if (scope === 'future') {
-    await db.from('lesson_occurrences').update({ status: 'cancelled' })
+    // (errors checked below)
+    // The series ends here. Marking the lesson cancelled frees the slot
+    // for rebooking (clash detection only considers active lessons) and
+    // stops the remaining occurrences cluttering the grid.
+    const { error: oErr } = await db.from('lesson_occurrences')
+      .update({ status: 'cancelled' })
       .eq('lesson_id', lessonId).gte('date', occDate);
+    const { error: lErr } = await db.from('lessons')
+      .update({ status: 'cancelled' }).eq('id', lessonId);
+    if (oErr || lErr) {
+      showToast('Could not fully cancel: ' + (oErr?.message ?? lErr?.message), 'error');
+      return;
+    }
     showToast('This and all future lessons cancelled.', 'success');
+
   } else if (scope === 'all') {
-    await db.from('lesson_occurrences').update({ status: 'cancelled' }).eq('lesson_id', lessonId);
-    await db.from('lessons').update({ status: 'cancelled' }).eq('id', lessonId);
-    showToast('Entire lesson series cancelled.', 'success');
+    // Only cancel from today onwards — past occurrences are history and
+    // may already carry attendance records.
+    const { error: oErr2 } = await db.from('lesson_occurrences')
+      .update({ status: 'cancelled' })
+      .eq('lesson_id', lessonId).gte('date', today);
+    const { error: lErr2 } = await db.from('lessons')
+      .update({ status: 'cancelled' }).eq('id', lessonId);
+    if (oErr2 || lErr2) {
+      showToast('Could not fully cancel: ' + (oErr2?.message ?? lErr2?.message), 'error');
+      return;
+    }
+    showToast('Lesson series cancelled from today onwards.', 'success');
   }
 
-  if (notify) await sendCancellationEmail(occId, occ);
+  if (notify) await sendCancellationEmail(occId, occ, scope);
 
   closeOccModal();
   loadView();
 }
 
 // Scenario 5 — automatic cancellation notice
-async function sendCancellationEmail(occId, occ) {
+async function sendCancellationEmail(occId, occ, scope = 'single') {
   const studioId = occ?.lessons?.studio_id;
   const studio   = allStudios.find(s => s.id === studioId);
 
@@ -1679,11 +1735,22 @@ async function sendCancellationEmail(occId, occ) {
     return;
   }
 
-  const bodyText =
-    'Dear {{student_name}},\n\n' +
-    'Your {{instrument}} lesson with {{teacher_name}} at {{lesson_time}} on {{lesson_day}} has been cancelled.\n\n' +
-    'Our admin will contact you shortly to arrange makeup lessons if applicable.\n\n' +
-    'Kind regards,\nPathfinder Music Lessons';
+  const ongoing = (scope === 'future' || scope === 'all');
+
+  const bodyText = ongoing
+    ? 'Dear {{student_name}},\n\n' +
+      'Your {{instrument}} lessons with {{teacher_name}} at {{lesson_time}} on {{lesson_weekday}}s ' +
+      'have been cancelled from {{lesson_day}} onwards.\n\n' +
+      'Our admin will contact you shortly to discuss your options.\n\n' +
+      'Kind regards,\nPathfinder Music Lessons'
+    : 'Dear {{student_name}},\n\n' +
+      'Your {{instrument}} lesson with {{teacher_name}} at {{lesson_time}} on {{lesson_day}} has been cancelled.\n\n' +
+      'Our admin will contact you shortly to arrange makeup lessons if applicable.\n\n' +
+      'Kind regards,\nPathfinder Music Lessons';
+
+  const subject = ongoing
+    ? 'Your {{instrument}} lessons have been cancelled'
+    : 'Your lesson on {{lesson_day}} has been cancelled';
 
   try {
     const res = await fetch('/.netlify/functions/send-email', {
@@ -1695,7 +1762,7 @@ async function sendCancellationEmail(occId, occ) {
         occurrenceId: occId,
         from:         studio.email,
         fromName:     `Pathfinder Music Lessons (${studio.name})`,
-        subject:      'Your lesson on {{lesson_day}} has been cancelled',
+        subject,
         bodyText,
         sentBy:       currentProfile?.id ?? null,
       }),

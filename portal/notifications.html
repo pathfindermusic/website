@@ -174,7 +174,7 @@
           <select class="form-select" id="fromStudio" onchange="refreshPreview()"></select>
           <div class="bcc-note">
             <span>📥</span>
-            <span id="bccNote">A copy is BCC'd to this studio's inbox so you have a record.</span>
+            <span id="bccNote">A summary of what was sent goes to this studio's inbox as your record.</span>
           </div>
         </div>
         <div class="form-group">
@@ -406,15 +406,47 @@ async function refreshPreview() {
     document.getElementById('recipientHint').textContent  =
       data.count === 1 ? 'student will receive this' : 'students will receive this';
 
-    document.getElementById('recipientList').innerHTML = (data.recipients ?? [])
+    let listHtml = (data.recipients ?? [])
       .map(r => `<div class="recipient-row">
         <div>${r.name}</div>
         <div class="recipient-email">${r.addresses.join(', ')}</div>
       </div>`).join('');
 
+    if (data.truncated > 0) {
+      listHtml += `<div class="recipient-row text-muted" style="font-style:italic;">
+        …and ${data.truncated} more
+      </div>`;
+    }
+
+    if (data.invalid > 0) {
+      listHtml += `<div style="margin-top:0.75rem;padding:0.6rem 0.7rem;background:#fee2e2;
+        border:1px solid #fca5a5;border-radius:var(--r-sm);font-size:0.76rem;color:#dc2626;line-height:1.55;">
+        ⚠️ <strong>${data.invalid}</strong> address${data.invalid !== 1 ? 'es look' : ' looks'}
+        invalid and will be skipped: ${(data.invalidNames ?? []).join('; ')}${
+          data.invalid > (data.invalidNames ?? []).length ? '…' : ''
+        }. Fix these on the student record.
+      </div>`;
+    }
+
+    if (data.unreachable > 0) {
+      listHtml += `<div style="margin-top:0.75rem;padding:0.6rem 0.7rem;background:#fef3c7;
+        border:1px solid #fcd34d;border-radius:var(--r-sm);font-size:0.76rem;color:#92400e;line-height:1.55;">
+        ⚠️ <strong>${data.unreachable}</strong> student${data.unreachable !== 1 ? 's have' : ' has'}
+        no email on file and will be skipped${
+          (data.unreachableNames ?? []).length
+            ? `: ${data.unreachableNames.join(', ')}${data.unreachable > (data.unreachableNames ?? []).length ? '…' : ''}`
+            : ''
+        }. Add an email on their student record so they receive notifications.
+      </div>`;
+    }
+
+    document.getElementById('recipientList').innerHTML = listHtml;
+
     document.getElementById('bccNote').textContent = data.bcc
-      ? `A copy is BCC'd to ${data.bcc} so you have a record.`
-      : `This studio has no email address set — no BCC copy will be kept.`;
+      ? (data.count === 1
+          ? `A copy is BCC'd to ${data.bcc} so you have a record.`
+          : `One summary email goes to ${data.bcc} listing everything sent — not a copy per student.`)
+      : `This studio has no email address set — no record copy will be kept.`;
 
   } catch (err) {
     clearPreview('Error: ' + err.message);
@@ -441,7 +473,11 @@ function confirmSend() {
   document.getElementById('confirmText').innerHTML =
     `This will send <strong>${lastPreview.count}</strong> individual email${lastPreview.count !== 1 ? 's' : ''} ` +
     `from <strong>${studio.email}</strong>` +
-    (lastPreview.bcc ? `, with a BCC copy to <strong>${lastPreview.bcc}</strong>` : '') + `.`;
+    (lastPreview.bcc
+       ? (lastPreview.count === 1
+            ? `, with a BCC copy to <strong>${lastPreview.bcc}</strong>`
+            : `. A single summary email will go to <strong>${lastPreview.bcc}</strong> as your record`)
+       : '') + `.`;
   document.getElementById('confirmSubject').textContent = subject;
   document.getElementById('confirmModal').classList.remove('hidden');
 }
@@ -477,7 +513,10 @@ async function doSend() {
     } else if (data.partial) {
       showToast(`Sent ${data.sent} of ${data.total} — some failed. Check Resend dashboard.`, 'warning');
     } else {
-      showToast(`Sent to ${data.sent} student${data.sent !== 1 ? 's' : ''}.`, 'success');
+      showToast(
+        `Sent to ${data.sent} student${data.sent !== 1 ? 's' : ''}.` +
+        (data.unreachable ? ` ${data.unreachable} skipped — no email on file.` : ''),
+        data.unreachable ? 'warning' : 'success');
       document.getElementById('subject').value  = '';
       document.getElementById('bodyText').value = '';
       clearPreview('Choose an audience to preview.');

@@ -1,9 +1,15 @@
-# Local Netlify folder
-.netlify
+# Local environment — contains the Supabase service role key.
+# Must never be committed.
 .env
 .env.local
+
+# Netlify CLI state
 .netlify/
+
+# Node
 node_modules/
+
+# Editor / OS noise
 .vscode/
 .DS_Store
 Thumbs.db
