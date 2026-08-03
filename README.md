@@ -107,6 +107,20 @@ compute — came to under 10 credits combined.
 **So:** develop locally, commit freely, and deploy **once** when a batch is
 confirmed working.
 
+Don't compare files by hand — `git status` and `git diff` (or VS Code's Source
+Control panel) show exactly what changed. Then:
+
+```bash
+git add -A
+git commit -m "what changed"
+git push
+```
+
+There is **no separate database deploy**: local dev runs against the production
+Supabase, so migrations take effect the moment you run them, regardless of what
+code is deployed. Additive changes are safe; a destructive one would break
+production immediately.
+
 Consider turning off auto-publish (Netlify → Site configuration → Build & deploy →
 Continuous deployment) so pushing to GitHub doesn't trigger a build. If you do,
 remember production will lag behind `main` until you deploy manually.
@@ -166,6 +180,21 @@ likewise orphaned and unused.
 lesson can be recorded. **Lesson notes are per occurrence** — deliberately
 shared across a band.
 
+**Students need `students.email` or they are unreachable.** Login emails live in
+`auth.users`, but bulk-imported students have no auth account. Notifications
+resolve an address in this order: auth email → `students.email` →
+`parent_email`. Before the `email` column existed, a studio-wide send silently
+reached only the handful of students created through the portal — the count
+looked plausible, so it was easy to miss. `zoho-migration.sql` now populates it,
+and the Notifications page warns about anyone with no address.
+
+**Instrument labels are compared as exact strings.** Skill grading, lesson
+instrument filtering and teacher-instrument validation all match on the literal
+value, so a mismatch fails silently rather than erroring. Zoho and the website
+form used "Piano / Keyboard" and "Voice" where the portal used "Piano" and
+"Voice / Singing". The canonical list now lives in three places —
+`lessons.html`, `students.html`, `teachers.html` — and they must stay identical.
+
 **Dates: never `new Date("2026-07-29")`.** That parses as UTC midnight, which is
 the previous day in AEST, and silently shifts lessons a day earlier. Use
 `parseLocalDate()` from `supabase-client.js`, or compare the `YYYY-MM-DD` strings
@@ -224,6 +253,97 @@ studio as the only record of what went out (it lands in Inbox, not Sent).
 
 ---
 
+## Decisions already made (don't relitigate without reason)
+
+- **Attendance rate = present ÷ all lessons that have ENDED.** Unmarked counts
+  against the student. Chosen deliberately over "present ÷ marked", which hid
+  the gap. Consequence: a teacher marking late briefly worsens their students'
+  rates, which is also the incentive to mark promptly.
+- **"Has the lesson ended", not "is it before today".** A lesson in progress
+  isn't yet missed. All three dashboards use the same test.
+- **Group lessons: attendance per student, notes shared.** Band notes go to the
+  whole group; absences are individual.
+- **Bulk sends get one studio summary, not one BCC per student.** 500 BCCs would
+  bury the studio inbox. Single-recipient sends still BCC.
+- **Cancelling a series keeps earlier occurrences on the grid** as history and
+  hides everything from the cancellation point. It also sets `lessons.status`
+  to cancelled, which frees the slot for rebooking — clash detection only
+  considers active lessons.
+- **Teacher detail page is read-only**; Edit bounces back to the Teachers page
+  rather than duplicating the edit modal's validation logic.
+
+## Row Level Security — read this before touching a policy
+
+Four findings, each of which cost real time. The last one is subtle and
+still load-bearing in several policies.
+
+**Run policy changes ONE STATEMENT AT A TIME.** Several DDL statements sent
+together to the Supabase SQL editor can apply *partially* — policy names
+created while the bodies stay stale — with no error. A whole session went
+into diagnosing an update that `pg_policies` said should have been allowed,
+because the policy being enforced was not the policy being displayed.
+
+**Always re-read the body afterwards**, not just the name:
+
+```sql
+SELECT policyname, permissive, cmd, qual, with_check
+  FROM pg_policies WHERE tablename = '<table>' ORDER BY policyname;
+```
+
+**Leftover permissive policies are additive and silent.** Renaming a policy
+during a rewrite leaves the old one in place, and permissive policies OR
+together — so the old, broader rule quietly wins. Drop by the old name
+explicitly.
+
+**A policy that subqueries another RLS-protected table inherits that
+table's visibility.** This looks like an existence check:
+
+```sql
+task_id IN (SELECT id FROM tasks)
+```
+
+but it actually means *"…among tasks I can see"*. Once a task moved to
+another studio it became invisible, so the condition could never hold and
+the operation failed with no useful error. This pattern is currently in the
+`task_notes`, `task_handovers` and teacher policies. It works in each case
+today — but it is doing more than it appears to.
+
+### Testing a policy as another user
+
+The SQL editor bypasses RLS, so policies look fine from there. Impersonate
+instead — wrapped in a rollback, so nothing is written:
+
+```sql
+BEGIN;
+  SET LOCAL role TO authenticated;
+  SET LOCAL request.jwt.claims TO '{"sub":"<user-id>","role":"authenticated"}';
+  SELECT get_my_role(), get_my_studio_ids();
+  -- then the actual query or update that is failing
+ROLLBACK;
+```
+
+### Task handover
+
+`tasks.studio_id` and `assigned_to` must be changed through
+`hand_over_task()`, never by a direct update. The function writes the
+handover record and performs the move in one transaction. Two separate
+writes produced phantom trail entries for handovers that never completed.
+
+## Traps that have already cost time
+
+- **Check which environment you're looking at.** Local dev runs against the same
+  Supabase as production, so data looks identical while the *code* differs by
+  weeks. A wrong number is more often a stale page than a logic bug. Check the
+  URL first.
+- **Resend rejects `example.com`** and similar test domains, and its batch
+  endpoint is all-or-nothing — one bad address kills the whole chunk. Use
+  `yourname+alias@gmail.com` for test recipients. Addresses are now validated
+  before sending, and skipped ones are reported.
+- **`redirect_to` on `/auth/v1/recover` must be a QUERY parameter.** In the body
+  it's silently ignored and Supabase falls back to the Site URL.
+- **PowerShell prints stderr in red.** Git progress and npm warnings look like
+  failures and aren't.
+
 ## Known limitations & open decisions
 
 - **One role per account.** Miranda teaches *and* administers; ~3 such cases.
@@ -234,8 +354,12 @@ studio as the only record of what went out (it lands in Inbox, not Sent).
   would return other students' rows if queried directly with the anon key.
   Fixing needs `security_invoker = on` plus read policies across ~8 underlying
   tables. **Should be closed before go-live.**
-- **Not built:** attendance report (sidebar link is dead), `teacher-detail.html`
-  (View button shows a toast), teacher Lesson Notes page.
+- **Not built:** attendance report (sidebar link is dead), teacher Lesson Notes
+  page, email history page. `send-email.js` already records every send in
+  `email_log` including each recipient's Resend message ID, so a history page
+  can show delivery status without further backend work. Per-recipient
+  delivery/bounce status at scale would want Resend webhooks rather than
+  polling.
 - **Resend free tier is 100/day.** A studio-wide announcement to ~500 students
   exceeds it. Budget for the paid tier before first bulk send.
 - **Bulk migration.** MyMusicStaff only exports PDF; Zoho CRM covers only students
@@ -261,16 +385,38 @@ Run in order. All are re-runnable.
    on `student_instruments`
 7. `student-schedule-view.sql`
 8. `per-student-attendance.sql` — `attendance.student_id`, both views rebuilt
+9. `student-contact-email.sql` — `students.email` (see below — this one matters)
+10. `normalise-instruments.sql` — one canonical instrument list
+11. `phase4a-tasks.sql` — tasks, contact log, handovers
+12. `phase4a-admin-read-policy.sql` — admins can see each other
+13. `phase4a-handover-function.sql` — `hand_over_task()`
+14. `phase4a-task-visibility.sql` — assignment overrides missing studio
 
 ---
 
 ## Testing status
 
-**Working:** super user, admin and studio management; teacher and student CRUD
-with temp-password modal and duplicate detection; forced password change on first
-login; password reset both paths; lessons daily grid with clash detection; group
-lessons; agenda PDF; teacher dashboard incl. per-student group attendance,
-notes and skill grading; student dashboard; notification email scenarios 6 and 7.
+**Working end to end:** super user, admin and studio management; teacher and
+student CRUD with temp-password modal and duplicate detection; forced password
+change on first login; password reset via both the login page and the admin
+button; lessons daily grid with clash detection and date picker; group lessons;
+agenda PDF; teacher dashboard including per-student group attendance, notes and
+skill grading; teacher detail page; student dashboard; **all seven notification
+scenarios**, including bulk sends, the studio summary email, and the automatic
+cancellation notice with wording that varies by scope.
 
-**Untested:** notification scenarios 1–5 (admin bulk sends, cancellation notice);
-CSV import through the portal UI.
+**Untested:** CSV import through the portal UI (bulk import is done via
+`zoho-migration.sql` instead).
+
+**Phase 4a (tasks) complete:** quick capture, contact log with attempt
+counting, studio-scoped dashboard, cross-studio handover with the history
+travelling intact, teacher read-only view.
+
+**Next up:** Phase 4b (enquiries, Prospective/Lapsed statuses); attendance
+report page; RLS on views before go-live.
+
+**Small gaps worth knowing:** the Admins page only lists accounts that have an
+`admins` row, so a profile with `role='admin'` and no row is invisible and
+unmanageable there. Password reset links always point at production, because
+the redirect is hardcoded in `create-user.js` — they still work from local
+development, they just land on the production page.

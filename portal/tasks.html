@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Tasks — Pathfinder Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/portal.css">
+  <style>
+    /* Quick capture — the sticky-note replacement. One box, type, Enter. */
+    .quick-add {
+      display: flex; gap: 0.5rem; align-items: center;
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 0.6rem 0.75rem;
+      box-shadow: var(--shadow); margin-bottom: 1.25rem;
+    }
+    .quick-add input {
+      flex: 1; border: none; outline: none; background: transparent;
+      font-family: 'Inter', sans-serif; font-size: 0.95rem; color: var(--charcoal);
+      padding: 0.3rem 0.15rem;
+    }
+    .quick-add input::placeholder { color: var(--mid-grey); }
+    .quick-add-hint { font-size: 0.72rem; color: var(--mid-grey); white-space: nowrap; }
+
+    /* Bucket cards double as filters */
+    .buckets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.85rem; margin-bottom: 1.25rem; }
+    @media (max-width: 900px) { .buckets { grid-template-columns: repeat(2, 1fr); } }
+    .bucket {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 0.9rem 1rem; cursor: pointer;
+      transition: all 0.15s; box-shadow: var(--shadow); text-align: left;
+      font-family: 'Inter', sans-serif;
+    }
+    .bucket:hover { border-color: var(--orange); }
+    .bucket.active { border-color: var(--orange); background: rgba(232,73,30,0.04); }
+    .bucket-label {
+      font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--mid-grey); margin-bottom: 0.2rem;
+    }
+    .bucket-value { font-size: 1.7rem; font-weight: 800; line-height: 1; color: var(--charcoal); }
+    .bucket-value.urgent { color: #dc2626; }
+
+    /* Task rows */
+    .task-row {
+      display: grid; grid-template-columns: 26px 1fr auto;
+      gap: 0.75rem; align-items: start;
+      padding: 0.7rem 1rem; border-bottom: 1px solid var(--border);
+      cursor: pointer; transition: background 0.12s;
+    }
+    .task-row:last-child { border-bottom: none; }
+    .task-row:hover { background: var(--off-white); }
+    .task-row.done .task-title { text-decoration: line-through; color: var(--mid-grey); }
+
+    .task-check {
+      width: 17px; height: 17px; border-radius: 4px; margin-top: 2px;
+      border: 1.5px solid var(--light-grey); background: var(--white);
+      cursor: pointer; flex-shrink: 0; padding: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; color: transparent; transition: all 0.12s;
+    }
+    .task-check:hover { border-color: var(--orange); }
+    .task-check.checked { background: var(--present); border-color: var(--present); color: var(--white); }
+
+    .task-title { font-size: 0.9rem; font-weight: 500; color: var(--charcoal); line-height: 1.4; }
+    .task-meta {
+      font-size: 0.75rem; color: var(--mid-grey); margin-top: 0.2rem;
+      display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;
+    }
+    .task-meta a { color: var(--orange); text-decoration: none; }
+    .task-meta a:hover { text-decoration: underline; }
+    .due-overdue { color: #dc2626; font-weight: 600; }
+    .due-today   { color: var(--orange); font-weight: 600; }
+
+    .tag {
+      font-size: 0.68rem; padding: 0.1rem 0.45rem; border-radius: 3px;
+      background: var(--off-white); border: 1px solid var(--border); color: var(--dark-grey);
+    }
+    .tag-unassigned { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+
+    /* Contact log */
+    .log-entry { padding: 0.65rem 0; border-bottom: 1px solid var(--border); }
+    .log-entry:last-child { border-bottom: none; }
+    .log-head {
+      display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;
+      font-size: 0.72rem; color: var(--mid-grey); margin-bottom: 0.25rem;
+    }
+    .log-text { font-size: 0.86rem; color: var(--charcoal); line-height: 1.55; white-space: pre-wrap; }
+    .outcome-reached      { color: var(--present); font-weight: 600; }
+    .outcome-unreachable  { color: #dc2626; font-weight: 600; }
+    .outcome-left_message { color: #d97706; font-weight: 600; }
+
+    .attempt-banner {
+      background: var(--off-white); border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 0.5rem 0.7rem;
+      font-size: 0.78rem; color: var(--dark-grey); margin-bottom: 0.75rem;
+    }
+    .attempt-banner strong { color: var(--charcoal); }
+  </style>
+</head>
+<body>
+<div class="portal-shell">
+
+  <nav class="topnav">
+    <a href="#" class="topnav-logo"><img src="../Logo_-_long.png" alt="Pathfinder Music Lessons"></a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">–</span>
+        </div>
+      </div>
+      <a href="change-password.html" class="btn-logout" style="text-decoration:none;">🔑 Password</a>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <aside class="sidebar" id="sidebar"><!-- injected --></aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Tasks</div>
+        <div class="page-sub" id="pageSub">Loading…</div>
+      </div>
+    </div>
+
+    <!-- Quick capture (admins only) -->
+    <div class="quick-add hidden" id="quickAdd">
+      <span style="color:var(--orange);font-size:1.1rem;line-height:1;">+</span>
+      <input type="text" id="quickInput" placeholder="What needs doing?"
+             onkeydown="if(event.key==='Enter') quickAddTask()">
+      <span class="quick-add-hint">Press Enter</span>
+    </div>
+
+    <div class="buckets" id="buckets"></div>
+
+    <!-- Filters -->
+    <div class="filters-bar" id="filterBar">
+      <select class="filter-select" id="filterStudio" onchange="render()">
+        <option value="">All studios</option>
+      </select>
+      <select class="filter-select" id="filterAssignee" onchange="render()">
+        <option value="">Anyone</option>
+        <option value="__me">Assigned to me</option>
+        <option value="__none">Unassigned</option>
+      </select>
+      <select class="filter-select" id="filterStatus" onchange="render()">
+        <option value="open">Open</option>
+        <option value="all">All</option>
+        <option value="done">Done</option>
+      </select>
+    </div>
+
+    <div class="card"><div id="taskList">
+      <div class="loading"><div class="spinner"></div> Loading tasks…</div>
+    </div></div>
+  </main>
+</div>
+
+<!-- TASK DETAIL -->
+<div class="modal-overlay hidden" id="taskModal">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-header">
+      <span class="modal-title" id="tmTitle">Task</span>
+      <button class="modal-close" onclick="closeTask()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="tmId">
+
+      <div class="form-group">
+        <label class="form-label">Title</label>
+        <input class="form-input" type="text" id="tmTitleInput">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">About</label>
+          <select class="form-select" id="tmSubject"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Studio</label>
+          <select class="form-select" id="tmStudio"></select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Assigned to</label>
+          <select class="form-select" id="tmAssignee"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Due date</label>
+          <input class="form-input" type="date" id="tmDue">
+        </div>
+      </div>
+
+      <div class="flex gap-1" style="flex-wrap:wrap;margin-bottom:0.5rem;">
+        <button class="btn btn-ghost btn-sm" onclick="snooze(1)">Due tomorrow</button>
+        <button class="btn btn-ghost btn-sm" onclick="snooze(7)">Due next week</button>
+        <button class="btn btn-ghost btn-sm" onclick="snooze(0)">Due today</button>
+      </div>
+
+      <!-- Contact log -->
+      <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:0.75rem;">
+        <div class="form-label" style="margin-bottom:0.6rem;">Contact log</div>
+        <div id="tmAttempts"></div>
+
+        <div style="background:var(--off-white);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.75rem;margin-bottom:0.85rem;">
+          <textarea class="form-textarea" id="tmNoteText" placeholder="What happened? e.g. Called, no answer — will try Thursday"
+                    style="min-height:56px;margin-bottom:0.5rem;"></textarea>
+          <div class="form-row" style="margin-bottom:0.5rem;">
+            <div class="form-group" style="margin-bottom:0;">
+              <select class="form-select" id="tmMethod">
+                <option value="">No contact — just a note</option>
+                <option value="phone">Phone</option>
+                <option value="email">Email</option>
+                <option value="sms">SMS</option>
+                <option value="in_person">In person</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <select class="form-select" id="tmOutcome">
+                <option value="">—</option>
+                <option value="reached">Reached</option>
+                <option value="unreachable">Unreachable</option>
+                <option value="left_message">Left message</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="addNote()">Add to log</button>
+        </div>
+
+        <div id="tmLog"></div>
+      </div>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between;">
+      <button class="btn btn-danger btn-sm" onclick="cancelTask()">Cancel task</button>
+      <div class="flex gap-1">
+        <button class="btn btn-ghost" onclick="closeTask()">Close</button>
+        <button class="btn btn-secondary" id="tmDoneBtn" onclick="toggleDone()">Mark done</button>
+        <button class="btn btn-primary" onclick="saveTask()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toastWrap" class="toast-wrap"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script>
+let me          = null;
+let isTeacher   = false;
+let tasks       = [];
+let studios     = [];
+let admins      = [];
+let studentOpts = [];
+let teacherOpts = [];
+let myStudios   = [];         // studios this admin covers
+let bucket      = 'open';     // overdue | today | unassigned | upcoming | open
+let openTask    = null;
+
+// ============================================================
+// INIT
+// ============================================================
+(async () => {
+  me = await requireAuth(['superuser','admin','teacher']);
+  if (!me) return;
+  renderTopNavUser(me);
+  isTeacher = me.role === 'teacher';
+  renderSidebar();
+  if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
+
+  if (!isTeacher) {
+    document.getElementById('quickAdd').classList.remove('hidden');
+    await loadOptions();
+  } else {
+    document.getElementById('filterBar').classList.add('hidden');
+  }
+  await loadTasks();
+})();
+
+function renderSidebar() {
+  const item = (href, label, path, active) => `
+    <a class="nav-item ${active ? 'active' : ''}" href="${href}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${path}</svg>
+      ${label}
+    </a>`;
+
+  const ICONS = {
+    grid:    '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>',
+    people:  '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>',
+    person:  '<circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/>',
+    cal:     '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+    mail:    '<path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/>',
+    check:   '<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+    task:    '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+    home:    '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    shield:  '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  };
+
+  let html = '';
+  if (isTeacher) {
+    html = `<div class="sidebar-section">Main</div>
+      ${item('dashboard-teacher.html','My Schedule',ICONS.cal)}
+      ${item('my-students.html','My Students',ICONS.people)}
+      ${item('tasks.html','My Tasks',ICONS.task,true)}`;
+  } else {
+    html = `<div class="sidebar-section">Main</div>
+      ${item('dashboard-admin.html','Schedule',ICONS.grid)}
+      ${item('students.html','Students',ICONS.people)}
+      ${item('teachers.html','Teachers',ICONS.person)}
+      ${item('lessons.html','Lessons',ICONS.cal)}
+      ${item('tasks.html','Tasks',ICONS.task,true)}
+      ${item('notifications.html','Notifications',ICONS.mail)}
+      <div class="sidebar-section">Reports</div>
+      ${item('attendance-report.html','Attendance',ICONS.check)}`;
+    if (me.role === 'superuser') {
+      html += `<div class="sidebar-section">Super User</div>
+        ${item('studios.html','Studios',ICONS.home)}
+        ${item('admins.html','Admins',ICONS.shield)}`;
+    }
+  }
+  document.getElementById('sidebar').innerHTML = html;
+}
+
+// ============================================================
+// OPTIONS
+// ============================================================
+async function loadOptions() {
+  const [stRes, adRes, studRes, teachRes] = await Promise.all([
+    db.from('studios').select('id,name').eq('status','active').order('name'),
+    db.from('admins').select('id,user_id'),
+    db.from('students').select('id,user_id,status').in('status',['active','trial']),
+    db.from('teachers').select('id,user_id'),
+  ]);
+
+  studios = stRes.data ?? [];
+
+  // Which studios do I cover? Used to scope quick-added tasks, so a
+  // task doesn't land with no studio and appear on everyone's list.
+  if (me.role === 'superuser') {
+    myStudios = studios.map(s => s.id);
+  } else {
+    const mine = (adRes.data ?? []).find(a => a.user_id === me.id);
+    myStudios = (mine?.studio_ids?.length ? mine.studio_ids : studios.map(s => s.id));
+  }
+
+  const ids = [
+    ...(adRes.data    ?? []).map(a => a.user_id),
+    ...(studRes.data  ?? []).map(s => s.user_id),
+    ...(teachRes.data ?? []).map(t => t.user_id),
+  ].filter(Boolean);
+
+  const { data: profs } = ids.length
+    ? await db.from('profiles').select('id,first_name,last_name,role,status').in('id', ids)
+    : { data: [] };
+  const pMap = {};
+  (profs ?? []).forEach(p => { pMap[p.id] = p; });
+  const nameOf = uid => {
+    const p = pMap[uid];
+    return p ? `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() : '';
+  };
+
+  if (adRes.error) console.warn('[tasks] Could not read admins:', adRes.error.message);
+  if (teachRes.error) console.warn('[tasks] Could not read teachers:', teachRes.error.message);
+  if (!profs?.length && ids.length) {
+    console.warn('[tasks] No profiles returned for', ids.length, 'ids — check RLS on profiles');
+  }
+
+  admins = (adRes.data ?? [])
+    .map(a => ({ id: a.user_id, name: nameOf(a.user_id) || '(name unavailable)' }))
+    .sort((a,b) => a.name.localeCompare(b.name));
+  // The super user administers too, so should be assignable
+  if (!admins.some(a => a.id === me.id)) {
+    admins.unshift({ id: me.id, name: `${me.first_name} ${me.last_name}`.trim() });
+  }
+
+  studentOpts = (studRes.data ?? [])
+    .map(s => ({ id: s.id, name: nameOf(s.user_id) }))
+    .filter(s => s.name).sort((a,b) => a.name.localeCompare(b.name));
+
+  teacherOpts = (teachRes.data ?? [])
+    .map(t => ({
+      id:     t.id,
+      name:   nameOf(t.user_id) || '(name unavailable)',
+      status: pMap[t.user_id]?.status ?? null,
+    }))
+    .filter(t => t.status !== 'inactive')
+    .sort((a,b) => a.name.localeCompare(b.name));
+
+  if ((teachRes.data ?? []).length && !teacherOpts.length) {
+    console.warn('[tasks] Teachers exist but none are selectable — check profile status');
+  }
+
+  const fs = document.getElementById('filterStudio');
+  studios.forEach(s => { fs.innerHTML += `<option value="${s.id}">${s.name}</option>`; });
+
+  const fa = document.getElementById('filterAssignee');
+  admins.forEach(a => { fa.innerHTML += `<option value="${a.id}">${a.name}</option>`; });
+
+  // Modal selects
+  document.getElementById('tmStudio').innerHTML =
+    `<option value="">All studios — shared queue</option>` +
+    studios.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
+  document.getElementById('tmAssignee').innerHTML =
+    `<option value="">Unassigned — studio queue</option>` +
+    admins.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+
+  const optGroup = (label, items, prefix) =>
+    `<optgroup label="${label}">` + (items.length
+      ? items.map(x => `<option value="${prefix}:${x.id}">${x.name}</option>`).join('')
+      : `<option value="" disabled>None available</option>`) + `</optgroup>`;
+
+  document.getElementById('tmSubject').innerHTML =
+    `<option value="">Nothing in particular</option>` +
+    optGroup('Students', studentOpts, 'student') +
+    optGroup('Teachers', teacherOpts, 'teacher');
+}
+
+// ============================================================
+// LOAD
+// ============================================================
+async function loadTasks() {
+  const { data, error } = await db.from('tasks').select('*')
+    .order('due_date', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    document.getElementById('taskList').innerHTML =
+      `<div class="empty-state"><p style="color:#dc2626;">${error.message}</p></div>`;
+    return;
+  }
+  tasks = data ?? [];
+
+  // Resolve subject names for display
+  if (isTeacher) {
+    // A teacher only sees their own; no lookups needed
+    tasks.forEach(t => { t.subjectName = 'You'; });
+  } else {
+    tasks.forEach(t => {
+      if (!t.subject_type) { t.subjectName = null; return; }
+      const pool = t.subject_type === 'student' ? studentOpts : teacherOpts;
+      t.subjectName = pool.find(x => x.id === t.subject_id)?.name ?? '(unknown)';
+    });
+  }
+
+  renderBuckets();
+  render();
+}
+
+// ============================================================
+// BUCKETS
+// ============================================================
+function bucketCounts() {
+  const today = toISODate(new Date());
+  const open  = tasks.filter(t => t.status === 'open');
+  const in7   = new Date(); in7.setDate(in7.getDate() + 7);
+  const wk    = toISODate(in7);
+
+  return {
+    overdue:    open.filter(t => t.due_date && t.due_date < today).length,
+    today:      open.filter(t => t.due_date === today).length,
+    unassigned: open.filter(t => !t.assigned_to).length,
+    upcoming:   open.filter(t => t.due_date && t.due_date > today && t.due_date <= wk).length,
+  };
+}
+
+function renderBuckets() {
+  const c = bucketCounts();
+  const defs = isTeacher
+    ? [['overdue','Overdue',c.overdue,true],
+       ['today','Due today',c.today,false],
+       ['upcoming','Next 7 days',c.upcoming,false],
+       ['open','All open',tasks.filter(t=>t.status==='open').length,false]]
+    : [['overdue','Overdue',c.overdue,true],
+       ['today','Due today',c.today,false],
+       ['unassigned','Unassigned',c.unassigned,false],
+       ['upcoming','Next 7 days',c.upcoming,false]];
+
+  document.getElementById('buckets').innerHTML = defs.map(([key,label,val,urgent]) =>
+    `<button class="bucket ${bucket===key?'active':''}" onclick="setBucket('${key}')">
+      <div class="bucket-label">${label}</div>
+      <div class="bucket-value ${urgent && val>0 ? 'urgent' : ''}">${val}</div>
+    </button>`).join('');
+}
+
+function setBucket(k) {
+  bucket = (bucket === k) ? 'open' : k;
+  renderBuckets();
+  render();
+}
+
+// ============================================================
+// RENDER LIST
+// ============================================================
+function render() {
+  const today  = toISODate(new Date());
+  const in7    = new Date(); in7.setDate(in7.getDate() + 7);
+  const wk     = toISODate(in7);
+
+  const fStudio   = document.getElementById('filterStudio')?.value   ?? '';
+  const fAssignee = document.getElementById('filterAssignee')?.value ?? '';
+  const fStatus   = document.getElementById('filterStatus')?.value   ?? 'open';
+
+  let list = tasks.slice();
+
+  // Bucket
+  if (bucket === 'overdue')    list = list.filter(t => t.status==='open' && t.due_date && t.due_date < today);
+  else if (bucket === 'today') list = list.filter(t => t.status==='open' && t.due_date === today);
+  else if (bucket === 'unassigned') list = list.filter(t => t.status==='open' && !t.assigned_to);
+  else if (bucket === 'upcoming')   list = list.filter(t => t.status==='open' && t.due_date > today && t.due_date <= wk);
+  else if (bucket === 'open')  list = list.filter(t => t.status === 'open');
+
+  // Filters
+  if (fStatus === 'open') list = list.filter(t => t.status === 'open');
+  else if (fStatus === 'done') list = list.filter(t => t.status !== 'open');
+  if (fStudio)   list = list.filter(t => t.studio_id === fStudio);
+  if (fAssignee === '__me')        list = list.filter(t => t.assigned_to === me.id);
+  else if (fAssignee === '__none') list = list.filter(t => !t.assigned_to);
+  else if (fAssignee)              list = list.filter(t => t.assigned_to === fAssignee);
+
+  document.getElementById('pageSub').textContent =
+    `${tasks.filter(t=>t.status==='open').length} open · ${list.length} shown`;
+
+  const el = document.getElementById('taskList');
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon">✓</div>
+      <h3>Nothing here</h3>
+      <p>${isTeacher ? 'No tasks for you right now.' : 'Nothing matches this view.'}</p>
+    </div>`;
+    return;
+  }
+
+  const studioName = id => studios.find(s => s.id === id)?.name;
+  const adminName  = id => admins.find(a => a.id === id)?.name;
+
+  el.innerHTML = list.map(t => {
+    const done = t.status !== 'open';
+    let dueCls = '', dueTxt = '';
+    if (t.due_date) {
+      dueTxt = formatShortDate(parseLocalDate(t.due_date));
+      if (!done && t.due_date < today)      { dueCls = 'due-overdue'; dueTxt = `Overdue · ${dueTxt}`; }
+      else if (!done && t.due_date === today) { dueCls = 'due-today'; dueTxt = 'Due today'; }
+    }
+
+    const bits = [];
+    if (t.subjectName) bits.push(`<span>${t.subjectName}</span>`);
+    if (studioName(t.studio_id)) {
+      bits.push(`<span class="tag">${studioName(t.studio_id)}</span>`);
+    } else if (!t.assigned_to) {
+      bits.push(`<span class="tag">All studios</span>`);
+    }
+    if (!isTeacher) {
+      bits.push(t.assigned_to
+        ? `<span class="tag">${adminName(t.assigned_to) ?? 'Assigned'}</span>`
+        : `<span class="tag tag-unassigned">Unassigned</span>`);
+    }
+    if (dueTxt) bits.push(`<span class="${dueCls}">${dueTxt}</span>`);
+    if (t.status === 'cancelled') bits.push(`<span class="tag">Cancelled</span>`);
+
+    return `<div class="task-row ${done ? 'done' : ''}" onclick="openTaskModal('${t.id}')">
+      <button class="task-check ${done ? 'checked' : ''}"
+              onclick="event.stopPropagation();quickToggle('${t.id}')"
+              title="${done ? 'Reopen' : 'Mark done'}">✓</button>
+      <div>
+        <div class="task-title">${escapeHtml(t.title)}</div>
+        <div class="task-meta">${bits.join('')}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ============================================================
+// QUICK ADD — title only, everything else optional
+// ============================================================
+async function quickAddTask() {
+  const input = document.getElementById('quickInput');
+  const title = input.value.trim();
+  if (!title) return;
+
+  input.value = '';
+
+  // Prefer the studio filter if one is set; otherwise fall back to my
+  // own studio when I cover exactly one. Leaving it null would make the
+  // task visible to every admin, which is only right for genuinely
+  // organisation-wide work.
+  const studioId = document.getElementById('filterStudio').value
+    || (myStudios.length === 1 ? myStudios[0] : null);
+
+  const { error } = await db.from('tasks').insert({
+    title, studio_id: studioId, created_by: me.id, assigned_to: me.id,
+  });
+
+  if (error) { showToast('Could not add: ' + error.message, 'error'); input.value = title; return; }
+  showToast('Task added.', 'success');
+  await loadTasks();
+}
+
+// ============================================================
+// TASK MODAL
+// ============================================================
+async function openTaskModal(id) {
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+  openTask = t;
+
+  // Clear the draft note. Without this the textarea keeps whatever was
+  // typed against the previously opened task, which risks filing a note
+  // against the wrong student.
+  document.getElementById('tmNoteText').value = '';
+  document.getElementById('tmMethod').value   = '';
+  document.getElementById('tmOutcome').value  = '';
+
+  document.getElementById('tmId').value         = t.id;
+  document.getElementById('tmTitle').textContent = t.status === 'open' ? 'Task' : 'Task (closed)';
+  document.getElementById('tmTitleInput').value  = t.title ?? '';
+  document.getElementById('tmDue').value         = t.due_date ?? '';
+
+  if (!isTeacher) {
+    document.getElementById('tmSubject').value  = t.subject_type ? `${t.subject_type}:${t.subject_id}` : '';
+    document.getElementById('tmStudio').value   = t.studio_id   ?? '';
+    document.getElementById('tmAssignee').value = t.assigned_to ?? '';
+  }
+
+  // Teachers get a read-only view
+  ['tmTitleInput','tmSubject','tmStudio','tmAssignee','tmDue','tmNoteText','tmMethod','tmOutcome']
+    .forEach(x => { const el = document.getElementById(x); if (el) el.disabled = isTeacher; });
+  document.querySelectorAll('#taskModal .modal-footer button, #taskModal .btn-secondary')
+    .forEach(b => {
+      if (b.textContent.trim() === 'Close') return;
+      b.style.display = isTeacher ? 'none' : '';
+    });
+
+  document.getElementById('tmDoneBtn').textContent = t.status === 'open' ? 'Mark done' : 'Reopen';
+  document.getElementById('taskModal').classList.remove('hidden');
+  await loadLog(t.id);
+}
+
+function closeTask() {
+  const draft = document.getElementById('tmNoteText').value.trim();
+  if (draft && !confirm('You have an unsaved note. Close and discard it?')) return;
+  document.getElementById('taskModal').classList.add('hidden');
+  document.getElementById('tmNoteText').value = '';
+  document.getElementById('tmMethod').value   = '';
+  document.getElementById('tmOutcome').value  = '';
+  openTask = null;
+}
+
+async function loadLog(taskId) {
+  const { data } = await db.from('task_notes').select('*')
+    .eq('task_id', taskId).order('logged_at', { ascending: false });
+
+  const notes = data ?? [];
+  const attempts = notes.filter(n => n.contact_method);
+
+  // Attempt count is shown, never enforced
+  const banner = document.getElementById('tmAttempts');
+  if (attempts.length) {
+    const first = attempts[attempts.length - 1];
+    banner.innerHTML = `<div class="attempt-banner">
+      <strong>${attempts.length}</strong> contact attempt${attempts.length !== 1 ? 's' : ''}
+      since ${formatShortDate(new Date(first.logged_at))}
+      ${attempts.length >= 5 ? ' · guidance is a maximum of 5 over 2 weeks' : ''}
+    </div>`;
+  } else {
+    banner.innerHTML = '';
+  }
+
+  const METHOD  = { phone:'Phone', email:'Email', sms:'SMS', in_person:'In person' };
+  const OUTCOME = { reached:'Reached', unreachable:'Unreachable', left_message:'Left message' };
+
+  document.getElementById('tmLog').innerHTML = notes.length
+    ? notes.map(n => `<div class="log-entry">
+        <div class="log-head">
+          <span>${formatShortDate(new Date(n.logged_at))}, ${formatTime(new Date(n.logged_at).toTimeString().slice(0,8))}</span>
+          ${n.contact_method ? `<span class="tag">${METHOD[n.contact_method]}</span>` : ''}
+          ${n.outcome ? `<span class="outcome-${n.outcome}">${OUTCOME[n.outcome]}</span>` : ''}
+        </div>
+        <div class="log-text">${escapeHtml(n.note_text)}</div>
+      </div>`).join('')
+    : `<div class="text-sm text-muted">Nothing logged yet.</div>`;
+}
+
+async function addNote() {
+  const taskId = document.getElementById('tmId').value;
+  const text   = document.getElementById('tmNoteText').value.trim();
+  if (!text) { showToast('Write something first.', 'warning'); return; }
+
+  const { error } = await db.from('task_notes').insert({
+    task_id: taskId,
+    note_text: text,
+    contact_method: document.getElementById('tmMethod').value || null,
+    outcome:        document.getElementById('tmOutcome').value || null,
+    logged_by: me.id,
+  });
+
+  if (error) { showToast('Could not save: ' + error.message, 'error'); return; }
+
+  document.getElementById('tmNoteText').value = '';
+  document.getElementById('tmMethod').value   = '';
+  document.getElementById('tmOutcome').value  = '';
+  await loadLog(taskId);
+  showToast('Added to log.', 'success');
+}
+
+function snooze(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  document.getElementById('tmDue').value = toISODate(d);
+}
+
+async function saveTask() {
+  const id  = document.getElementById('tmId').value;
+  const raw = document.getElementById('tmSubject').value;
+  const [sType, sId] = raw ? raw.split(':') : [null, null];
+  const title = document.getElementById('tmTitleInput').value.trim();
+  if (!title) { showToast('A task needs a title.', 'error'); return; }
+
+  const prevAssignee = openTask?.assigned_to ?? null;
+  const prevStudio   = openTask?.studio_id   ?? null;
+  const newAssignee  = document.getElementById('tmAssignee').value || null;
+  const newStudio    = document.getElementById('tmStudio').value   || null;
+
+  const movedStudio = newStudio !== prevStudio;
+  const movedOwner  = newAssignee !== prevAssignee;
+
+  // Fields that are always the caller's to change
+  const { error } = await db.from('tasks').update({
+    title,
+    subject_type: sType, subject_id: sId,
+    due_date:     document.getElementById('tmDue').value || null,
+  }).eq('id', id);
+
+  if (error) {
+    console.error('[tasks] task update failed:', error);
+    showToast('Could not save the task: ' + error.message, 'error');
+    return;
+  }
+
+  // Ownership changes go through hand_over_task(), which records the
+  // trail and performs the move in one controlled step. A direct update
+  // of studio_id is refused by RLS even when the policy appears to
+  // permit it, so this is the supported path.
+  if (movedStudio || movedOwner) {
+    const { error: hErr } = await db.rpc('hand_over_task', {
+      p_task_id:   id,
+      p_to_studio: newStudio,
+      p_to_user:   newAssignee,
+      p_note:      null,
+    });
+    if (hErr) {
+      console.error('[tasks] handover failed:', hErr);
+      showToast('Saved, but the handover failed: ' + hErr.message, 'error');
+      await loadTasks();
+      return;
+    }
+  }
+
+  closeTask();
+  await loadTasks();
+
+  // A task handed to a studio this admin doesn't cover leaves their
+  // list. Say so, rather than letting it silently vanish.
+  const stillVisible = tasks.some(t => t.id === id);
+  if (!stillVisible && movedStudio) {
+    const to = studios.find(s => s.id === newStudio)?.name ?? 'another studio';
+    showToast(`Handed over to ${to}. It's now in their queue and no longer on your list.`, 'warning');
+  } else {
+    showToast('Saved.', 'success');
+  }
+}
+
+async function toggleDone() {
+  const id = document.getElementById('tmId').value;
+  await setStatus(id, openTask?.status === 'open' ? 'done' : 'open');
+  closeTask();
+}
+
+async function quickToggle(id) {
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+  await setStatus(id, t.status === 'open' ? 'done' : 'open');
+}
+
+async function setStatus(id, status) {
+  const patch = { status };
+  if (status === 'done') { patch.completed_at = new Date().toISOString(); patch.completed_by = me.id; }
+  else                   { patch.completed_at = null; patch.completed_by = null; }
+
+  const { error } = await db.from('tasks').update(patch).eq('id', id);
+  if (error) { showToast('Could not update: ' + error.message, 'error'); return; }
+  showToast(status === 'done' ? 'Done.' : 'Reopened.', 'success');
+  await loadTasks();
+}
+
+async function cancelTask() {
+  const id = document.getElementById('tmId').value;
+  if (!confirm('Cancel this task? It stays on the record but drops off the open list.')) return;
+  await setStatus(id, 'cancelled');
+  closeTask();
+}
+
+document.getElementById('taskModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeTask();
+});
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+</script>
+</body>
+</html>
