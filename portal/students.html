@@ -61,7 +61,7 @@
       vertical-align: middle;
     }
     .students-table tr:last-child td { border-bottom: none; }
-    .students-table tr:hover td { background: var(--off-white); cursor: pointer; }
+    .students-table tr:hover td { background: var(--off-white); }
     .student-name { font-weight: 600; color: var(--charcoal); }
     .student-email { font-size: 0.78rem; color: var(--mid-grey); }
     .instrument-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; }
@@ -498,7 +498,7 @@ function renderStudents(students) {
       `${t.teachers?.profiles?.first_name ?? ''} ${t.teachers?.profiles?.last_name ?? ''}`.trim()
     ))].filter(Boolean);
 
-    return `<tr onclick="showToast('Student detail page coming soon.', 'warning')" style="cursor:pointer;">
+    return `<tr>
       <td>
         <div class="student-name">${p.first_name ?? ''} ${p.last_name ?? ''}</div>
         <div class="student-email">${p.email ?? ''}</div>

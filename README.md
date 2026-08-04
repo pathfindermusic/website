@@ -188,6 +188,11 @@ reached only the handful of students created through the portal — the count
 looked plausible, so it was easy to miss. `zoho-migration.sql` now populates it,
 and the Notifications page warns about anyone with no address.
 
+**Adding a column? Run `NOTIFY pgrst, 'reload schema';` afterwards.** Supabase
+caches the schema, so until PostgREST refreshes, every write including the new
+column fails with *"Could not find the 'x' column of 'y' in the schema cache"* —
+which reads like a code bug and isn't.
+
 **Instrument labels are compared as exact strings.** Skill grading, lesson
 instrument filtering and teacher-instrument validation all match on the literal
 value, so a mismatch fails silently rather than erroring. Zoho and the website
@@ -329,6 +334,39 @@ ROLLBACK;
 handover record and performs the move in one transaction. Two separate
 writes produced phantom trail entries for handovers that never completed.
 
+### Everything else about tasks
+
+**Who can write what.** Admins have normal access, scoped by studio. Teachers
+have **no** write access to `tasks` or `task_notes` at all — they reply through
+`teacher_reply_to_task()`, which is `SECURITY DEFINER` and checks that the task
+is genuinely about them. Same pattern as `hand_over_task()`: the checks inside
+the function *are* the security boundary.
+
+**Visibility.** `can_see_task(studio, assignee)` holds the rule in one place. An
+admin sees a task when it belongs to one of their studios, **or** it is assigned
+to them wherever it sits, **or** it has neither studio nor assignee — the shared
+queue. Claiming a shared task therefore removes it from everyone else's list,
+which is intended.
+
+**Kinds.** `task` and `waitlist`. Waitlist entries are open-ended and have no due
+date, so they are excluded from Overdue, Due Today, Next 7 Days, Unassigned and
+All Open, and have a bucket of their own. Without that they would silently
+accumulate in the main list.
+
+**Tasks follow a student between studios.** A trigger on `students` moves open
+tasks when `studio_id` changes, leaves them **unassigned** so they land in the
+receiving studio's queue rather than being pushed at one named admin, and writes
+a handover record explaining why. Closed tasks stay put — they are history.
+
+**The log is one timeline.** Notes and handovers are merged and sorted together.
+Handover records were written from the start but had nothing displaying them for
+several days, so a task could change hands with nothing in the thread explaining
+it.
+
+**Buckets and the status filter used to fight.** The bucket filter ran first and
+forced open-only, so choosing Done returned nothing. They now cooperate: picking
+a date bucket resets the status filter, and vice versa.
+
 ## Traps that have already cost time
 
 - **Check which environment you're looking at.** Local dev runs against the same
@@ -391,6 +429,11 @@ Run in order. All are re-runnable.
 12. `phase4a-admin-read-policy.sql` — admins can see each other
 13. `phase4a-handover-function.sql` — `hand_over_task()`
 14. `phase4a-task-visibility.sql` — assignment overrides missing studio
+15. `phase4a-waitlist-and-transfer.sql` — `tasks.kind`, tasks follow a student
+    who changes studio
+16. `phase4a-outcome-values.sql` — contact-log outcomes matched to method
+17. `phase4a-teacher-replies.sql` — `tasks.awaiting_admin`,
+    `teacher_reply_to_task()`
 
 ---
 
@@ -408,12 +451,23 @@ cancellation notice with wording that varies by scope.
 **Untested:** CSV import through the portal UI (bulk import is done via
 `zoho-migration.sql` instead).
 
-**Phase 4a (tasks) complete:** quick capture, contact log with attempt
-counting, studio-scoped dashboard, cross-studio handover with the history
-travelling intact, teacher read-only view.
+**Phase 4a (tasks) complete and tested by both studios.** Quick capture,
+contact log with attempt counting and method-specific outcomes, studio-scoped
+dashboard, cross-studio handover with the history intact, waitlist entries,
+tasks following a student between studios, and a teacher reply loop.
+
+Admins and teachers began using the reply loop as a back-and-forth chat within
+hours, which nobody designed for. Two things will chafe if that continues:
+nobody knows a reply has arrived until they next log in, and long threads read
+newest-first. Worth watching before acting.
 
 **Next up:** Phase 4b (enquiries, Prospective/Lapsed statuses); attendance
 report page; RLS on views before go-live.
+
+**Teacher landing page.** The teacher dashboard shows an open-task count —
+red when non-zero — and a strip listing outstanding tasks above the schedule.
+The strip is hidden entirely when there is nothing outstanding, so the schedule
+stays the main thing on a normal day.
 
 **Small gaps worth knowing:** the Admins page only lists accounts that have an
 `admins` row, so a profile with `role='admin'` and no row is invisible and

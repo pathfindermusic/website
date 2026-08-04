@@ -24,8 +24,10 @@
     .quick-add-hint { font-size: 0.72rem; color: var(--mid-grey); white-space: nowrap; }
 
     /* Bucket cards double as filters */
-    .buckets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.85rem; margin-bottom: 1.25rem; }
-    @media (max-width: 900px) { .buckets { grid-template-columns: repeat(2, 1fr); } }
+    .buckets {
+      display: grid; gap: 0.85rem; margin-bottom: 1.25rem;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    }
     .bucket {
       background: var(--white); border: 1px solid var(--border);
       border-radius: var(--r); padding: 0.9rem 1rem; cursor: pointer;
@@ -50,7 +52,10 @@
     }
     .task-row:last-child { border-bottom: none; }
     .task-row:hover { background: var(--off-white); }
-    .task-row.done .task-title { text-decoration: line-through; color: var(--mid-grey); }
+    /* Done: completed, so muted but still legible */
+    .task-row.done .task-title { color: var(--mid-grey); }
+    /* Cancelled: never happened, so struck through */
+    .task-row.cancelled .task-title { text-decoration: line-through; color: var(--light-grey); }
 
     .task-check {
       width: 17px; height: 17px; border-radius: 4px; margin-top: 2px;
@@ -61,6 +66,10 @@
     }
     .task-check:hover { border-color: var(--orange); }
     .task-check.checked { background: var(--present); border-color: var(--present); color: var(--white); }
+    .task-check.cancelled {
+      background: var(--white); border-color: #dc2626; color: #dc2626;
+      font-weight: 700;
+    }
 
     .task-title { font-size: 0.9rem; font-weight: 500; color: var(--charcoal); line-height: 1.4; }
     .task-meta {
@@ -77,6 +86,10 @@
       background: var(--off-white); border: 1px solid var(--border); color: var(--dark-grey);
     }
     .tag-unassigned { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+    .tag-wait { background: rgba(37,99,235,0.08); border-color: rgba(37,99,235,0.25); color: #1e40af; }
+    .tag-replied { background: rgba(232,73,30,0.1); border-color: rgba(232,73,30,0.3); color: var(--orange); font-weight: 600; }
+    .tag-move { background: var(--charcoal); border-color: var(--charcoal); color: var(--white); }
+    .log-move .log-text { color: var(--mid-grey); font-size: 0.82rem; }
 
     /* Contact log */
     .log-entry { padding: 0.65rem 0; border-bottom: 1px solid var(--border); }
@@ -86,7 +99,10 @@
       font-size: 0.72rem; color: var(--mid-grey); margin-bottom: 0.25rem;
     }
     .log-text { font-size: 0.86rem; color: var(--charcoal); line-height: 1.55; white-space: pre-wrap; }
+    .outcome-spoke        { color: var(--present); font-weight: 600; }
+    .outcome-replied      { color: var(--present); font-weight: 600; }
     .outcome-reached      { color: var(--present); font-weight: 600; }
+    .outcome-sent         { color: var(--dark-grey); font-weight: 600; }
     .outcome-unreachable  { color: #dc2626; font-weight: 600; }
     .outcome-left_message { color: #d97706; font-weight: 600; }
 
@@ -147,10 +163,10 @@
         <option value="__me">Assigned to me</option>
         <option value="__none">Unassigned</option>
       </select>
-      <select class="filter-select" id="filterStatus" onchange="render()">
+      <select class="filter-select" id="filterStatus" onchange="onStatusFilterChange()">
         <option value="open">Open</option>
-        <option value="all">All</option>
-        <option value="done">Done</option>
+        <option value="done">Done &amp; cancelled</option>
+        <option value="all">Everything</option>
       </select>
     </div>
 
@@ -177,13 +193,24 @@
 
       <div class="form-row">
         <div class="form-group">
+          <label class="form-label">Kind</label>
+          <select class="form-select" id="tmKind" onchange="onKindChange()">
+            <option value="task">Task — something to do</option>
+            <option value="waitlist">Waiting list — student wants a slot</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label class="form-label">About</label>
           <select class="form-select" id="tmSubject"></select>
         </div>
+      </div>
+
+      <div class="form-row">
         <div class="form-group">
           <label class="form-label">Studio</label>
           <select class="form-select" id="tmStudio"></select>
         </div>
+        <div class="form-group"></div>
       </div>
 
       <div class="form-row">
@@ -209,28 +236,44 @@
         <div id="tmAttempts"></div>
 
         <div style="background:var(--off-white);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.75rem;margin-bottom:0.85rem;">
-          <textarea class="form-textarea" id="tmNoteText" placeholder="What happened? e.g. Called, no answer — will try Thursday"
-                    style="min-height:56px;margin-bottom:0.5rem;"></textarea>
-          <div class="form-row" style="margin-bottom:0.5rem;">
+          <div class="form-row" style="margin-bottom:0.6rem;">
             <div class="form-group" style="margin-bottom:0;">
-              <select class="form-select" id="tmMethod">
-                <option value="">No contact — just a note</option>
-                <option value="phone">Phone</option>
-                <option value="email">Email</option>
+              <label class="form-label">How did you contact them?</label>
+              <select class="form-select" id="tmMethod" onchange="onMethodChange()">
+                <option value="">Didn't — just recording a note</option>
+                <option value="phone">Phone call</option>
                 <option value="sms">SMS</option>
+                <option value="email">Email</option>
                 <option value="in_person">In person</option>
               </select>
             </div>
             <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">What happened?</label>
               <select class="form-select" id="tmOutcome">
                 <option value="">—</option>
-                <option value="reached">Reached</option>
-                <option value="unreachable">Unreachable</option>
-                <option value="left_message">Left message</option>
               </select>
             </div>
           </div>
+          <div class="form-group" style="margin-bottom:0.5rem;">
+            <label class="form-label">Notes</label>
+            <textarea class="form-textarea" id="tmNoteText"
+                      placeholder="What did they say? Anything worth remembering next time?"
+                      style="min-height:64px;"></textarea>
+          </div>
           <button class="btn btn-secondary btn-sm" onclick="addNote()">Add to log</button>
+        </div>
+
+        <!-- Teachers can reply but not close. The admin keeps ownership. -->
+        <div class="hidden" id="tmReplyBox"
+             style="background:var(--off-white);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.75rem;margin-bottom:0.85rem;">
+          <label class="form-label">Reply to the studio</label>
+          <textarea class="form-textarea" id="tmReplyText"
+                    placeholder="e.g. Done on 5 August — sheets handed over. Or: not sure what's needed here, could you clarify?"
+                    style="min-height:64px;margin-bottom:0.5rem;"></textarea>
+          <button class="btn btn-primary btn-sm" onclick="sendReply()">Send reply</button>
+          <div class="form-hint" style="margin-top:0.4rem;">
+            The studio is notified and decides whether this closes the task.
+          </div>
         </div>
 
         <div id="tmLog"></div>
@@ -439,7 +482,7 @@ async function loadTasks() {
   // Resolve subject names for display
   if (isTeacher) {
     // A teacher only sees their own; no lookups needed
-    tasks.forEach(t => { t.subjectName = 'You'; });
+      tasks.forEach(t => { t.subjectName = 'You'; });
   } else {
     tasks.forEach(t => {
       if (!t.subject_type) { t.subjectName = null; return; }
@@ -457,29 +500,38 @@ async function loadTasks() {
 // ============================================================
 function bucketCounts() {
   const today = toISODate(new Date());
-  const open  = tasks.filter(t => t.status === 'open');
   const in7   = new Date(); in7.setDate(in7.getDate() + 7);
   const wk    = toISODate(in7);
+
+  // Waitlist entries are open-ended and have no due date. Counting
+  // them alongside day-to-day work would just inflate the numbers.
+  const open = tasks.filter(t => t.status === 'open' && t.kind !== 'waitlist');
+  const wait = tasks.filter(t => t.status === 'open' && t.kind === 'waitlist');
 
   return {
     overdue:    open.filter(t => t.due_date && t.due_date < today).length,
     today:      open.filter(t => t.due_date === today).length,
     unassigned: open.filter(t => !t.assigned_to).length,
     upcoming:   open.filter(t => t.due_date && t.due_date > today && t.due_date <= wk).length,
+    waiting:    wait.length,
+    replied:    tasks.filter(t => t.status === 'open' && t.awaiting_admin).length,
   };
 }
 
 function renderBuckets() {
   const c = bucketCounts();
+  const openCount = tasks.filter(t => t.status === 'open' && t.kind !== 'waitlist').length;
   const defs = isTeacher
     ? [['overdue','Overdue',c.overdue,true],
        ['today','Due today',c.today,false],
        ['upcoming','Next 7 days',c.upcoming,false],
-       ['open','All open',tasks.filter(t=>t.status==='open').length,false]]
+       ['open','All open',openCount,false]]
     : [['overdue','Overdue',c.overdue,true],
        ['today','Due today',c.today,false],
        ['unassigned','Unassigned',c.unassigned,false],
-       ['upcoming','Next 7 days',c.upcoming,false]];
+       ['upcoming','Next 7 days',c.upcoming,false],
+       ['replied','Teacher replied',c.replied,c.replied > 0],
+       ['waiting','Waiting list',c.waiting,false]];
 
   document.getElementById('buckets').innerHTML = defs.map(([key,label,val,urgent]) =>
     `<button class="bucket ${bucket===key?'active':''}" onclick="setBucket('${key}')">
@@ -488,8 +540,24 @@ function renderBuckets() {
     </button>`).join('');
 }
 
+function onStatusFilterChange() {
+  // The date buckets only contain open tasks. Leaving one selected while
+  // asking for Done would return nothing and look broken.
+  if (document.getElementById('filterStatus').value !== 'open' && bucket !== 'open') {
+    bucket = 'open';
+    renderBuckets();
+  }
+  render();
+}
+
 function setBucket(k) {
   bucket = (bucket === k) ? 'open' : k;
+  // These buckets are open-work views; reset the status filter to match
+  // rather than showing an empty list.
+  if (bucket !== 'open') {
+    const sel = document.getElementById('filterStatus');
+    if (sel && sel.value !== 'open') sel.value = 'open';
+  }
   renderBuckets();
   render();
 }
@@ -508,12 +576,22 @@ function render() {
 
   let list = tasks.slice();
 
-  // Bucket
-  if (bucket === 'overdue')    list = list.filter(t => t.status==='open' && t.due_date && t.due_date < today);
-  else if (bucket === 'today') list = list.filter(t => t.status==='open' && t.due_date === today);
-  else if (bucket === 'unassigned') list = list.filter(t => t.status==='open' && !t.assigned_to);
-  else if (bucket === 'upcoming')   list = list.filter(t => t.status==='open' && t.due_date > today && t.due_date <= wk);
-  else if (bucket === 'open')  list = list.filter(t => t.status === 'open');
+
+  // Bucket. Every view except "Waiting list" excludes waitlist
+  // entries, so open-ended items don't clutter the day's work.
+  const notWait = t => t.kind !== 'waitlist';
+  if (bucket === 'overdue')    list = list.filter(t => t.status==='open' && notWait(t) && t.due_date && t.due_date < today);
+  else if (bucket === 'today') list = list.filter(t => t.status==='open' && notWait(t) && t.due_date === today);
+  else if (bucket === 'unassigned') list = list.filter(t => t.status==='open' && notWait(t) && !t.assigned_to);
+  else if (bucket === 'upcoming')   list = list.filter(t => t.status==='open' && notWait(t) && t.due_date > today && t.due_date <= wk);
+  else if (bucket === 'waiting')    list = list.filter(t => t.status==='open' && t.kind === 'waitlist');
+  else if (bucket === 'replied')    list = list.filter(t => t.status==='open' && t.awaiting_admin);
+  else if (bucket === 'open') {
+    // No bucket constraint — the status dropdown decides. Waitlist
+    // entries are hidden only while looking at open work; a closed one
+    // ("slot found") belongs in the Done view like anything else.
+    if (fStatus === 'open') list = list.filter(notWait);
+  }
 
   // Filters
   if (fStatus === 'open') list = list.filter(t => t.status === 'open');
@@ -540,7 +618,9 @@ function render() {
   const adminName  = id => admins.find(a => a.id === id)?.name;
 
   el.innerHTML = list.map(t => {
-    const done = t.status !== 'open';
+    const isDone      = t.status === 'done';
+    const isCancelled = t.status === 'cancelled';
+    const done        = t.status !== 'open';   // closed, either way
     let dueCls = '', dueTxt = '';
     if (t.due_date) {
       dueTxt = formatShortDate(parseLocalDate(t.due_date));
@@ -561,12 +641,20 @@ function render() {
         : `<span class="tag tag-unassigned">Unassigned</span>`);
     }
     if (dueTxt) bits.push(`<span class="${dueCls}">${dueTxt}</span>`);
-    if (t.status === 'cancelled') bits.push(`<span class="tag">Cancelled</span>`);
+    if (t.kind === 'waitlist') bits.push(`<span class="tag tag-wait">Waiting</span>`);
+    if (t.awaiting_admin && !isTeacher) bits.push(`<span class="tag tag-replied">Teacher replied</span>`);
 
-    return `<div class="task-row ${done ? 'done' : ''}" onclick="openTaskModal('${t.id}')">
-      <button class="task-check ${done ? 'checked' : ''}"
+    const rowCls   = isCancelled ? 'cancelled' : (isDone ? 'done' : '');
+    const checkCls = isCancelled ? 'cancelled' : (isDone ? 'checked' : '');
+    const mark     = isCancelled ? '✕' : '✓';
+    const tip      = isCancelled ? 'Cancelled — click to reopen'
+                   : isDone      ? 'Done — click to reopen'
+                   :               'Mark done';
+
+    return `<div class="task-row ${rowCls}" onclick="openTaskModal('${t.id}')">
+      <button class="task-check ${checkCls}"
               onclick="event.stopPropagation();quickToggle('${t.id}')"
-              title="${done ? 'Reopen' : 'Mark done'}">✓</button>
+              title="${tip}">${mark}</button>
       <div>
         <div class="task-title">${escapeHtml(t.title)}</div>
         <div class="task-meta">${bits.join('')}</div>
@@ -618,12 +706,14 @@ async function openTaskModal(id) {
   // against the wrong student.
   document.getElementById('tmNoteText').value = '';
   document.getElementById('tmMethod').value   = '';
-  document.getElementById('tmOutcome').value  = '';
+  onMethodChange();
 
   document.getElementById('tmId').value         = t.id;
   document.getElementById('tmTitle').textContent = t.status === 'open' ? 'Task' : 'Task (closed)';
   document.getElementById('tmTitleInput').value  = t.title ?? '';
   document.getElementById('tmDue').value         = t.due_date ?? '';
+  document.getElementById('tmKind').value       = t.kind ?? 'task';
+  onKindChange();
 
   if (!isTeacher) {
     document.getElementById('tmSubject').value  = t.subject_type ? `${t.subject_type}:${t.subject_id}` : '';
@@ -631,9 +721,15 @@ async function openTaskModal(id) {
     document.getElementById('tmAssignee').value = t.assigned_to ?? '';
   }
 
-  // Teachers get a read-only view
-  ['tmTitleInput','tmSubject','tmStudio','tmAssignee','tmDue','tmNoteText','tmMethod','tmOutcome']
+  // Teachers get a read-only view of the details, plus a reply box
+  ['tmTitleInput','tmSubject','tmStudio','tmAssignee','tmDue','tmNoteText','tmMethod','tmOutcome','tmKind']
     .forEach(x => { const el = document.getElementById(x); if (el) el.disabled = isTeacher; });
+
+  document.getElementById('tmReplyBox').classList.toggle('hidden', !isTeacher);
+  document.getElementById('tmReplyText').value = '';
+  // The admin's contact-log form is meaningless to a teacher
+  const logForm = document.querySelector('#taskModal .modal-body > div > div[style*="background:var(--off-white)"]');
+  if (logForm && logForm.id !== 'tmReplyBox') logForm.style.display = isTeacher ? 'none' : '';
   document.querySelectorAll('#taskModal .modal-footer button, #taskModal .btn-secondary')
     .forEach(b => {
       if (b.textContent.trim() === 'Close') return;
@@ -660,6 +756,28 @@ async function loadLog(taskId) {
     .eq('task_id', taskId).order('logged_at', { ascending: false });
 
   const notes = data ?? [];
+
+  // Handovers belong in the same timeline. Without them a task can
+  // change hands, or follow a student to another studio, with nothing
+  // in the thread explaining why.
+  const { data: moves } = await db.from('task_handovers')
+    .select('*').eq('task_id', taskId).order('moved_at', { ascending: false });
+
+  const authorIds = [...new Set([
+    ...notes.map(n => n.logged_by),
+    ...(moves ?? []).flatMap(m => [m.moved_by, m.from_user, m.to_user]),
+  ].filter(Boolean))];
+  const authorName = {};
+  if (authorIds.length) {
+    const { data: ap } = await db.from('profiles')
+      .select('id,first_name,last_name,role').in('id', authorIds);
+    (ap ?? []).forEach(p => {
+      authorName[p.id] = {
+        name: `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim(),
+        role: p.role,
+      };
+    });
+  }
   const attempts = notes.filter(n => n.contact_method);
 
   // Attempt count is shown, never enforced
@@ -676,18 +794,73 @@ async function loadLog(taskId) {
   }
 
   const METHOD  = { phone:'Phone', email:'Email', sms:'SMS', in_person:'In person' };
-  const OUTCOME = { reached:'Reached', unreachable:'Unreachable', left_message:'Left message' };
+  const OUTCOME = {
+    spoke:'Spoke with them', left_message:'Left a message', unreachable:'No answer',
+    sent:'Sent', replied:'They replied',
+    reached:'Reached',            // legacy values, kept so old entries still read correctly
+  };
 
-  document.getElementById('tmLog').innerHTML = notes.length
-    ? notes.map(n => `<div class="log-entry">
-        <div class="log-head">
-          <span>${formatShortDate(new Date(n.logged_at))}, ${formatTime(new Date(n.logged_at).toTimeString().slice(0,8))}</span>
-          ${n.contact_method ? `<span class="tag">${METHOD[n.contact_method]}</span>` : ''}
-          ${n.outcome ? `<span class="outcome-${n.outcome}">${OUTCOME[n.outcome]}</span>` : ''}
-        </div>
-        <div class="log-text">${escapeHtml(n.note_text)}</div>
-      </div>`).join('')
+  const stamp = d =>
+    `${formatShortDate(new Date(d))}, ${formatTime(new Date(d).toTimeString().slice(0,8))}`;
+  const who = id => authorName[id]?.name ?? null;
+
+  const entries = [
+    ...notes.map(n => ({ at: n.logged_at, type: 'note', row: n })),
+    ...(moves ?? []).map(m => ({ at: m.moved_at, type: 'move', row: m })),
+  ].sort((a, b) => new Date(b.at) - new Date(a.at));
+
+  const studioName = id => studios.find(s => s.id === id)?.name;
+
+  const renderMove = m => {
+    // Describe the move in the terms that matter: where it went, and
+    // who now holds it.
+    const bits = [];
+    if (m.to_studio) bits.push(`to <strong>${studioName(m.to_studio) ?? 'another studio'}</strong>`);
+    bits.push(m.to_user ? `assigned to <strong>${who(m.to_user) ?? 'someone'}</strong>` : 'left unassigned');
+    return `<div class="log-entry log-move">
+      <div class="log-head">
+        <span>${stamp(m.moved_at)}</span>
+        <span class="tag tag-move">Handover</span>
+        ${who(m.moved_by) ? `<span class="tag">${who(m.moved_by)}</span>` : ''}
+      </div>
+      <div class="log-text">
+        Moved ${bits.join(', ')}${
+          who(m.from_user) ? ` — previously with ${who(m.from_user)}` : ''
+        }.${m.note ? `<br><em>${escapeHtml(m.note)}</em>` : ''}
+      </div>
+    </div>`;
+  };
+
+  const renderNote = n => `<div class="log-entry">
+      <div class="log-head">
+        <span>${stamp(n.logged_at)}</span>
+        ${who(n.logged_by)
+          ? `<span class="tag ${authorName[n.logged_by].role === 'teacher' ? 'tag-wait' : ''}">${who(n.logged_by)}</span>`
+          : ''}
+        ${n.contact_method ? `<span class="tag">${METHOD[n.contact_method]}</span>` : ''}
+        ${n.outcome ? `<span class="outcome-${n.outcome}">${OUTCOME[n.outcome] ?? n.outcome}</span>` : ''}
+      </div>
+      <div class="log-text">${escapeHtml(n.note_text)}</div>
+    </div>`;
+
+  document.getElementById('tmLog').innerHTML = entries.length
+    ? entries.map(e => e.type === 'move' ? renderMove(e.row) : renderNote(e.row)).join('')
     : `<div class="text-sm text-muted">Nothing logged yet.</div>`;
+}
+
+async function sendReply() {
+  const taskId = document.getElementById('tmId').value;
+  const text   = document.getElementById('tmReplyText').value.trim();
+  if (!text) { showToast('Write a reply first.', 'warning'); return; }
+
+  const { error } = await db.rpc('teacher_reply_to_task', {
+    p_task_id: taskId, p_note: text,
+  });
+  if (error) { showToast('Could not send: ' + error.message, 'error'); return; }
+
+  document.getElementById('tmReplyText').value = '';
+  await loadLog(taskId);
+  showToast('Reply sent to the studio.', 'success');
 }
 
 async function addNote() {
@@ -705,11 +878,49 @@ async function addNote() {
 
   if (error) { showToast('Could not save: ' + error.message, 'error'); return; }
 
+  // The admin has responded, so the task is no longer waiting on them
+  await db.from('tasks').update({ awaiting_admin: false }).eq('id', taskId);
+
   document.getElementById('tmNoteText').value = '';
   document.getElementById('tmMethod').value   = '';
-  document.getElementById('tmOutcome').value  = '';
+  onMethodChange();
   await loadLog(taskId);
+  await loadTasks();
   showToast('Added to log.', 'success');
+}
+
+// The sensible outcomes depend on how you made contact. Offering
+// "left a message" against an email, or "sent" against a phone call,
+// just makes the list harder to read.
+const OUTCOMES_BY_METHOD = {
+  '':          [],
+  phone:       [['spoke','Spoke with them'],
+                ['left_message','Left a message'],
+                ['unreachable','No answer']],
+  sms:         [['sent','Text sent'],
+                ['replied','They replied']],
+  email:       [['sent','Email sent'],
+                ['replied','They replied']],
+  in_person:   [['spoke','Conversation held']],
+};
+
+function onMethodChange() {
+  const method = document.getElementById('tmMethod').value;
+  const sel    = document.getElementById('tmOutcome');
+  const opts   = OUTCOMES_BY_METHOD[method] ?? [];
+  sel.innerHTML = `<option value="">—</option>` +
+    opts.map(([v,l]) => `<option value="${v}">${l}</option>`).join('');
+  sel.disabled = opts.length === 0;
+}
+
+function onKindChange() {
+  const waiting = document.getElementById('tmKind').value === 'waitlist';
+  const due     = document.getElementById('tmDue');
+  // A waiting entry is open-ended. A due date is still allowed — some
+  // admins set one to prompt a review — but it isn't expected.
+  due.placeholder = waiting ? 'Optional — set one to prompt a review' : '';
+  document.getElementById('tmDoneBtn').textContent =
+    openTask?.status === 'open' ? (waiting ? 'Slot found — close' : 'Mark done') : 'Reopen';
 }
 
 function snooze(days) {
@@ -736,6 +947,7 @@ async function saveTask() {
   // Fields that are always the caller's to change
   const { error } = await db.from('tasks').update({
     title,
+    kind:         document.getElementById('tmKind').value,
     subject_type: sType, subject_id: sId,
     due_date:     document.getElementById('tmDue').value || null,
   }).eq('id', id);
@@ -788,11 +1000,12 @@ async function toggleDone() {
 async function quickToggle(id) {
   const t = tasks.find(x => x.id === id);
   if (!t) return;
+  // Anything closed — done or cancelled — reopens.
   await setStatus(id, t.status === 'open' ? 'done' : 'open');
 }
 
 async function setStatus(id, status) {
-  const patch = { status };
+  const patch = { status, awaiting_admin: false };
   if (status === 'done') { patch.completed_at = new Date().toISOString(); patch.completed_by = me.id; }
   else                   { patch.completed_at = null; patch.completed_by = null; }
 

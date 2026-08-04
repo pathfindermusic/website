@@ -134,6 +134,24 @@
         <div class="stat-value" id="statUnmarked">–</div>
         <div class="stat-sub">past lessons</div>
       </div>
+      <a class="stat-card" href="tasks.html" style="text-decoration:none;cursor:pointer;">
+        <div class="stat-card-top">
+          <span class="stat-label">My tasks</span>
+          <div class="stat-icon">✅</div>
+        </div>
+        <div class="stat-value" id="statTasks">–</div>
+        <div class="stat-sub" id="statTasksSub">nothing outstanding</div>
+      </a>
+    </div>
+
+    <!-- Outstanding tasks. Hidden entirely when there are none, so it
+         never competes with the schedule on a normal day. -->
+    <div class="card hidden" id="taskStrip" style="margin-bottom:1.25rem;border-left:3px solid var(--orange);">
+      <div class="card-header">
+        <span class="card-title">Tasks for you</span>
+        <a href="tasks.html" style="font-size:0.8rem;color:var(--orange);text-decoration:none;">View all →</a>
+      </div>
+      <div id="taskStripBody"></div>
     </div>
 
     <!-- Page header -->
@@ -239,7 +257,7 @@ let activeOccurrenceId = null;
   const { data: t } = await db.from('teachers').select('*').eq('user_id', currentProfile.id).single();
   teacherRecord = t;
 
-  await Promise.all([loadStats(), loadSchedule()]);
+  await Promise.all([loadStats(), loadSchedule(), loadMyTasks()]);
 })();
 
 // ---- Stats ----
@@ -303,6 +321,73 @@ async function countMyStudents() {
   const { data: ls } = await db.from('lesson_students')
     .select('student_id').in('lesson_id', ids);
   return new Set((ls ?? []).map(r => r.student_id)).size;
+}
+
+// Open tasks about this teacher. Kept simple deliberately: teachers
+// won't have many, so "anything open" is a more useful frame than a
+// date window, and the count is what draws the eye.
+async function loadMyTasks() {
+  if (!teacherRecord) return;
+
+  const { data, error } = await db.from('tasks')
+    .select('id,title,due_date,status,awaiting_admin,kind')
+    .eq('subject_type', 'teacher')
+    .eq('subject_id', teacherRecord.id)
+    .eq('status', 'open')
+    .order('due_date', { ascending: true, nullsFirst: false })
+    .limit(20);
+
+  const valEl  = document.getElementById('statTasks');
+  const subEl  = document.getElementById('statTasksSub');
+  const strip  = document.getElementById('taskStrip');
+  const body   = document.getElementById('taskStripBody');
+
+  if (error) { valEl.textContent = '–'; return; }
+
+  const open = data ?? [];
+  valEl.textContent = open.length;
+
+  if (open.length === 0) {
+    valEl.style.color = '';
+    subEl.textContent = 'nothing outstanding';
+    strip.classList.add('hidden');
+    return;
+  }
+
+  // Red draws the eye — that was the whole point of putting it here
+  valEl.style.color = '#dc2626';
+  subEl.textContent = open.length === 1 ? 'needs your attention' : 'need your attention';
+
+  const today = toISODate(new Date());
+  body.innerHTML = open.slice(0, 5).map(t => {
+    let due = '';
+    if (t.due_date) {
+      const label = formatShortDate(parseLocalDate(t.due_date));
+      due = t.due_date < today
+        ? `<span style="color:#dc2626;font-weight:600;">Overdue · ${label}</span>`
+        : t.due_date === today
+          ? `<span style="color:var(--orange);font-weight:600;">Due today</span>`
+          : `<span class="text-muted">${label}</span>`;
+    }
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;
+                        padding:0.6rem 1.25rem;border-bottom:1px solid var(--border);">
+      <div>
+        <div style="font-size:0.875rem;font-weight:500;color:var(--charcoal);">${
+          String(t.title ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        }</div>
+        ${t.awaiting_admin
+          ? '<div style="font-size:0.72rem;color:var(--mid-grey);">Replied — waiting on the studio</div>'
+          : ''}
+      </div>
+      <div style="font-size:0.78rem;white-space:nowrap;">${due}</div>
+    </div>`;
+  }).join('') + (open.length > 5
+    ? `<div style="padding:0.5rem 1.25rem;font-size:0.78rem;" class="text-muted">
+         …and ${open.length - 5} more
+       </div>`
+    : '');
+
+  strip.classList.remove('hidden');
 }
 
 // ---- Week navigation ----
@@ -480,7 +565,7 @@ async function markAttendance(occurrenceId, studentId, status) {
 
   showToast('Attendance saved.', 'success');
   await syncOccurrenceStatus(occurrenceId);
-  await Promise.all([loadSchedule(), loadStats()]);
+  await Promise.all([loadSchedule(), loadStats(), loadMyTasks()]);
 }
 
 // Upsert one student's attendance for one occurrence
@@ -581,7 +666,7 @@ async function saveGroupAttendance() {
   const occId = groupAttOccurrenceId;
   closeGroupAttendance();
   await syncOccurrenceStatus(occId);
-  await Promise.all([loadSchedule(), loadStats()]);
+  await Promise.all([loadSchedule(), loadStats(), loadMyTasks()]);
 }
 
 // ---- Read-only lesson view ----
