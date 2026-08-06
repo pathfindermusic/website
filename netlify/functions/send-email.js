@@ -156,8 +156,18 @@ exports.handler = async (event) => {
     // 2. Resolve student names, user_ids and parent emails
     // ============================================================
     const idList = studentIds.map(i => `"${i}"`).join(',');
+    // Audience modes exclude prospects — a studio-wide announcement
+    // should never reach someone who has only enquired. But when the
+    // caller names specific students, or a specific lesson, they have
+    // chosen the recipient and the filter would wrongly block it: the
+    // enquiry acknowledgement goes to exactly one prospect.
+    const explicitRecipients = (mode === 'students' || mode === 'occurrence');
+    const statusFilter = explicitRecipients
+      ? '&status=in.(active,trial,prospective)'
+      : '&status=in.(active,trial)';
+
     const students = await get(
-      `students?id=in.(${idList})&status=in.(active,trial)` +
+      `students?id=in.(${idList})${statusFilter}` +
       `&select=id,user_id,email,parent_name,parent_email`
     );
 
@@ -437,25 +447,55 @@ function escapeHtml(s) {
 function emailTemplate(bodyText, studioEmail) {
   const inlineBold = (s) => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 
-  const paragraphs = escapeHtml(bodyText)
-    .split(/\n\s*\n/)
-    .map(p => {
-      const trimmed = p.trim();
-      const callout = trimmed.match(/^\*\*([\s\S]+)\*\*$/);
-      if (callout) {
-        const inner = callout[1].trim().replace(/\n/g, '<br>');
-        return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;">
-          <tr>
-            <td style="width:4px;background:#E8491E;border-radius:2px 0 0 2px;">&nbsp;</td>
-            <td style="background:#f5f5f7;padding:14px 16px;border-radius:0 2px 2px 0;font-size:15px;line-height:1.6;color:#1c1c1e;font-weight:600;">
-              ${inner}
-            </td>
-          </tr>
-        </table>`;
-      }
-      return `<p style="margin:0 0 14px;">${inlineBold(trimmed.replace(/\n/g, '<br>'))}</p>`;
-    })
-    .join('');
+  const para = (p) => {
+    const t = p.trim();
+    // A paragraph of only dashes is a section break
+    if (/^-{3,}$/.test(t)) {
+      return '<div style="border-top:1px solid #e5e5e5;margin:22px 0 18px;"></div>';
+    }
+    // A short ALL-CAPS line is a heading
+    if (/^[A-Z][A-Z0-9 &'’,.\-]{2,40}$/.test(t) && !t.includes('\n')) {
+      return `<p style="margin:0 0 10px;font-size:12px;font-weight:bold;letter-spacing:0.08em;
+              text-transform:uppercase;color:#E8491E;">${t}</p>`;
+    }
+    return `<p style="margin:0 0 14px;">${inlineBold(t.replace(/\n/g, '<br>'))}</p>`;
+  };
+
+  const callout = (inner) =>
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;">
+      <tr>
+        <td style="width:4px;background:#E8491E;border-radius:2px 0 0 2px;">&nbsp;</td>
+        <td style="background:#f5f5f7;padding:14px 16px;border-radius:0 2px 2px 0;font-size:15px;line-height:1.6;color:#1c1c1e;">
+          ${inner.split(/\n\s*\n/).map(b =>
+            `<div style="margin:0 0 10px;">${inlineBold(b.trim().replace(/\n/g, '<br>'))}</div>`
+          ).join('')}
+        </td>
+      </tr>
+    </table>`;
+
+  // A callout may span blank lines, so it is extracted from the whole
+  // body before paragraphs are split. Matching per paragraph meant a
+  // multi-paragraph block never matched and its asterisks showed
+  // through literally.
+  const src = escapeHtml(bodyText);
+  let html = '';
+  let last = 0;
+  const re = /\*\*([\s\S]+?)\*\*(?=\s*(?:\n\s*\n|$))/g;
+  let m;
+
+  while ((m = re.exec(src)) !== null) {
+    // Only treat it as a block when it starts its own paragraph —
+    // otherwise **bold** mid-sentence would be swallowed.
+    const before = src.slice(last, m.index);
+    const startsBlock = /(^|\n\s*\n)\s*$/.test(before);
+    if (!startsBlock) continue;
+
+    before.split(/\n\s*\n/).filter(p => p.trim()).forEach(p => { html += para(p); });
+    html += callout(m[1]);
+    last = m.index + m[0].length;
+  }
+
+  src.slice(last).split(/\n\s*\n/).filter(p => p.trim()).forEach(p => { html += para(p); });
 
   return `<!DOCTYPE html>
 <html><body style="margin:0;padding:0;background:#f5f5f7;">
@@ -469,95 +509,13 @@ function emailTemplate(bodyText, studioEmail) {
           </div>
         </td></tr>
         <tr><td style="padding:24px;color:#1c1c1e;font-size:15px;line-height:1.65;">
-          ${paragraphs}
+          ${html}
         </td></tr>
         <tr><td style="padding:16px 24px;border-top:1px solid #eeeeee;color:#999999;font-size:12px;line-height:1.6;">
           Pathfinder Music Lessons · <a href="mailto:${studioEmail}" style="color:#E8491E;text-decoration:none;">${studioEmail}</a><br>
+          20 Collins Place, Kilsyth VIC 3137 &nbsp;·&nbsp; G3 / 93a Heatherdale Rd, Ringwood VIC 3134<br>
           <a href="https://www.pathfindermusiclessons.com.au" style="color:#999999;">pathfindermusiclessons.com.au</a>
         </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body></html>`;
-}
-
-// Studio copy of a bulk send — one email describing everything that
-// went out, rather than one BCC per student.
-function summaryTemplate({ subject, bodyText, fromEmail, recipients, sent,
-                           unreachable, invalidAddresses, mode, spec }) {
-  const when = new Date().toLocaleString('en-AU', {
-    dateStyle: 'full', timeStyle: 'short', timeZone: 'Australia/Melbourne',
-  });
-
-  const audience = {
-    studios:      'All students at the selected studios',
-    teacher:      'All students of one teacher',
-    day:          'All students with lessons on a given weekday',
-    teacher_date: 'Students of one teacher on a specific date',
-    students:     'Individually selected students',
-    occurrence:   'Students on one lesson occurrence',
-  }[mode] ?? mode;
-
-  const rows = recipients.map(r =>
-    `<tr>
-       <td style="padding:5px 10px;border-bottom:1px solid #eee;font-size:13px;">${escapeHtml(r.name)}</td>
-       <td style="padding:5px 10px;border-bottom:1px solid #eee;font-size:12px;color:#666;">${escapeHtml(r.addresses.join(', '))}</td>
-     </tr>`).join('');
-
-  const problems = [];
-  if (unreachable?.length) {
-    problems.push(`<strong>${unreachable.length}</strong> skipped — no email on file: ${escapeHtml(unreachable.join(', '))}`);
-  }
-  if (invalidAddresses?.length) {
-    problems.push(`<strong>${invalidAddresses.length}</strong> skipped — address looked invalid: ${escapeHtml(invalidAddresses.join('; '))}`);
-  }
-
-  return `<!DOCTYPE html>
-<html><body style="margin:0;padding:0;background:#f5f5f7;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f7;padding:24px 12px;">
-    <tr><td align="center">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
-             style="max-width:640px;background:#ffffff;border-radius:8px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;">
-
-        <tr><td style="background:#1c1c1e;padding:18px 24px;border-bottom:3px solid #E8491E;">
-          <div style="color:#E8491E;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;font-weight:bold;">
-            Pathfinder Music Lessons — Studio copy
-          </div>
-        </td></tr>
-
-        <tr><td style="padding:24px;color:#1c1c1e;font-size:15px;line-height:1.6;">
-          <p style="margin:0 0 16px;font-size:17px;font-weight:bold;">
-            Sent to ${sent} student${sent !== 1 ? 's' : ''}
-          </p>
-
-          <table role="presentation" width="100%" style="font-size:13px;margin:0 0 20px;">
-            <tr><td style="padding:3px 0;color:#666;width:110px;">Subject</td><td style="padding:3px 0;font-weight:bold;">${escapeHtml(subject)}</td></tr>
-            <tr><td style="padding:3px 0;color:#666;">Audience</td><td style="padding:3px 0;">${escapeHtml(audience)}</td></tr>
-            <tr><td style="padding:3px 0;color:#666;">Sent from</td><td style="padding:3px 0;">${escapeHtml(fromEmail)}</td></tr>
-            <tr><td style="padding:3px 0;color:#666;">Sent at</td><td style="padding:3px 0;">${escapeHtml(when)}</td></tr>
-          </table>
-
-          ${problems.length ? `
-            <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:4px;padding:10px 12px;margin:0 0 20px;font-size:13px;color:#92400e;line-height:1.55;">
-              ${problems.join('<br>')}
-            </div>` : ''}
-
-          <p style="margin:0 0 8px;font-size:13px;color:#666;font-weight:bold;text-transform:uppercase;letter-spacing:0.06em;">Message sent</p>
-          <div style="background:#f5f5f7;border-left:4px solid #E8491E;padding:12px 16px;margin:0 0 22px;font-size:14px;line-height:1.6;white-space:pre-wrap;">${escapeHtml(bodyText)}</div>
-
-          <p style="margin:0 0 8px;font-size:13px;color:#666;font-weight:bold;text-transform:uppercase;letter-spacing:0.06em;">Recipients (${recipients.length})</p>
-          <table role="presentation" width="100%" style="border-collapse:collapse;">${rows}</table>
-
-          <p style="margin:18px 0 0;font-size:12px;color:#999;line-height:1.6;">
-            Each student received their own individual email — no one could see another recipient's address.
-            Any placeholders such as {{first_name}} were replaced per student.
-          </p>
-        </td></tr>
-
-        <tr><td style="padding:16px 24px;border-top:1px solid #eeeeee;color:#999999;font-size:12px;">
-          Pathfinder Music Lessons · <a href="https://www.pathfindermusiclessons.com.au" style="color:#999999;">pathfindermusiclessons.com.au</a>
-        </td></tr>
-
       </table>
     </td></tr>
   </table>

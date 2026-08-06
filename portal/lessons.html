@@ -257,10 +257,14 @@
 
   <!-- SIDEBAR -->
   <aside class="sidebar" id="sidebar">
-    <div class="sidebar-section">Main</div>
+    <div class="sidebar-section">Teaching</div>
     <a class="nav-item" href="dashboard-admin.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
       Schedule
+    </a>
+    <a class="nav-item active" href="lessons.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Lessons
     </a>
     <a class="nav-item" href="students.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
@@ -270,9 +274,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
       Teachers
     </a>
-    <a class="nav-item active" href="lessons.html">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      Lessons
+    <div class="sidebar-section">Front desk</div>
+    <a class="nav-item" href="enquiries.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+      Enquiries
     </a>
     <a class="nav-item" href="tasks.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
@@ -289,7 +294,7 @@
     </a>
     <div class="sidebar-section hidden" id="superuserSection">Super User</div>
     <a class="nav-item hidden" href="studios.html" id="studiosLink">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
       Studios
     </a>
     <a class="nav-item hidden" href="admins.html" id="adminsLink">
@@ -310,6 +315,7 @@
         <div class="view-toggle">
           <button class="view-btn active" id="btnDaily" onclick="switchView('daily')">Daily</button>
           <button class="view-btn" id="btnWeekly" onclick="switchView('weekly')">Weekly</button>
+        <button class="view-btn" id="btnMonthly" onclick="switchView('monthly')">Monthly</button>
         </div>
         <!-- Date / week navigation -->
         <div class="week-nav">
@@ -335,6 +341,9 @@
         <option value="scheduled">Scheduled</option>
         <option value="">All statuses</option>
         <option value="cancelled">Cancelled</option>
+      </select>
+      <select class="filter-select" id="filterStudent" onchange="onStudentFilter()">
+        <option value="">All students</option>
       </select>
     </div>
 
@@ -452,6 +461,12 @@
             <option value="occurrences">Fixed number of lessons</option>
             <option value="date_range">Until a specific date</option>
           </select>
+        </div>
+        <div class="hidden" id="trialRecurrenceNote"
+             style="background:var(--off-white);border:1px solid var(--border);
+                    border-radius:var(--r-sm);padding:0.5rem 0.7rem;margin-bottom:0.65rem;
+                    font-size:0.78rem;color:var(--dark-grey);">
+          A trial is a single lesson, so the recurrence is fixed at one.
         </div>
         <div class="form-group hidden" id="recurrenceCountWrap">
           <label class="form-label">Number of lessons</label>
@@ -583,6 +598,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-client.js"></script>
+<script src="js/processes.js"></script>
 <script>
 // ============================================================
 // CONSTANTS
@@ -636,6 +652,7 @@ function computeTimeSlots(occurrences) {
 // ============================================================
 let currentProfile  = null;
 let currentView     = 'daily';
+let monthAnchor     = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let currentDate     = new Date();
 let weekStart       = getWeekStart(new Date());
 let allStudios      = [];
@@ -731,7 +748,8 @@ async function loadTeachers() {
 }
 
 async function loadStudents() {
-  const { data: sData } = await db.from('students').select('id,user_id,status').eq('status','active');
+  const { data: sData } = await db.from('students')
+    .select('id,user_id,status').in('status', ['active','trial']);
   const userIds = (sData ?? []).map(s => s.user_id);
   const { data: pData } = userIds.length > 0
     ? await db.from('profiles').select('id,first_name,last_name').in('id', userIds)
@@ -740,11 +758,26 @@ async function loadStudents() {
   (pData ?? []).forEach(p => { pMap[p.id] = p; });
   allStudents = (sData ?? []).map(s => ({ ...s, profile: pMap[s.user_id] ?? null }));
 
+  const filterSel = document.getElementById('filterStudent');
+  if (filterSel) {
+    filterSel.innerHTML = '<option value="">All students</option>' +
+      allStudents
+        .slice()
+        .sort((a, b) => `${a.profile?.first_name ?? ''}`.localeCompare(`${b.profile?.first_name ?? ''}`))
+        .map(s => {
+          const n = `${s.profile?.first_name ?? ''} ${s.profile?.last_name ?? ''}`.trim();
+          return `<option value="${s.id}">${n}${s.status === 'trial' ? ' (trial)' : ''}</option>`;
+        }).join('');
+  }
+
   const picker = document.getElementById('studentPicker');
-  allStudents.forEach(s => {
-    const name = `${s.profile?.first_name ?? ''} ${s.profile?.last_name ?? ''}`.trim();
-    picker.innerHTML += `<option value="${s.id}">${name}</option>`;
-  });
+  allStudents
+    .sort((a, b) => `${a.profile?.first_name ?? ''}`.localeCompare(`${b.profile?.first_name ?? ''}`))
+    .forEach(s => {
+      const name = `${s.profile?.first_name ?? ''} ${s.profile?.last_name ?? ''}`.trim();
+      const tag  = s.status === 'trial' ? ' (trial)' : '';
+      picker.innerHTML += `<option value="${s.id}">${name}${tag}</option>`;
+    });
 }
 
 function populateInstruments() {
@@ -767,15 +800,19 @@ function onInstrumentChange() {
 // ============================================================
 function switchView(view) {
   currentView = view;
-  document.getElementById('btnDaily').classList.toggle('active', view === 'daily');
-  document.getElementById('btnWeekly').classList.toggle('active', view === 'weekly');
-  document.getElementById('pageTitle').textContent = view === 'daily' ? 'Daily Schedule' : 'Weekly Schedule';
+  document.getElementById('btnDaily').classList.toggle('active',   view === 'daily');
+  document.getElementById('btnWeekly').classList.toggle('active',  view === 'weekly');
+  document.getElementById('btnMonthly').classList.toggle('active', view === 'monthly');
+  document.getElementById('pageTitle').textContent =
+    view === 'daily' ? 'Daily Schedule' : view === 'weekly' ? 'Weekly Schedule' : 'Monthly Schedule';
   loadView();
 }
 
 function navBack() {
   if (currentView === 'daily') {
     currentDate.setDate(currentDate.getDate() - 1);
+  } else if (currentView === 'monthly') {
+    monthAnchor = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() - 1, 1);
   } else {
     weekStart = new Date(weekStart.getTime() - 7 * 86400000);
   }
@@ -785,6 +822,8 @@ function navBack() {
 function navForward() {
   if (currentView === 'daily') {
     currentDate.setDate(currentDate.getDate() + 1);
+  } else if (currentView === 'monthly') {
+    monthAnchor = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + 1, 1);
   } else {
     weekStart = new Date(weekStart.getTime() + 7 * 86400000);
   }
@@ -794,6 +833,7 @@ function navForward() {
 function goToday() {
   currentDate = new Date();
   weekStart   = getWeekStart(new Date());
+  monthAnchor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   loadView();
 }
 
@@ -804,6 +844,8 @@ function jumpToDate(value) {
   const picked = parseLocalDate(value);
   if (currentView === 'daily') {
     currentDate = picked;
+  } else if (currentView === 'monthly') {
+    monthAnchor = new Date(picked.getFullYear(), picked.getMonth(), 1);
   } else {
     weekStart = getWeekStart(picked);
   }
@@ -817,11 +859,129 @@ function syncDatePicker(date) {
 }
 
 async function loadView() {
-  if (currentView === 'daily') {
-    await loadDailyView();
-  } else {
-    await loadWeeklyView();
+  if (currentView === 'daily')        await loadDailyView();
+  else if (currentView === 'monthly') await loadMonthlyView();
+  else                                await loadWeeklyView();
+}
+
+// Picking a student switches to the monthly view — a weekly lesson is
+// only visible as a pattern once you can see a month of it.
+function onStudentFilter() {
+  const sid = document.getElementById('filterStudent').value;
+  if (sid && currentView !== 'monthly') { switchView('monthly'); return; }
+  loadView();
+}
+
+// ============================================================
+// MONTHLY VIEW
+//
+// Most students have one lesson a week, so a month is the span that
+// shows the pattern — and whether any of it has been cancelled.
+// ============================================================
+async function loadMonthlyView() {
+  const el = document.getElementById('viewContent');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div> Loading…</div>';
+
+  const y = monthAnchor.getFullYear(), m = monthAnchor.getMonth();
+  const first = new Date(y, m, 1), last = new Date(y, m + 1, 0);
+
+  document.getElementById('dateLabel').textContent =
+    monthAnchor.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
+  syncDatePicker(first);
+
+  const studioId  = document.getElementById('filterStudio').value;
+  const statusF   = document.getElementById('filterStatus').value;
+  const studentId = document.getElementById('filterStudent').value;
+
+  let q = db.from('schedule_view').select('*')
+    .gte('date', toISODate(first)).lte('date', toISODate(last))
+    .order('date').order('start_time');
+  if (studioId) q = q.eq('studio_id', studioId);
+  if (statusF)  q = q.eq('occurrence_status', statusF);
+
+  const { data, error } = await q;
+  if (error) {
+    el.innerHTML = `<div class="empty-state"><p style="color:#dc2626;">${error.message}</p></div>`;
+    return;
   }
+
+  let rows = (data ?? []).filter(o =>
+    o.lesson_status !== 'active' ? o.occurrence_status !== 'cancelled' : true);
+
+  // Filtering by student needs lesson membership, which the view
+  // doesn't carry — it holds one row per occurrence, not per student.
+  if (studentId) {
+    const { data: ls } = await db.from('lesson_students')
+      .select('lesson_id').eq('student_id', studentId);
+    const mine = new Set((ls ?? []).map(r => r.lesson_id));
+    rows = rows.filter(r => mine.has(r.lesson_id));
+  }
+
+  const byDate = {};
+  rows.forEach(r => { (byDate[r.date?.slice(0,10)] ??= []).push(r); });
+
+  const studentName = studentId
+    ? (allStudents.find(s => s.id === studentId)?.profile
+        ? `${allStudents.find(s => s.id === studentId).profile.first_name} ${allStudents.find(s => s.id === studentId).profile.last_name}`.trim()
+        : '')
+    : '';
+
+  // Monday-first grid
+  const lead = (first.getDay() + 6) % 7;
+  const cells = [];
+  for (let i = 0; i < lead; i++) cells.push(null);
+  for (let d = 1; d <= last.getDate(); d++) cells.push(new Date(y, m, d));
+  while (cells.length % 7) cells.push(null);
+
+  const today = toISODate(new Date());
+
+  el.innerHTML = `
+    ${studentId ? `<div style="margin-bottom:0.85rem;font-size:0.875rem;color:var(--dark-grey);">
+      Showing <strong>${studentName}</strong> — ${rows.length} lesson${rows.length !== 1 ? 's' : ''} this month
+      · <a href="#" onclick="document.getElementById('filterStudent').value='';onStudentFilter();return false;"
+           style="color:var(--orange);text-decoration:none;">show everyone</a>
+    </div>` : ''}
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);background:var(--off-white);
+                  border-bottom:1px solid var(--border);">
+        ${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d =>
+          `<div style="padding:0.5rem;text-align:center;font-size:0.7rem;font-weight:600;
+                       text-transform:uppercase;letter-spacing:0.06em;color:var(--mid-grey);">${d}</div>`).join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);">
+        ${cells.map(d => {
+          if (!d) return `<div style="min-height:92px;background:var(--off-white);
+                                      border-right:1px solid var(--border);border-bottom:1px solid var(--border);"></div>`;
+          const key = toISODate(d);
+          const list = byDate[key] ?? [];
+          const isToday = key === today;
+          return `<div style="min-height:92px;padding:0.35rem;border-right:1px solid var(--border);
+                              border-bottom:1px solid var(--border);
+                              ${isToday ? 'background:rgba(232,73,30,0.04);' : ''}">
+            <div style="font-size:0.72rem;font-weight:${isToday ? '700' : '500'};
+                        color:${isToday ? 'var(--orange)' : 'var(--mid-grey)'};margin-bottom:0.25rem;">
+              ${d.getDate()}
+            </div>
+            ${list.map(r => {
+              const cancelled = r.occurrence_status === 'cancelled';
+              const who = r.lesson_type === 'group'
+                ? `${r.student_count} students`
+                : (r.student_name ?? '—');
+              return `<div onclick="openOccurrence('${r.occurrence_id}')"
+                style="cursor:pointer;font-size:0.7rem;line-height:1.3;padding:0.2rem 0.3rem;
+                       margin-bottom:0.15rem;border-radius:3px;
+                       background:${cancelled ? 'transparent' : 'rgba(232,73,30,0.08)'};
+                       border-left:2px solid ${cancelled ? 'var(--light-grey)' : 'var(--orange)'};
+                       ${cancelled ? 'opacity:0.55;text-decoration:line-through;' : ''}">
+                <div style="font-weight:600;color:var(--charcoal);">${formatTime(r.start_time)}</div>
+                <div style="color:var(--dark-grey);">${studentId ? r.instrument : who}</div>
+                ${studentId ? `<div style="color:var(--mid-grey);">${r.teacher_name ?? ''}</div>` : ''}
+              </div>`;
+            }).join('')}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
 }
 
 // ============================================================
@@ -1202,6 +1362,7 @@ function openLessonModalFromCell(teacherId, studioId, slot, dayOfWeek) {
 function openLessonModal(lesson = null) {
   lessonStudents = [];
   renderLessonStudents();
+  updateRecurrenceForTrial();
   document.getElementById('clashError').classList.remove('show');
   document.getElementById('availWarning').classList.remove('show');
   document.getElementById('lRecurrence').value  = 'indefinite';
@@ -1288,12 +1449,42 @@ function addStudentToLesson() {
 
   lessonStudents.push(sid);
   renderLessonStudents();
+  updateRecurrenceForTrial();
   picker.value = '';
 }
 
 function removeStudentFromLesson(sid) {
   lessonStudents = lessonStudents.filter(s => s !== sid);
   renderLessonStudents();
+  updateRecurrenceForTrial();
+}
+
+// Booking for a trial student forces a single occurrence — that is what
+// a trial is. The controls lock rather than relying on the admin to
+// remember, and unlock again if the trial student is removed.
+function updateRecurrenceForTrial() {
+  const hasTrial = lessonStudents.some(sid =>
+    allStudents.find(s => s.id === sid)?.status === 'trial');
+
+  const recSel   = document.getElementById('lRecurrence');
+  const countIn  = document.getElementById('lCount');
+  const endIn    = document.getElementById('lEndDate');
+  const note     = document.getElementById('trialRecurrenceNote');
+
+  if (hasTrial) {
+    recSel.value    = 'occurrences';
+    countIn.value   = 1;
+    recSel.disabled = true;
+    countIn.disabled = true;
+    endIn.disabled   = true;
+    note.classList.remove('hidden');
+  } else {
+    recSel.disabled  = false;
+    countIn.disabled = false;
+    endIn.disabled   = false;
+    note.classList.add('hidden');
+  }
+  toggleRecurrenceFields();
 }
 
 function renderLessonStudents() {
@@ -1389,6 +1580,17 @@ async function saveLesson() {
   }
   if (lType === 'private' && lessonStudents.length > 1) {
     showToast('Private lessons can only have one student.', 'error'); return;
+  }
+
+  // A trial is one lesson, whatever the form was left showing
+  const trialStudent = lessonStudents.find(sid =>
+    allStudents.find(s => s.id === sid)?.status === 'trial');
+  if (trialStudent && !(recurrence === 'occurrences' && count === 1)) {
+    showToast('A trial is a single lesson — recurrence has been set to one.', 'warning');
+    document.getElementById('lRecurrence').value = 'occurrences';
+    document.getElementById('lCount').value = 1;
+    updateRecurrenceForTrial();
+    return;
   }
 
   // ---- HARD BLOCK: Teacher must teach this instrument ----
@@ -1502,6 +1704,23 @@ async function saveLesson() {
     showToast('Lesson created successfully.', 'success');
     closeLessonModal();
     loadView();
+
+    // A confirmation email waits on the lesson existing — this is that
+    // moment. Idempotent, so it can never send twice.
+    for (const sid of lessonStudents) {
+      try {
+        // Tasks created at conversion had no lesson to date themselves
+        // from — now there is one
+        await realignProcessTasks(sid);
+
+        const r = await maybeSendConfirmation(sid, currentProfile?.id);
+        if (r === 'sent') showToast('Confirmation email sent to the student.', 'success');
+        else if (r === 'no-studio-email')
+          showToast('No confirmation email sent — the studio has no email address.', 'warning');
+        else if (r === 'failed')
+          showToast('Lesson saved, but the confirmation email failed. Check the checklist.', 'warning');
+      } catch (_) { /* never block the lesson on an email */ }
+    }
   } catch (err) {
     showToast(err.message, 'error');
   }

@@ -75,6 +75,34 @@
       border: 1px solid rgba(232,73,30,0.2);
     }
     .action-btns { display: flex; gap: 0.4rem; }
+
+    .proc-pill {
+      display: inline-block; font-size: 0.7rem; font-weight: 600;
+      padding: 0.15rem 0.5rem; border-radius: 3px; white-space: nowrap;
+      border: 1px solid transparent; cursor: pointer;
+    }
+    .proc-progress { background: rgba(37,99,235,0.1); border-color: rgba(37,99,235,0.3); color: #1e40af; }
+    .proc-blocked  { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+    .proc-complete { background: var(--present-bg); border-color: var(--present); color: var(--present); }
+
+    .chk-row {
+      display: grid; grid-template-columns: 22px 1fr auto;
+      gap: 0.65rem; align-items: start;
+      padding: 0.6rem 0; border-bottom: 1px solid var(--border);
+    }
+    .chk-row:last-child { border-bottom: none; }
+    .chk-box {
+      width: 18px; height: 18px; border-radius: 4px; margin-top: 1px;
+      border: 1.5px solid var(--light-grey); background: var(--white);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.72rem; color: transparent; cursor: pointer; padding: 0;
+    }
+    .chk-box:hover { border-color: var(--orange); }
+    .chk-box.done { background: var(--present); border-color: var(--present); color: var(--white); }
+    .chk-box.auto { background: var(--present); border-color: var(--present); color: var(--white); cursor: default; }
+    .chk-box.blocked { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+    .chk-label { font-size: 0.875rem; color: var(--charcoal); line-height: 1.45; }
+    .chk-note  { font-size: 0.72rem; color: var(--mid-grey); margin-top: 0.15rem; }
     /* CSV import area */
     .import-zone {
       border: 2px dashed var(--light-grey);
@@ -127,22 +155,27 @@
 
   <!-- SIDEBAR -->
   <aside class="sidebar" id="sidebar">
-    <div class="sidebar-section">Main</div>
+    <div class="sidebar-section">Teaching</div>
     <a class="nav-item" href="dashboard-admin.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
       Schedule
     </a>
+    <a class="nav-item" href="lessons.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Lessons
+    </a>
     <a class="nav-item active" href="students.html">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
       Students
     </a>
     <a class="nav-item" href="teachers.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
       Teachers
     </a>
-    <a class="nav-item" href="lessons.html">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      Lessons
+    <div class="sidebar-section">Front desk</div>
+    <a class="nav-item" href="enquiries.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+      Enquiries
     </a>
     <a class="nav-item" href="tasks.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
@@ -212,6 +245,7 @@
               <th>Instruments</th>
               <th>Teacher(s)</th>
               <th>Status</th>
+              <th>Enrolment</th>
               <th></th>
             </tr>
           </thead>
@@ -331,6 +365,24 @@
   </div>
 </div>
 
+<!-- ENROLMENT CHECKLIST -->
+<div class="modal-overlay hidden" id="procModal">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <span class="modal-title" id="procTitle">Checklist</span>
+      <button class="modal-close" onclick="closeProcess()">✕</button>
+    </div>
+    <div class="modal-body" id="procBody"></div>
+    <div class="modal-footer" style="justify-content:space-between;">
+      <div class="flex gap-1">
+        <button class="btn btn-ghost btn-sm" id="procPlanBtn" onclick="planEndEnrolment()">Plan ending…</button>
+        <button class="btn btn-secondary btn-sm" id="procNextBtn" onclick="startNextProcess()"></button>
+      </div>
+      <button class="btn btn-ghost" onclick="closeProcess()">Close</button>
+    </div>
+  </div>
+</div>
+
 <div id="toastWrap" class="toast-wrap"></div>
 
 <!-- PASSWORD MODAL -->
@@ -373,6 +425,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-client.js"></script>
+<script src="js/processes.js"></script>
 <script>
 
 const INSTRUMENTS = ['Guitar','Bass','Drums','Piano / Keyboard','Voice / Singing','Violin','Ukulele','Music Theory','Saxophone','Band','Other'];
@@ -413,9 +466,12 @@ async function loadStudios() {
 // ---- Load students ----
 async function loadStudents() {
   // Fetch students base records only
+  // Prospective and lapsed are enquiries, not students — they live on
+  // the Enquiries page and would otherwise clutter this list.
   const { data: studentData, error } = await db
     .from('students')
     .select('id, status, user_id, studio_id')
+    .in('status', ['trial','active','inactive'])
     .order('id');
 
   if (error) { showToast('Error loading students: ' + error.message, 'error'); return; }
@@ -480,7 +536,16 @@ async function loadStudents() {
 
   document.getElementById('studentCount').textContent =
     `${allStudents.filter(s => s.status === 'active').length} active · ${allStudents.length} total`;
+
+  await loadProcesses();
   renderStudents(allStudents);
+
+  // Arrived here straight after converting someone — open their checklist
+  const wanted = sessionStorage.getItem('openProcessStudentId');
+  if (wanted) {
+    sessionStorage.removeItem('openProcessStudentId');
+    if (procByStudent[wanted]) openProcess(wanted);
+  }
 }
 
 // ---- Render students ----
@@ -511,12 +576,13 @@ function renderStudents(students) {
       </td>
       <td class="text-sm">${teachers.join(', ') || '–'}</td>
       <td><span class="pill pill-${s.status}">${s.status.charAt(0).toUpperCase()+s.status.slice(1)}</span></td>
+      <td onclick="event.stopPropagation()">${renderProcCell(s.id)}</td>
       <td>
         <div class="action-btns" onclick="event.stopPropagation()">
           <button class="btn btn-ghost btn-sm" onclick="openStudentByIndex(${allStudents.indexOf(s)})">Edit</button>
-          <button class="btn btn-danger btn-sm" onclick="toggleStudentStatus('${s.id}','${s.status}')">
-            ${s.status === 'inactive' ? 'Activate' : 'Deactivate'}
-          </button>
+          ${s.status === 'inactive'
+            ? `<button class="btn btn-secondary btn-sm" onclick="reactivateStudent('${s.id}')">Reactivate</button>`
+            : `<button class="btn btn-danger btn-sm" onclick="endEnrolmentFor('${s.id}')">End enrolment</button>`}
           <button class="btn btn-ghost btn-sm" onclick="resetPassword('${s.user_id}','${s.profiles?.first_name ?? ''} ${s.profiles?.last_name ?? ''}')">Reset PW</button>
           <button class="btn btn-danger btn-sm" onclick="deleteStudent('${s.id}','${s.user_id}','${s.profiles?.first_name ?? ''} ${s.profiles?.last_name ?? ''}')">Delete</button>
         </div>
@@ -524,6 +590,334 @@ function renderStudents(students) {
     </tr>`;
   }).join('');
 }
+
+// ============================================================
+// ENROLMENT PROCESSES
+// ============================================================
+let procByStudent = {};   // studentId -> { proc, items, checks }
+
+async function loadProcesses() {
+  procByStudent = {};
+  const ids = allStudents.map(s => s.id);
+  if (!ids.length) return;
+
+  const { data: procs } = await db.from('student_processes')
+    .select('*').in('student_id', ids).order('started_at', { ascending: false });
+  if (!procs?.length) return;
+
+  const { data: items } = await db.from('process_items')
+    .select('*').in('process_id', procs.map(p => p.id)).order('item_order');
+
+  const byProc = {};
+  (items ?? []).forEach(i => { (byProc[i.process_id] ??= []).push(i); });
+
+  // Auto items are evaluated live — they become true after the process
+  // starts, so a stored value would go stale immediately.
+  // Measured from each process's own start, so a student's existing
+  // lessons don't satisfy a checklist begun today
+  const newest = {};
+  procs.forEach(p => { if (!newest[p.student_id]) newest[p.student_id] = p; });
+
+  const checksFor = {};
+  await Promise.all(Object.values(newest).map(async p => {
+    checksFor[p.student_id] = await evaluateAutoChecks(p.student_id, p.started_at);
+  }));
+
+  // An item deferred to a task clears when that task is done — without
+  // this it stays blocked for ever and the checklist can never finish.
+  const blockedDone = await blockedTaskStatuses(items ?? []);
+  Object.values(checksFor).forEach(ch => { ch._blockedDone = blockedDone; });
+
+  // Most recent process per student wins the badge
+  procs.forEach(p => {
+    if (procByStudent[p.student_id]) return;
+    procByStudent[p.student_id] = {
+      proc: p, items: byProc[p.id] ?? [], checks: checksFor[p.student_id] ?? {},
+    };
+  });
+}
+
+function renderProcCell(studentId) {
+  const entry = procByStudent[studentId];
+  if (!entry) {
+    return `<button class="proc-pill" style="background:var(--off-white);border-color:var(--border);color:var(--mid-grey);"
+              onclick="offerStartProcess('${studentId}')">Start…</button>`;
+  }
+  const { proc, items, checks } = entry;
+  const p = processProgress(items, checks);
+  const cls = p.complete ? 'proc-complete' : p.blocked ? 'proc-blocked' : 'proc-progress';
+  const text = p.complete ? `${PROCESS_DEFS[proc.process_type].label} ✓`
+             : p.blocked  ? `${p.done}/${p.total} · tasked`
+             : `${p.done}/${p.total}`;
+  return `<span class="proc-pill ${cls}" onclick="openProcess('${studentId}')">${text}</span>`;
+}
+
+function nextProcessFor(studentStatus, currentType) {
+  if (studentStatus === 'trial'  && currentType !== 'ongoing_enrolment')
+    return { type: 'ongoing_enrolment', label: 'Enrol in ongoing lessons' };
+  if (studentStatus === 'active' && currentType !== 'end_enrolment')
+    return { type: 'end_enrolment', label: 'End enrolment' };
+  return null;
+}
+
+async function startNextProcess() {
+  const studentId = document.getElementById('procModal').dataset.studentId;
+  const type      = document.getElementById('procNextBtn').dataset.type;
+  if (!studentId || !type) return;
+
+  const label = PROCESS_DEFS[type].label;
+  if (!confirm(`Start the ${label.toLowerCase()} checklist?`)) return;
+
+  try {
+    await startProcess(studentId, type, currentProfile.id);
+    closeProcess();
+    await loadStudents();
+    if (procByStudent[studentId]) openProcess(studentId);
+    showToast(`${label} checklist started.`, 'success');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+// Most endings are planned: a student gives notice, or the studio
+// decides to stop. The task records why and when, and closing it starts
+// the checklist.
+async function planEndEnrolment() {
+  const studentId = document.getElementById('procPlanBtn').dataset.studentId;
+  const s = allStudents.find(x => x.id === studentId);
+  const name = `${s?.profiles?.first_name ?? ''} ${s?.profiles?.last_name ?? ''}`.trim();
+
+  const when = prompt(
+    `When should ${name}'s enrolment end?\n\n` +
+    `Format: YYYY-MM-DD. Leave as today if it's immediate.`,
+    toISODate(new Date()));
+  if (when === null) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(when.trim())) {
+    showToast('Enter a date as YYYY-MM-DD.', 'warning'); return;
+  }
+
+  const reason = prompt('Why is the enrolment ending?\n(e.g. student request, moving away, non-payment)');
+  if (reason === null) return;
+
+  const { data: task, error } = await db.from('tasks').insert({
+    title:        `End enrolment — ${name}`,
+    subject_type: 'student', subject_id: studentId,
+    studio_id:    s?.studio_id ?? null,
+    assigned_to:  currentProfile.id,
+    due_date:     when.trim(),
+    created_by:   currentProfile.id,
+    source:       'manual',
+  }).select('id').single();
+  if (error) { showToast('Could not create the task: ' + error.message, 'error'); return; }
+
+  if (reason.trim()) {
+    await db.from('task_notes').insert({
+      task_id: task.id, note_text: reason.trim(), logged_by: currentProfile.id,
+    });
+  }
+
+  closeProcess();
+  showToast(`Task created, due ${formatShortDate(parseLocalDate(when.trim()))}. Closing it starts the end-enrolment checklist.`, 'success');
+}
+
+async function offerStartProcess(studentId) {
+  const s = allStudents.find(x => x.id === studentId);
+  const answer = prompt(
+    `Start which process for ${s?.profiles?.first_name ?? 'this student'}?\n\n` +
+    `  1 — Trial confirmation\n` +
+    `  2 — Ongoing enrolment\n` +
+    `  3 — End enrolment\n\nEnter 1, 2 or 3:`);
+  if (answer === null) return;
+  const type = { '1':'trial_confirmation', '2':'ongoing_enrolment', '3':'end_enrolment' }[answer.trim()];
+  if (!type) { showToast('Enter 1, 2 or 3.', 'warning'); return; }
+
+  try {
+    await startProcess(studentId, type, currentProfile.id);
+    showToast('Checklist started.', 'success');
+    await loadStudents();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function openProcess(studentId) {
+  const entry = procByStudent[studentId];
+  if (!entry) return;
+
+  // Normally the email goes when the lesson is created. This is the
+  // safety net for when that didn't happen — a lesson added before the
+  // process existed, or a send that failed.
+  try {
+    await realignProcessTasks(studentId);
+    const r = await maybeSendConfirmation(studentId, currentProfile.id);
+    if (r === 'sent') {
+      showToast('Confirmation email sent to the student.', 'success');
+      await loadStudents();
+    }
+  } catch (_) { /* opening a checklist must never fail on an email */ }
+  const s = allStudents.find(x => x.id === studentId);
+  const name = `${s?.profiles?.first_name ?? ''} ${s?.profiles?.last_name ?? ''}`.trim();
+
+  document.getElementById('procTitle').textContent =
+    `${PROCESS_DEFS[entry.proc.process_type].label} — ${name}`;
+  document.getElementById('procModal').dataset.studentId = studentId;
+
+  // Offer the next step in the lifecycle: enrol after a trial, or end
+  // an enrolment. Without this a student with a process had no route to
+  // the next one at all.
+  const nextBtn = document.getElementById('procNextBtn');
+  const planBtn = document.getElementById('procPlanBtn');
+  const next    = nextProcessFor(s?.status, entry.proc.process_type);
+  const prog    = processProgress(entry.items, entry.checks);
+
+  planBtn.style.display = 'none';
+  if (next) {
+    // An enrolment still being set up cannot sensibly be ended
+    const blockedByProgress = next.type === 'end_enrolment' && !prog.complete;
+    nextBtn.textContent   = next.label;
+    nextBtn.dataset.type  = next.type;
+    nextBtn.disabled      = blockedByProgress;
+    nextBtn.title         = blockedByProgress
+      ? 'Finish the enrolment checklist first' : '';
+    nextBtn.style.opacity = blockedByProgress ? '0.45' : '';
+    nextBtn.style.display = '';
+
+    // Ending is usually planned rather than done on the spot — the
+    // task carries the reason and the date it takes effect
+    if (next.type === 'end_enrolment' && !blockedByProgress) {
+      planBtn.style.display = '';
+      planBtn.dataset.studentId = studentId;
+    }
+  } else {
+    nextBtn.style.display = 'none';
+  }
+
+  renderProcessBody(studentId);
+  document.getElementById('procModal').classList.remove('hidden');
+}
+
+function renderProcessBody(studentId) {
+  const { proc, items, checks } = procByStudent[studentId];
+  const p = processProgress(items, checks);
+
+  document.getElementById('procBody').innerHTML = `
+    <div style="margin-bottom:0.85rem;font-size:0.845rem;color:var(--dark-grey);">
+      ${p.complete
+        ? '<span style="color:var(--present);font-weight:600;">All steps complete.</span>'
+        : `${p.done} of ${p.total} done${p.blocked ? ` · ${p.blocked} tracked as tasks` : ''}`}
+    </div>
+    ${items.map(it => {
+      const done = itemIsDone(it, checks);
+      const auto = !!it.auto_key;
+      const blocked = it.blocked_task_id && !done;
+      const cls  = done ? (auto ? 'auto' : 'done') : blocked ? 'blocked' : '';
+      const mark = done ? '✓' : blocked ? '!' : '';
+      return `<div class="chk-row">
+        <button class="chk-box ${cls}"
+          ${auto ? 'title="Checked by the portal"' : `onclick="toggleItem('${studentId}','${it.id}')"`}
+        >${mark}</button>
+        <div>
+          <div class="chk-label">${it.label}</div>
+          ${auto ? `<div class="chk-note">${
+            it.auto_key === 'email_sent'
+              ? (done ? `Sent ${formatShortDate(new Date(it.sent_at))}`
+                      : 'Sends automatically once the lesson is booked')
+              : (done ? 'Verified by the portal'
+                      : 'Waiting — the portal will tick this itself')
+          }</div>` : ''}
+          ${blocked ? `<div class="chk-note" style="color:#92400e;">Tracked as a separate task</div>` : ''}
+        </div>
+        <div>${
+          (it.auto_key === 'lessons_ended' && !done)
+            ? `<button class="btn btn-secondary btn-sm" onclick="endLessonsFor('${studentId}')">End lessons…</button>`
+          : (!auto && !done && !blocked && it.can_defer)
+            ? `<button class="btn btn-ghost btn-sm" onclick="blockItem('${studentId}','${it.id}')">To do</button>`
+            : ''}</div>
+      </div>`;
+    }).join('')}`;
+}
+
+async function toggleItem(studentId, itemId) {
+  const { items } = procByStudent[studentId];
+  const it = items.find(x => x.id === itemId);
+  if (!it) return;
+
+  const next = !it.is_done;
+  const { error } = await db.from('process_items').update({
+    is_done: next,
+    done_by: next ? currentProfile.id : null,
+    done_at: next ? new Date().toISOString() : null,
+    blocked_task_id: next ? null : it.blocked_task_id,
+  }).eq('id', itemId);
+  if (error) { showToast('Could not update: ' + error.message, 'error'); return; }
+
+  it.is_done = next;
+  if (next) it.blocked_task_id = null;
+  await syncProcessStatus(studentId);
+  renderProcessBody(studentId);
+  renderStudents(allStudents);
+}
+
+// An item that can't be done yet gets a task instead of a false tick.
+// Previously an admin would tick eWay anyway and track the real work
+// separately, which loses the only thing the checklist records.
+async function blockItem(studentId, itemId) {
+  const { proc, items } = procByStudent[studentId];
+  const it = items.find(x => x.id === itemId);
+  const s  = allStudents.find(x => x.id === studentId);
+  const name = `${s?.profiles?.first_name ?? ''} ${s?.profiles?.last_name ?? ''}`.trim();
+  if (!it) return;
+
+  if (!confirm(
+    `Create a task for "${it.label}"?\n\n` +
+    `It will be due today and assigned to you. The checklist shows this ` +
+    `step as outstanding until the task is done.`)) return;
+
+  const { data: task, error: tErr } = await db.from('tasks').insert({
+    title:        `${it.label} — ${name}`,
+    subject_type: 'student', subject_id: studentId,
+    studio_id:    s?.studio_id ?? null,
+    assigned_to:  currentProfile.id,
+    // Due today by default. Without a date it would never appear in any
+    // dashboard bucket, which defeats the point of raising it.
+    due_date:     toISODate(new Date()),
+    created_by:   currentProfile.id,
+    source:       'process',
+    process_id:   proc.id,
+  }).select('id').single();
+  if (tErr) { showToast('Could not create the task: ' + tErr.message, 'error'); return; }
+
+  const { error } = await db.from('process_items')
+    .update({ blocked_task_id: task.id }).eq('id', itemId);
+  if (error) { showToast('Could not update: ' + error.message, 'error'); return; }
+
+  it.blocked_task_id = task.id;
+  renderProcessBody(studentId);
+  renderStudents(allStudents);
+  showToast('Task created — the checklist shows this step as blocked.', 'success');
+}
+
+async function syncProcessStatus(studentId) {
+  const { proc, items, checks } = procByStudent[studentId];
+  const p = processProgress(items, checks);
+  const want = p.complete ? 'complete' : 'in_progress';
+  if (proc.status === want) return;
+
+  await db.from('student_processes').update({
+    status: want,
+    completed_at: want === 'complete' ? new Date().toISOString() : null,
+  }).eq('id', proc.id);
+  proc.status = want;
+
+  // Finishing the end-enrolment checklist is what makes someone
+  // inactive — the status follows the process rather than an admin
+  // having to remember a separate step.
+  if (want === 'complete' && proc.process_type === 'end_enrolment') {
+    await db.from('students').update({ status: 'inactive' }).eq('id', studentId);
+    showToast('Enrolment ended — student marked inactive.', 'success');
+    await loadStudents();
+  }
+}
+
+function closeProcess() { document.getElementById('procModal').classList.add('hidden'); }
 
 // ---- Filter ----
 function filterStudents() {
@@ -782,11 +1176,106 @@ async function saveStudent() {
 }
 
 // ---- Toggle active/inactive ----
-async function toggleStudentStatus(id, currentStatus) {
-  const newStatus = currentStatus === 'inactive' ? 'active' : 'inactive';
-  const { error } = await db.from('students').update({ status: newStatus }).eq('id', id);
-  if (error) { showToast('Could not update status.', 'error'); return; }
-  showToast(`Student ${newStatus === 'inactive' ? 'deactivated' : 'activated'}.`, 'success');
+// Ending an enrolment is a process, not a status flag. The old
+// Deactivate button set the status and left the lessons running, so a
+// "deactivated" student still appeared on their teacher's schedule.
+async function endEnrolmentFor(studentId) {
+  const s = allStudents.find(x => x.id === studentId);
+  const name = `${s?.profiles?.first_name ?? ''} ${s?.profiles?.last_name ?? ''}`.trim();
+
+  const answer = prompt(
+    `Ending ${name}'s enrolment.\n\n` +
+    `  1 — Plan it: create a task with the end date and the reason\n` +
+    `  2 — Start now: run the checklist and send the farewell email\n\n` +
+    `Enter 1 or 2:`);
+  if (answer === null) return;
+
+  if (answer.trim() === '1') {
+    document.getElementById('procPlanBtn').dataset.studentId = studentId;
+    await planEndEnrolment();
+    return;
+  }
+  if (answer.trim() !== '2') { showToast('Enter 1 or 2.', 'warning'); return; }
+
+  if (!confirm(`Start the end-enrolment checklist for ${name}?\n\nThis sends the farewell email.`)) return;
+  try {
+    await startProcess(studentId, 'end_enrolment', currentProfile.id);
+    await loadStudents();
+    if (procByStudent[studentId]) openProcess(studentId);
+    showToast('End enrolment checklist started.', 'success');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+// Ends every active lesson series for a student on a chosen date.
+// Occurrences up to that date stay put — students usually have notice
+// to serve — and everything after it is cancelled. Nothing is deleted,
+// so past attendance and notes survive.
+async function endLessonsFor(studentId) {
+  const s = allStudents.find(x => x.id === studentId);
+  const name = `${s?.profiles?.first_name ?? ''} ${s?.profiles?.last_name ?? ''}`.trim();
+
+  const { data: ls } = await db.from('lesson_students')
+    .select('lesson_id').eq('student_id', studentId);
+  const ids = (ls ?? []).map(r => r.lesson_id);
+  if (!ids.length) { showToast('This student has no lessons.', 'warning'); return; }
+
+  const { data: lessons } = await db.from('lessons')
+    .select('id,instrument,day_of_week,start_time,status').in('id', ids).eq('status','active');
+  if (!lessons?.length) { showToast('No active lessons to end.', 'warning'); return; }
+
+  const when = prompt(
+    `When is ${name}'s last lesson?\n\n` +
+    `Lessons up to and including this date are kept. Everything after ` +
+    `it is cancelled.\n\nFormat: YYYY-MM-DD`,
+    toISODate(new Date()));
+  if (when === null) return;
+  const endDate = when.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+    showToast('Enter a date as YYYY-MM-DD.', 'warning'); return;
+  }
+
+  const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const list = lessons.map(l =>
+    `  · ${l.instrument}, ${DAYS[l.day_of_week]} ${formatTime(l.start_time)}`).join('\n');
+
+  if (!confirm(
+    `End ${lessons.length} lesson series for ${name}?\n\n${list}\n\n` +
+    `Last lesson: ${formatShortDate(parseLocalDate(endDate))}\n` +
+    `Anything after that date is cancelled. Past lessons, attendance and ` +
+    `notes are kept.`)) return;
+
+  try {
+    const lessonIds = lessons.map(l => l.id);
+
+    const { error: oErr } = await db.from('lesson_occurrences')
+      .update({ status: 'cancelled' })
+      .in('lesson_id', lessonIds).gt('date', endDate);
+    if (oErr) throw new Error(oErr.message);
+
+    const { error: lErr } = await db.from('lessons')
+      .update({ status: 'cancelled' }).in('id', lessonIds);
+    if (lErr) throw new Error(lErr.message);
+
+    showToast(
+      `${lessons.length} series ended. Last lesson ${formatShortDate(parseLocalDate(endDate))}.`,
+      'success');
+    await loadStudents();
+    if (procByStudent[studentId]) openProcess(studentId);
+  } catch (err) {
+    showToast('Could not end the lessons: ' + err.message, 'error');
+  }
+}
+
+// Undo, for someone marked inactive by mistake. A genuine return runs
+// through a trial or enrolment process instead, which sets the status
+// itself.
+async function reactivateStudent(studentId) {
+  if (!confirm('Set this student back to active?\n\nIf they are actually returning, start a trial or enrolment instead — that sets the status and creates the lessons.')) return;
+  const { error } = await db.from('students').update({ status: 'active' }).eq('id', studentId);
+  if (error) { showToast('Could not update: ' + error.message, 'error'); return; }
+  showToast('Student reactivated.', 'success');
   await loadStudents();
 }
 
@@ -934,6 +1423,7 @@ async function confirmImport() {
   await loadStudents();
 }
 
+document.getElementById('procModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeProcess(); });
 document.getElementById('studentModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeStudentModal(); });
 document.getElementById('importModal').addEventListener('click',  e => { if (e.target === e.currentTarget) closeImportModal(); });
 

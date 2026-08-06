@@ -176,6 +176,21 @@
   </main>
 </div>
 
+<!-- ENQUIRY OUTCOME — asked when closing a prospect's follow-up -->
+<div class="modal-overlay hidden" id="outcomeModal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <span class="modal-title">How did it go?</span>
+      <button class="modal-close" onclick="closeOutcome()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-sm" style="line-height:1.7;margin-bottom:1rem;" id="ocPrompt"></p>
+      <div style="display:flex;flex-direction:column;gap:0.5rem;" id="ocButtons"></div>
+      <div class="form-hint" style="margin-top:0.85rem;" id="ocHint"></div>
+    </div>
+  </div>
+</div>
+
 <!-- TASK DETAIL -->
 <div class="modal-overlay hidden" id="taskModal">
   <div class="modal" style="max-width:600px;">
@@ -185,6 +200,15 @@
     </div>
     <div class="modal-body">
       <input type="hidden" id="tmId">
+
+      <!-- Enquiry context, shown only when the subject is a prospect -->
+      <div class="hidden" id="tmEnquiry"
+           style="background:var(--off-white);border-left:3px solid var(--orange);
+                  border-radius:0 var(--r-sm) var(--r-sm) 0;padding:0.7rem 0.85rem;margin-bottom:0.85rem;">
+        <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.07em;
+                    color:var(--mid-grey);font-weight:600;margin-bottom:0.3rem;">Enquiry</div>
+        <div id="tmEnquiryBody" style="font-size:0.845rem;line-height:1.55;color:var(--dark-grey);"></div>
+      </div>
 
       <div class="form-group">
         <label class="form-label">Title</label>
@@ -280,7 +304,10 @@
       </div>
     </div>
     <div class="modal-footer" style="justify-content:space-between;">
-      <button class="btn btn-danger btn-sm" onclick="cancelTask()">Cancel task</button>
+      <div class="flex gap-1">
+        <button class="btn btn-danger btn-sm" id="tmCancelBtn" onclick="cancelTask()">Cancel task</button>
+        <button class="btn btn-danger btn-sm hidden" id="tmDiscardBtn" onclick="discardEnquiry()">Discard as spam</button>
+      </div>
       <div class="flex gap-1">
         <button class="btn btn-ghost" onclick="closeTask()">Close</button>
         <button class="btn btn-secondary" id="tmDoneBtn" onclick="toggleDone()">Mark done</button>
@@ -293,6 +320,7 @@
 <div id="toastWrap" class="toast-wrap"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-client.js"></script>
+<script src="js/processes.js"></script>
 <script>
 let me          = null;
 let isTeacher   = false;
@@ -323,6 +351,21 @@ let openTask    = null;
     document.getElementById('filterBar').classList.add('hidden');
   }
   await loadTasks();
+
+  // Arrived from Enquiries with a specific task in mind
+  const wanted = sessionStorage.getItem('openTaskId');
+  if (wanted) {
+    sessionStorage.removeItem('openTaskId');
+    if (tasks.some(t => t.id === wanted)) {
+      openTaskModal(wanted);
+    } else {
+      // Most likely closed, and the status filter defaults to Open
+      document.getElementById('filterStatus').value = 'all';
+      onStatusFilterChange();
+      if (tasks.some(t => t.id === wanted)) openTaskModal(wanted);
+      else showToast('That task is no longer visible to you.', 'warning');
+    }
+  }
 })();
 
 function renderSidebar() {
@@ -340,6 +383,7 @@ function renderSidebar() {
     mail:    '<path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/>',
     check:   '<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
     task:    '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+    inbox:   '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
     home:    '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
     shield:  '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
   };
@@ -351,11 +395,14 @@ function renderSidebar() {
       ${item('my-students.html','My Students',ICONS.people)}
       ${item('tasks.html','My Tasks',ICONS.task,true)}`;
   } else {
-    html = `<div class="sidebar-section">Main</div>
+    // Teaching = the operation. Front desk = work in flight.
+    html = `<div class="sidebar-section">Teaching</div>
       ${item('dashboard-admin.html','Schedule',ICONS.grid)}
+      ${item('lessons.html','Lessons',ICONS.cal)}
       ${item('students.html','Students',ICONS.people)}
       ${item('teachers.html','Teachers',ICONS.person)}
-      ${item('lessons.html','Lessons',ICONS.cal)}
+      <div class="sidebar-section">Front desk</div>
+      ${item('enquiries.html','Enquiries',ICONS.inbox)}
       ${item('tasks.html','Tasks',ICONS.task,true)}
       ${item('notifications.html','Notifications',ICONS.mail)}
       <div class="sidebar-section">Reports</div>
@@ -376,7 +423,8 @@ async function loadOptions() {
   const [stRes, adRes, studRes, teachRes] = await Promise.all([
     db.from('studios').select('id,name').eq('status','active').order('name'),
     db.from('admins').select('id,user_id'),
-    db.from('students').select('id,user_id,status').in('status',['active','trial']),
+    db.from('students').select('id,user_id,status,enquiry_notes,enquiry_date,email')
+      .in('status',['active','trial','prospective','lapsed','inactive']),
     db.from('teachers').select('id,user_id'),
   ]);
 
@@ -422,7 +470,10 @@ async function loadOptions() {
   }
 
   studentOpts = (studRes.data ?? [])
-    .map(s => ({ id: s.id, name: nameOf(s.user_id) }))
+    .map(s => ({
+      id: s.id, name: nameOf(s.user_id), status: s.status,
+      enquiry_notes: s.enquiry_notes, enquiry_date: s.enquiry_date, email: s.email,
+    }))
     .filter(s => s.name).sort((a,b) => a.name.localeCompare(b.name));
 
   teacherOpts = (teachRes.data ?? [])
@@ -458,9 +509,13 @@ async function loadOptions() {
       ? items.map(x => `<option value="${prefix}:${x.id}">${x.name}</option>`).join('')
       : `<option value="" disabled>None available</option>`) + `</optgroup>`;
 
+  const enrolled  = studentOpts.filter(s => ['active','trial','inactive'].includes(s.status));
+  const enquiries = studentOpts.filter(s => s.status === 'prospective');
+
   document.getElementById('tmSubject').innerHTML =
     `<option value="">Nothing in particular</option>` +
-    optGroup('Students', studentOpts, 'student') +
+    optGroup('Students', enrolled, 'student') +
+    (enquiries.length ? optGroup('Enquiries', enquiries, 'student') : '') +
     optGroup('Teachers', teacherOpts, 'teacher');
 }
 
@@ -643,6 +698,10 @@ function render() {
     if (dueTxt) bits.push(`<span class="${dueCls}">${dueTxt}</span>`);
     if (t.kind === 'waitlist') bits.push(`<span class="tag tag-wait">Waiting</span>`);
     if (t.awaiting_admin && !isTeacher) bits.push(`<span class="tag tag-replied">Teacher replied</span>`);
+    if (t.subject_type === 'student') {
+      const subj = studentOpts.find(x => x.id === t.subject_id);
+      if (subj?.status === 'lapsed') bits.push(`<span class="tag">Lapsed enquiry</span>`);
+    }
 
     const rowCls   = isCancelled ? 'cancelled' : (isDone ? 'done' : '');
     const checkCls = isCancelled ? 'cancelled' : (isDone ? 'checked' : '');
@@ -713,6 +772,7 @@ async function openTaskModal(id) {
   document.getElementById('tmTitleInput').value  = t.title ?? '';
   document.getElementById('tmDue').value         = t.due_date ?? '';
   document.getElementById('tmKind').value       = t.kind ?? 'task';
+  renderEnquiryContext(t);
   onKindChange();
 
   if (!isTeacher) {
@@ -736,9 +796,147 @@ async function openTaskModal(id) {
       b.style.display = isTeacher ? 'none' : '';
     });
 
-  document.getElementById('tmDoneBtn').textContent = t.status === 'open' ? 'Mark done' : 'Reopen';
+  // Hide Reopen entirely for a lapsed enquiry — the button would only
+  // ever refuse.
+  const subj = t.subject_type === 'student'
+    ? studentOpts.find(x => x.id === t.subject_id) : null;
+  const doneBtn = document.getElementById('tmDoneBtn');
+  doneBtn.textContent = t.status === 'open' ? 'Mark done' : 'Reopen';
+  doneBtn.style.display =
+    (t.status !== 'open' && subj?.status === 'lapsed') ? 'none' : '';
+
+  const isEnquiryFollowUp = subj?.status === 'prospective';
+
+  document.getElementById('tmDiscardBtn').classList.toggle(
+    'hidden', isTeacher || !isEnquiryFollowUp);
+
+  // For an enquiry, Cancel would leave it open with nothing chasing it.
+  document.getElementById('tmCancelBtn').classList.toggle(
+    'hidden', isTeacher || isEnquiryFollowUp);
   document.getElementById('taskModal').classList.remove('hidden');
   await loadLog(t.id);
+}
+
+// An enquiry's description is the most useful thing an admin has before
+// the first conversation. Surface it where the chasing happens.
+function renderEnquiryContext(t) {
+  const box = document.getElementById('tmEnquiry');
+  if (!box) return;
+
+  const s = (t.subject_type === 'student')
+    ? studentOpts.find(x => x.id === t.subject_id)
+    : null;
+
+  if (!s || s.status !== 'prospective') { box.classList.add('hidden'); return; }
+
+  const bits = [];
+  if (s.enquiry_date) bits.push(`Enquired ${formatShortDate(parseLocalDate(s.enquiry_date))}`);
+  if (s.email)        bits.push(escapeHtml(s.email));
+
+  document.getElementById('tmEnquiryBody').innerHTML =
+    (bits.length ? `<div class="text-sm text-muted" style="margin-bottom:0.3rem;">${bits.join(' · ')}</div>` : '') +
+    (s.enquiry_notes
+      ? `<div style="white-space:pre-wrap;">${escapeHtml(s.enquiry_notes)}</div>`
+      : `<div class="text-muted">No description given.</div>`) +
+    `<div id="tmMatches"></div>` +
+    `<div style="margin-top:0.4rem;"><a href="enquiries.html" style="color:var(--orange);font-size:0.78rem;text-decoration:none;">Open in Enquiries →</a></div>`;
+
+  box.classList.remove('hidden');
+
+  // Same check as the Enquiries page — an admin working from Tasks
+  // should not have to go looking to find out we know this person
+  const parts = String(s.name ?? '').split(' ');
+  findPossibleMatches({
+    id: s.id, email: s.email,
+    first_name: parts[0] ?? '', last_name: parts.slice(1).join(' '),
+    phone: '',
+  }).then(m => {
+    const box2 = document.getElementById('tmMatches');
+    if (box2 && m.length) box2.innerHTML = `<div style="margin-top:0.5rem;">${matchBanner(m)}</div>`;
+  }).catch(() => {});
+}
+
+
+// Does this enquiry look like someone we already know? Returning people
+// send a fresh enquiry rather than reviving an old one, and it is often a
+// past student rather than a lapsed enquiry. Matching on email, phone or
+// exact name catches most of it — the admin judges the rest.
+async function findPossibleMatches(enq) {
+  const out    = new Map();
+  const digits = s => String(s ?? '').replace(/\D/g, '');
+  const myPhone = digits(enq.phone);
+
+  const add = (row, why) => {
+    if (!row || row.id === enq.id) return;
+    if (out.has(row.id)) { out.get(row.id).why.add(why); return; }
+    out.set(row.id, { ...row, why: new Set([why]) });
+  };
+
+  // Same email address
+  if (enq.email) {
+    const { data } = await db.from('students')
+      .select('id,user_id,status,studio_id,email')
+      .ilike('email', enq.email.trim());
+    for (const r of (data ?? [])) add(r, 'same email');
+  }
+
+  // Same name, or same phone number
+  const { data: profs } = await db.from('profiles')
+    .select('id,first_name,last_name,phone')
+    .ilike('first_name', (enq.first_name ?? '').trim())
+    .ilike('last_name',  (enq.last_name  ?? '').trim());
+
+  const { data: byPhone } = myPhone
+    ? await db.from('profiles').select('id,first_name,last_name,phone')
+    : { data: [] };
+
+  const candidateIds = [
+    ...(profs ?? []).map(p => p.id),
+    ...(byPhone ?? []).filter(p => digits(p.phone) && digits(p.phone) === myPhone).map(p => p.id),
+  ];
+
+  if (candidateIds.length) {
+    const { data } = await db.from('students')
+      .select('id,user_id,status,studio_id,email')
+      .in('user_id', [...new Set(candidateIds)]);
+    for (const r of (data ?? [])) {
+      const nameHit  = (profs   ?? []).some(p => p.id === r.user_id);
+      const phoneHit = (byPhone ?? []).some(p => p.id === r.user_id && digits(p.phone) === myPhone);
+      if (nameHit)  add(r, 'same name');
+      if (phoneHit) add(r, 'same phone');
+    }
+  }
+
+  const matches = [...out.values()];
+  if (!matches.length) return [];
+
+  // Names for display
+  const { data: mp } = await db.from('profiles')
+    .select('id,first_name,last_name')
+    .in('id', matches.map(m => m.user_id).filter(Boolean));
+  const nameOf = {};
+  (mp ?? []).forEach(p => { nameOf[p.id] = `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim(); });
+
+  return matches.map(m => ({
+    ...m,
+    name: nameOf[m.user_id] ?? '(unnamed)',
+    why:  [...m.why].join(', '),
+  }));
+}
+
+function matchBanner(matches) {
+  if (!matches.length) return '';
+  const LABEL = {
+    active:'Currently enrolled', trial:'On a trial', inactive:'Past student',
+    lapsed:'Lapsed enquiry', prospective:'Another open enquiry',
+  };
+  return `<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:var(--r-sm);
+              padding:0.7rem 0.85rem;margin-bottom:1rem;font-size:0.82rem;color:#92400e;line-height:1.6;">
+      <strong>We may already know this person.</strong>
+      ${matches.map(m =>
+        `<div style="margin-top:0.3rem;">${m.name} — ${LABEL[m.status] ?? m.status}
+         <span style="opacity:0.75;">(${m.why})</span></div>`).join('')}
+    </div>`;
 }
 
 function closeTask() {
@@ -1004,7 +1202,60 @@ async function quickToggle(id) {
   await setStatus(id, t.status === 'open' ? 'done' : 'open');
 }
 
+// Closing a follow-up task for someone still marked as an enquiry leaves
+// them stranded on the Enquiries page with no record of what happened.
+// Ask, rather than letting the enquiry sit there indefinitely.
+let pendingClose = null;
+
 async function setStatus(id, status) {
+  if (status === 'done') {
+    const t = tasks.find(x => x.id === id);
+    const s = t?.subject_type === 'student'
+      ? studentOpts.find(x => x.id === t.subject_id) : null;
+    const lower = String(t?.title ?? '').toLowerCase();
+    const isTrialFollowUp  = lower.startsWith('trial follow-up');
+    const isEndEnrolment   = lower.startsWith('end enrolment');
+
+    if (s?.status === 'prospective') {
+      openOutcome({ taskId: id, student: s, kind: 'enquiry' });
+      return;
+    }
+    // The same decision, one stage later: after the trial, do they enrol?
+    if (s?.status === 'trial' && isTrialFollowUp) {
+      openOutcome({ taskId: id, student: s, kind: 'trial' });
+      return;
+    }
+    // An end-enrolment task is the plan; closing it is the moment to act
+    if (s?.status === 'active' && isEndEnrolment) {
+      if (confirm(`Start the end-enrolment checklist for ${s.name}?\n\nThis sends the farewell email.`)) {
+        try {
+          await startProcess(s.subject_id ?? t.subject_id, 'end_enrolment', me.id);
+          sessionStorage.setItem('openProcessStudentId', t.subject_id);
+          await closeTaskNow(id);
+          window.location.href = 'students.html';
+          return;
+        } catch (err) {
+          showToast('Could not start the checklist: ' + err.message, 'error');
+          return;
+        }
+      }
+    }
+  }
+
+  // Reopening a task for a lapsed enquiry would restart a chase that
+  // was deliberately abandoned. The enquiry must be revived first.
+  if (status === 'open') {
+    const t = tasks.find(x => x.id === id);
+    const s = t?.subject_type === 'student'
+      ? studentOpts.find(x => x.id === t.subject_id) : null;
+    if (s?.status === 'lapsed') {
+      showToast(`${s.name} is a lapsed enquiry. Revive the enquiry first if they've come back.`, 'warning');
+      return;
+    }
+  }
+
+  if (status === 'done') await offerTaskEmail(id);
+
   const patch = { status, awaiting_admin: false };
   if (status === 'done') { patch.completed_at = new Date().toISOString(); patch.completed_by = me.id; }
   else                   { patch.completed_at = null; patch.completed_by = null; }
@@ -1015,8 +1266,173 @@ async function setStatus(id, status) {
   await loadTasks();
 }
 
+function openOutcome(ctx) {
+  pendingClose = ctx;
+  const n = ctx.student.name;
+
+  if (ctx.kind === 'enquiry') {
+    document.getElementById('ocPrompt').innerHTML =
+      `<strong>${n}</strong> is still marked as an enquiry. What came of it?`;
+    document.getElementById('ocButtons').innerHTML = `
+      <button class="btn btn-secondary" onclick="resolveEnquiry('trial')">Booked a trial lesson</button>
+      <button class="btn btn-secondary" onclick="resolveEnquiry('active')">Enrolling in ongoing lessons</button>
+      <button class="btn btn-secondary" onclick="resolveEnquiry('lapsed')">Not proceeding</button>`;
+    document.getElementById('ocHint').innerHTML =
+      `Booking a trial or enrolling moves them out of Enquiries and into Students.<br><br>` +
+      `Still deciding? Close this box and change the due date instead — the task stays ` +
+      `open so they keep being chased.`;
+  } else {
+    document.getElementById('ocPrompt').innerHTML =
+      `<strong>${n}</strong> has had their trial lesson. Are they carrying on?`;
+    document.getElementById('ocButtons').innerHTML = `
+      <button class="btn btn-secondary" onclick="resolveEnquiry('active')">Enrolling in ongoing lessons</button>
+      <button class="btn btn-secondary" onclick="resolveEnquiry('inactive')">Not proceeding</button>`;
+    document.getElementById('ocHint').innerHTML =
+      `Enrolling starts the ongoing enrolment checklist.<br><br>` +
+      `Still thinking about it? Close this box and push the due date out instead, ` +
+      `and log what they said — the task stays open.`;
+  }
+
+  document.getElementById('outcomeModal').classList.remove('hidden');
+}
+
+function closeOutcome() {
+  document.getElementById('outcomeModal').classList.add('hidden');
+  pendingClose = null;
+}
+
+async function resolveEnquiry(outcome) {
+  if (!pendingClose) return;
+  const { taskId, student } = pendingClose;
+
+  {
+    const patch = { status: outcome };
+    if (outcome === 'lapsed' || outcome === 'inactive') {
+      const reason = prompt('Why are they not proceeding? (optional)');
+      if (reason === null) return;            // cancelled — leave everything alone
+      if (outcome === 'lapsed') patch.lapsed_reason = reason.trim() || null;
+    }
+    const { error } = await db.from('students').update(patch).eq('id', student.id);
+    if (error) { showToast('Could not update the enquiry: ' + error.message, 'error'); return; }
+    student.status = outcome;                 // keep local state honest
+
+    // A conversion starts the corresponding checklist. This is the
+    // natural trigger — it is the moment the admin knows which one.
+    const procType = outcome === 'trial'  ? 'trial_confirmation'
+                   : outcome === 'active' ? 'ongoing_enrolment'
+                   : null;
+    if (procType) {
+      try {
+        await startProcess(student.id, procType, me.id);
+      } catch (err) {
+        showToast('Converted, but the checklist could not be started: ' + err.message, 'warning');
+      }
+    }
+  }
+
+
+  document.getElementById('outcomeModal').classList.add('hidden');
+  pendingClose = null;
+
+  await closeTaskNow(taskId);
+
+  if (outcome === 'trial' || outcome === 'active') {
+    sessionStorage.setItem('openProcessStudentId', student.id);
+    window.location.href = 'students.html';
+    return;
+  }
+
+  showToast({
+    lapsed:   `${student.name} marked lapsed.`,
+    inactive: `${student.name} marked inactive — they didn't carry on after the trial.`,
+  }[outcome], 'success');
+}
+
+// The plain close, with the enquiry prompt already dealt with
+// Some tasks have an email that goes with them. Offer it at the moment
+// the admin closes the task, rather than expecting them to remember.
+async function offerTaskEmail(id) {
+  const t = tasks.find(x => x.id === id);
+  if (!t || t.subject_type !== 'student') return;
+
+  const title = String(t.title ?? '').toLowerCase();
+  const isCheckIn = title.startsWith('check-in');
+  const isFinance = title.startsWith('finance follow-up');
+  if (!isCheckIn && !isFinance) return;
+
+  const what = isCheckIn ? 'the check-in email' : 'the payment follow-up email';
+  if (!confirm(`Send ${what} to the student?`)) return;
+
+  const r = isCheckIn
+    ? await sendCheckInEmail(t.subject_id, me.id)
+    : await sendFinanceFollowUp(t.subject_id, me.id);
+
+  showToast(
+    r === 'sent' ? 'Email sent.'
+    : r === 'no-studio-email' ? 'Not sent — the studio has no email address.'
+    : 'Could not send the email.',
+    r === 'sent' ? 'success' : 'warning');
+}
+
+async function closeTaskNow(id) {
+  const { error } = await db.from('tasks').update({
+    status: 'done', awaiting_admin: false,
+    completed_at: new Date().toISOString(), completed_by: me.id,
+  }).eq('id', id);
+  if (error) { showToast('Could not close the task: ' + error.message, 'error'); return; }
+  closeTask();
+  await loadTasks();
+}
+
+// Spam enquiries need removing entirely. Cancelling the task alone would
+// hide the prompt while leaving the enquiry in the registry for good.
+async function discardEnquiry() {
+  const id = document.getElementById('tmId').value;
+  const t  = tasks.find(x => x.id === id);
+  const s  = t?.subject_type === 'student'
+    ? studentOpts.find(x => x.id === t.subject_id) : null;
+  if (!s) { showToast('Could not identify the enquiry.', 'error'); return; }
+
+  if (!confirm(
+    `Discard the enquiry from ${s.name} completely?\n\n` +
+    `This deletes the enquiry and this task — use it for spam and fake enquiries.\n` +
+    `For a genuine enquiry that didn't convert, close the task and choose "Not proceeding".`
+  )) return;
+
+  try {
+    await db.from('tasks').delete()
+      .eq('subject_type','student').eq('subject_id', s.id);
+    await db.from('student_instruments').delete().eq('student_id', s.id);
+
+    const { data: stu } = await db.from('students')
+      .select('user_id').eq('id', s.id).maybeSingle();
+
+    await db.from('students').delete().eq('id', s.id);
+    if (stu?.user_id) await db.from('profiles').delete().eq('id', stu.user_id);
+
+    showToast(`Enquiry from ${s.name} discarded.`, 'success');
+    closeTask();
+    await loadTasks();
+    await loadOptions();
+  } catch (err) {
+    showToast('Could not discard: ' + err.message, 'error');
+  }
+}
+
 async function cancelTask() {
   const id = document.getElementById('tmId').value;
+  const t  = tasks.find(x => x.id === id);
+  const s  = t?.subject_type === 'student'
+    ? studentOpts.find(x => x.id === t.subject_id) : null;
+
+  if (s?.status === 'prospective') {
+    showToast(
+      'Cancelling would leave the enquiry open with nothing chasing it. ' +
+      'Use "Discard as spam", or mark it done and choose an outcome.',
+      'warning');
+    return;
+  }
+
   if (!confirm('Cancel this task? It stays on the record but drops off the open list.')) return;
   await setStatus(id, 'cancelled');
   closeTask();
@@ -1024,6 +1440,9 @@ async function cancelTask() {
 
 document.getElementById('taskModal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeTask();
+});
+document.getElementById('outcomeModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeOutcome();
 });
 function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
 </script>

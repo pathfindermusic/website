@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Enquiries — Pathfinder Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/portal.css">
+  <style>
+    .enq-table { width: 100%; border-collapse: collapse; font-size: 0.845rem; }
+    .enq-table th {
+      text-align: left; font-size: 0.7rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.07em; color: var(--mid-grey);
+      padding: 0 1rem 0.6rem; border-bottom: 1px solid var(--border); white-space: nowrap;
+    }
+    .enq-table td {
+      padding: 0.75rem 1rem; border-bottom: 1px solid var(--border);
+      color: var(--dark-grey); vertical-align: top;
+    }
+    .enq-table tr:last-child td { border-bottom: none; }
+    .enq-table tr:hover td { background: var(--off-white); cursor: pointer; }
+    .enq-table tr.lapsed td { opacity: 0.55; }
+
+    .enq-name  { font-weight: 600; color: var(--charcoal); }
+    .enq-sub   { font-size: 0.76rem; color: var(--mid-grey); }
+    .enq-notes {
+      font-size: 0.78rem; color: var(--dark-grey); line-height: 1.5;
+      max-width: 340px;
+    }
+
+    .due-overdue { color: #dc2626; font-weight: 600; }
+    .due-today   { color: var(--orange); font-weight: 600; }
+
+    .chip {
+      display: inline-block; font-size: 0.7rem; padding: 0.1rem 0.45rem;
+      border-radius: 3px; background: rgba(232,73,30,0.08);
+      color: var(--orange); border: 1px solid rgba(232,73,30,0.2);
+    }
+    .attempts-none { color: #dc2626; font-weight: 600; }
+
+    .detail-block {
+      background: var(--off-white); border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 0.85rem; margin-bottom: 1rem;
+    }
+    .kv { display: grid; grid-template-columns: 110px 1fr; gap: 0.4rem 0.85rem; font-size: 0.86rem; }
+    .kv dt { color: var(--mid-grey); font-size: 0.78rem; }
+    .kv dd { margin: 0; color: var(--charcoal); }
+  </style>
+</head>
+<body>
+<div class="portal-shell">
+
+  <nav class="topnav">
+    <a href="#" class="topnav-logo"><img src="../Logo_-_long.png" alt="Pathfinder Music Lessons"></a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">–</span>
+        </div>
+      </div>
+      <a href="change-password.html" class="btn-logout" style="text-decoration:none;">🔑 Password</a>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <aside class="sidebar" id="sidebar"><!-- injected --></aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Enquiries</div>
+        <div class="page-sub" id="pageSub">Loading…</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="openAdd()">+ Add enquiry</button>
+    </div>
+
+    <div class="filters-bar">
+      <select class="filter-select" id="filterStudio" onchange="render()">
+        <option value="">All studios</option>
+      </select>
+      <select class="filter-select" id="filterStatus" onchange="render()">
+        <option value="prospective">Open enquiries</option>
+        <option value="converted">Converted</option>
+        <option value="lapsed">Lapsed</option>
+        <option value="all">All</option>
+      </select>
+    </div>
+
+    <div class="card">
+      <div style="overflow-x:auto;">
+        <table class="enq-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Studio</th>
+              <th>Instrument</th>
+              <th>What they said</th>
+              <th>Enquired</th>
+              <th>Attempts</th>
+              <th>Next follow-up</th>
+            </tr>
+          </thead>
+          <tbody id="enqBody">
+            <tr><td colspan="7"><div class="loading"><div class="spinner"></div> Loading…</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ADD ENQUIRY -->
+<div class="modal-overlay hidden" id="addModal">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <span class="modal-title">Add enquiry</span>
+      <button class="modal-close" onclick="closeAdd()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-sm text-muted" style="margin-bottom:1rem;">
+        For enquiries taken by phone or in person. Website enquiries arrive on their own.
+      </p>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Student first name *</label>
+          <input class="form-input" type="text" id="aFirst">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Student last name *</label>
+          <input class="form-input" type="text" id="aLast">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Parent / guardian</label>
+          <input class="form-input" type="text" id="aParent" placeholder="If the student is a minor">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone *</label>
+          <input class="form-input" type="tel" id="aPhone">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Email *</label>
+        <input class="form-input" type="email" id="aEmail">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Studio *</label>
+          <select class="form-select" id="aStudio"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Instrument *</label>
+          <select class="form-select" id="aInstrument"></select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">How did they get in touch? *</label>
+          <select class="form-select" id="aSource">
+            <option value="phone">Phone</option>
+            <option value="walk_in">Walk-in</option>
+            <option value="website">Website form</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Date of enquiry *</label>
+          <input class="form-input" type="date" id="aDate">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">What are they looking for?</label>
+        <textarea class="form-textarea" id="aNotes" style="min-height:80px;"
+          placeholder="Experience, age, anything else worth knowing before the first conversation"></textarea>
+      </div>
+
+      <div class="form-hint">
+        A follow-up task is created automatically, due on the enquiry date.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeAdd()">Cancel</button>
+      <button class="btn btn-primary" id="addBtn" onclick="saveEnquiry()">Add enquiry</button>
+    </div>
+  </div>
+</div>
+
+<!-- ENQUIRY DETAIL -->
+<div class="modal-overlay hidden" id="detailModal">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <span class="modal-title" id="dTitle">Enquiry</span>
+      <button class="modal-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div class="modal-body" id="dBody"></div>
+    <div class="modal-footer" style="justify-content:space-between;">
+      <button class="btn btn-danger btn-sm" onclick="deleteEnquiry()" id="dDeleteBtn">Delete</button>
+      <div class="flex gap-1">
+        <button class="btn btn-ghost" onclick="closeDetail()">Close</button>
+        <button class="btn btn-secondary" id="dLapseBtn" onclick="markLapsed()">Mark lapsed</button>
+        <a class="btn btn-primary" id="dTaskBtn" href="tasks.html">Open follow-up task</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toastWrap" class="toast-wrap"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/processes.js"></script>
+<script>
+const INSTRUMENTS = ['Guitar','Bass','Drums','Piano / Keyboard','Voice / Singing','Violin','Ukulele','Music Theory','Saxophone','Band','Other'];
+
+let me       = null;
+let studios  = [];
+let enquiries = [];
+let openEnq  = null;
+
+(async () => {
+  me = await requireAuth(['superuser','admin']);
+  if (!me) return;
+  renderTopNavUser(me);
+  renderSidebar();
+  if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
+
+  document.getElementById('aDate').value = toISODate(new Date());
+  document.getElementById('aInstrument').innerHTML =
+    INSTRUMENTS.map(i => `<option value="${i}">${i}</option>`).join('');
+
+  await loadStudios();
+  await loadEnquiries();
+})();
+
+function renderSidebar() {
+  const I = {
+    grid:  '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>',
+    people:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>',
+    person:'<circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/>',
+    cal:   '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+    mail:  '<path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/>',
+    task:  '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+    check: '<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+    inbox: '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+    home:  '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  };
+  const it = (h,l,p,a) => `<a class="nav-item ${a?'active':''}" href="${h}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${p}</svg>${l}</a>`;
+
+  // Teaching = the operation. Front desk = work in flight.
+  let html = `<div class="sidebar-section">Teaching</div>
+    ${it('dashboard-admin.html','Schedule',I.grid)}
+    ${it('lessons.html','Lessons',I.cal)}
+    ${it('students.html','Students',I.people)}
+    ${it('teachers.html','Teachers',I.person)}
+    <div class="sidebar-section">Front desk</div>
+    ${it('enquiries.html','Enquiries',I.inbox,true)}
+    ${it('tasks.html','Tasks',I.task)}
+    ${it('notifications.html','Notifications',I.mail)}
+    <div class="sidebar-section">Reports</div>
+    ${it('attendance-report.html','Attendance',I.check)}`;
+  if (me.role === 'superuser') {
+    html += `<div class="sidebar-section">Super User</div>
+      ${it('studios.html','Studios',I.home)}
+      ${it('admins.html','Admins',I.shield)}`;
+  }
+  document.getElementById('sidebar').innerHTML = html;
+}
+
+async function loadStudios() {
+  const { data } = await db.from('studios').select('id,name')
+    .eq('status','active').order('name');
+  studios = data ?? [];
+  const f = document.getElementById('filterStudio');
+  const a = document.getElementById('aStudio');
+  studios.forEach(s => {
+    f.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+    a.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+  });
+}
+
+// ============================================================
+// LOAD
+// ============================================================
+async function loadEnquiries() {
+  // Converted enquiries are students now, but they belong in the history
+  // of this page — otherwise it only ever shows the ones that failed.
+  const { data: rows, error } = await db.from('students')
+    .select('id,user_id,status,studio_id,email,parent_name,enquiry_notes,enquiry_date,enquiry_source,lapsed_reason')
+    .not('enquiry_date', 'is', null)
+    .order('enquiry_date', { ascending: false });
+
+  if (error) {
+    document.getElementById('enqBody').innerHTML =
+      `<tr><td colspan="7"><div class="empty-state"><p style="color:#dc2626;">${error.message}</p></div></td></tr>`;
+    return;
+  }
+
+  const list = rows ?? [];
+  const userIds = list.map(r => r.user_id).filter(Boolean);
+  const ids     = list.map(r => r.id);
+
+  const [profRes, instRes, taskRes] = await Promise.all([
+    userIds.length ? db.from('profiles').select('id,first_name,last_name,phone').in('id', userIds) : { data: [] },
+    ids.length     ? db.from('student_instruments').select('student_id,instrument').in('student_id', ids) : { data: [] },
+    ids.length     ? db.from('tasks').select('id,subject_id,status,due_date')
+                       .eq('subject_type','student').in('subject_id', ids) : { data: [] },
+  ]);
+
+  const pMap = {};
+  (profRes.data ?? []).forEach(p => { pMap[p.id] = p; });
+
+  const instMap = {};
+  (instRes.data ?? []).forEach(r => { (instMap[r.student_id] ??= []).push(r.instrument); });
+
+  // The follow-up task carries the chase; attempts come from its log
+  const taskMap = {};
+  (taskRes.data ?? []).forEach(t => {
+    const cur = taskMap[t.subject_id];
+    // Prefer an open task; otherwise prefer a completed one over a
+    // cancelled one, so a stranded enquiry is not masked.
+    const rank = s => s === 'open' ? 2 : s === 'done' ? 1 : 0;
+    if (!cur || rank(t.status) > rank(cur.status)) taskMap[t.subject_id] = t;
+  });
+
+  const taskIds = Object.values(taskMap).map(t => t.id);
+  const { data: notes } = taskIds.length
+    ? await db.from('task_notes').select('task_id,contact_method').in('task_id', taskIds)
+    : { data: [] };
+  const attemptCount = {};
+  (notes ?? []).forEach(n => {
+    if (n.contact_method) attemptCount[n.task_id] = (attemptCount[n.task_id] ?? 0) + 1;
+  });
+
+  enquiries = list.map(r => {
+    const p = pMap[r.user_id] ?? {};
+    const t = taskMap[r.id];
+    return {
+      ...r,
+      first_name: p.first_name ?? '',
+      last_name:  p.last_name  ?? '',
+      phone:      p.phone      ?? '',
+      instruments: instMap[r.id] ?? [],
+      task:        t ?? null,
+      attempts:    t ? (attemptCount[t.id] ?? 0) : 0,
+    };
+  });
+
+  render();
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function render() {
+  const fStudio = document.getElementById('filterStudio').value;
+  const fStatus = document.getElementById('filterStatus').value;
+  const today   = toISODate(new Date());
+
+  const CONVERTED = ['trial','active','inactive'];
+
+  let list = enquiries.slice();
+  if (fStudio) list = list.filter(e => e.studio_id === fStudio);
+  if (fStatus === 'converted')   list = list.filter(e => CONVERTED.includes(e.status));
+  else if (fStatus !== 'all')    list = list.filter(e => e.status === fStatus);
+
+  // Whatever needs chasing soonest rises to the top
+  list.sort((a, b) => {
+    const ad = a.task?.status === 'open' ? (a.task.due_date ?? '9999') : '9999';
+    const bd = b.task?.status === 'open' ? (b.task.due_date ?? '9999') : '9999';
+    return ad.localeCompare(bd);
+  });
+
+  const openCount = enquiries.filter(e => e.status === 'prospective').length;
+  const convCount = enquiries.filter(e => CONVERTED.includes(e.status)).length;
+  document.getElementById('pageSub').textContent =
+    `${openCount} open · ${convCount} converted · ${enquiries.length} total · ${list.length} shown`;
+
+  const studioName = id => studios.find(s => s.id === id)?.name ?? '—';
+  const body = document.getElementById('enqBody');
+
+  if (!list.length) {
+    body.innerHTML = `<tr><td colspan="7"><div class="empty-state">
+      <div class="empty-state-icon">📥</div><h3>No enquiries</h3>
+      <p>Website enquiries appear here. Phone and walk-in enquiries can be added above.</p>
+    </div></td></tr>`;
+    return;
+  }
+
+  body.innerHTML = list.map(e => {
+    let due = '—';
+    if (e.task?.status === 'open' && e.task.due_date) {
+      const label = formatShortDate(parseLocalDate(e.task.due_date));
+      due = e.task.due_date < today  ? `<span class="due-overdue">Overdue · ${label}</span>`
+          : e.task.due_date === today ? `<span class="due-today">Today</span>`
+          : label;
+    } else if (e.status === 'lapsed') {
+      due = '<span class="text-muted">Lapsed</span>';
+    } else if (CONVERTED.includes(e.status)) {
+      const L = { trial:'Trial booked', active:'Enrolled', inactive:'Enrolled, since left' };
+      due = `<span style="color:var(--present);font-weight:600;">${L[e.status]}</span>`;
+    } else if (!e.task || e.task.status === 'cancelled') {
+      due = '<span style="color:#92400e;font-weight:600;">Needs a task</span>';
+    } else {
+      due = '<span class="text-muted">Task closed</span>';
+    }
+
+    const notes = e.enquiry_notes
+      ? escapeHtml(e.enquiry_notes).slice(0, 140) + (e.enquiry_notes.length > 140 ? '…' : '')
+      : '<span class="text-muted">—</span>';
+
+    return `<tr class="${e.status !== 'prospective' ? 'lapsed' : ''}" onclick="openDetail('${e.id}')">
+      <td>
+        <div class="enq-name">${escapeHtml(e.first_name)} ${escapeHtml(e.last_name)}</div>
+        <div class="enq-sub">${escapeHtml(e.email ?? '')}</div>
+        ${e.phone ? `<div class="enq-sub">${escapeHtml(e.phone)}</div>` : ''}
+      </td>
+      <td>${studioName(e.studio_id)}</td>
+      <td>${e.instruments.map(i => `<span class="chip">${i}</span>`).join(' ') || '—'}</td>
+      <td><div class="enq-notes">${notes}</div></td>
+      <td>${e.enquiry_date ? formatShortDate(parseLocalDate(e.enquiry_date)) : '—'}</td>
+      <td class="${e.attempts === 0 && e.status === 'prospective' ? 'attempts-none' : ''}">${e.attempts}</td>
+      <td>${due}</td>
+    </tr>`;
+  }).join('');
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ============================================================
+// ADD
+// ============================================================
+function openAdd() {
+  ['aFirst','aLast','aParent','aPhone','aEmail','aNotes'].forEach(id =>
+    document.getElementById(id).value = '');
+  document.getElementById('aDate').value = toISODate(new Date());
+  document.getElementById('addModal').classList.remove('hidden');
+}
+function closeAdd() { document.getElementById('addModal').classList.add('hidden'); }
+
+async function saveEnquiry() {
+  const first  = document.getElementById('aFirst').value.trim();
+  const last   = document.getElementById('aLast').value.trim();
+  const email  = document.getElementById('aEmail').value.trim();
+  const phone  = document.getElementById('aPhone').value.trim();
+  const studio = document.getElementById('aStudio').value;
+  const inst   = document.getElementById('aInstrument').value;
+  const date   = document.getElementById('aDate').value;
+
+  if (!first || !last || !email || !phone || !studio || !date) {
+    showToast('Please fill in the required fields.', 'error'); return;
+  }
+
+  const btn = document.getElementById('addBtn');
+  btn.textContent = 'Adding…'; btn.disabled = true;
+
+  try {
+    // An enquiry has no login account — it is a record, not a user.
+    // profiles.id has no foreign key to auth.users, which is what
+    // makes this possible (see the Zoho migration).
+    const userId = crypto.randomUUID();
+
+    const { error: pErr } = await db.from('profiles').insert({
+      id: userId, first_name: first, last_name: last,
+      phone: phone || null, role: 'student', status: 'active',
+    });
+    if (pErr) throw new Error('Profile: ' + pErr.message);
+
+    const { data: sData, error: sErr } = await db.from('students').insert({
+      user_id: userId, status: 'prospective', studio_id: studio,
+      email, parent_name: document.getElementById('aParent').value.trim() || null,
+      enquiry_notes:  document.getElementById('aNotes').value.trim() || null,
+      enquiry_date:   date,
+      enquiry_source: document.getElementById('aSource').value,
+    }).select('id').single();
+    if (sErr) throw new Error('Student: ' + sErr.message);
+
+    if (inst) {
+      await db.from('student_instruments')
+        .insert({ student_id: sData.id, instrument: inst, skill_level: 0 });
+    }
+
+    {
+      // Always created. An enquiry with nothing prompting anyone to chase
+      // it is the sticky note this whole thing exists to replace.
+      const { error: tErr } = await db.from('tasks').insert({
+        title:        `Follow up enquiry — ${first} ${last}`,
+        subject_type: 'student', subject_id: sData.id,
+        studio_id:    studio,
+        due_date:     date,          // chase from the day they enquired
+        created_by:   me.id,
+        source:       'system',
+      });
+      if (tErr) showToast('Enquiry added, but the follow-up task failed: ' + tErr.message, 'warning');
+    }
+
+    // Same acknowledgement the website form sends, so a phone or
+    // walk-in enquiry gets the same start
+    const ack = await sendEnquiryAcknowledgement(sData.id, me.id);
+    const why = {
+      'sent':            'Enquiry added and acknowledgement emailed.',
+      'no-studio-email': 'Enquiry added — the studio has no email address, so nothing was sent.',
+      'no-address':      'Enquiry added — no valid email address for them, so nothing was sent.',
+      'no-recipients':   'Enquiry added — the email could not find them.',
+      'failed':          'Enquiry added, but the acknowledgement failed to send.',
+    }[ack] ?? 'Enquiry added — no acknowledgement sent.';
+    showToast(why, ack === 'sent' ? 'success' : 'warning');
+
+    closeAdd();
+    await loadEnquiries();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+
+  btn.textContent = 'Add enquiry'; btn.disabled = false;
+}
+
+// ============================================================
+// DETAIL
+// ============================================================
+function openDetail(id) {
+  const e = enquiries.find(x => x.id === id);
+  if (!e) return;
+  openEnq = e;
+
+  const studioName = studios.find(s => s.id === e.studio_id)?.name ?? '—';
+  const SOURCE = { website:'Website form', phone:'Phone', walk_in:'Walk-in' };
+
+  document.getElementById('dTitle').textContent =
+    `${e.first_name} ${e.last_name}`.trim() || 'Enquiry';
+
+  document.getElementById('dBody').innerHTML = `
+    <div id="dMatches"></div>
+    <div class="detail-block">
+      <dl class="kv">
+        <dt>Status</dt><dd>${(() => {
+          const L = { prospective:['trial','Prospective'], lapsed:['inactive','Lapsed'],
+                      trial:['active','Converted — trial'], active:['active','Converted — enrolled'],
+                      inactive:['inactive','Converted, since left'] };
+          const [cls, label] = L[e.status] ?? ['inactive', e.status];
+          return `<span class="pill pill-${cls}">${label}</span>`;
+        })()}</dd>
+        <dt>Email</dt><dd><a href="mailto:${e.email ?? ''}" style="color:var(--orange);">${escapeHtml(e.email ?? '—')}</a></dd>
+        <dt>Phone</dt><dd>${escapeHtml(e.phone || '—')}</dd>
+        ${e.parent_name ? `<dt>Parent</dt><dd>${escapeHtml(e.parent_name)}</dd>` : ''}
+        <dt>Studio</dt><dd>${studioName}</dd>
+        <dt>Instrument</dt><dd>${e.instruments.join(', ') || '—'}</dd>
+        <dt>Enquired</dt><dd>${e.enquiry_date ? formatShortDate(parseLocalDate(e.enquiry_date)) : '—'}${
+          e.enquiry_source ? ` · ${SOURCE[e.enquiry_source]}` : ''}</dd>
+        <dt>Attempts</dt><dd>${e.attempts}</dd>
+      </dl>
+    </div>
+
+    ${e.enquiry_notes ? `
+      <div class="form-label" style="margin-bottom:0.35rem;">What they said</div>
+      <div style="background:var(--off-white);border-left:3px solid var(--orange);
+                  padding:0.7rem 0.85rem;font-size:0.86rem;line-height:1.6;
+                  color:var(--dark-grey);margin-bottom:1rem;white-space:pre-wrap;">${
+        escapeHtml(e.enquiry_notes)}</div>` : ''}
+
+    ${e.lapsed_reason ? `
+      <div class="form-label" style="margin-bottom:0.35rem;">Why it lapsed</div>
+      <div class="text-sm text-muted" style="margin-bottom:1rem;">${escapeHtml(e.lapsed_reason)}</div>` : ''}
+
+    ${(e.task && e.task.status !== 'cancelled')
+      ? `<div class="text-sm text-muted">The chase is recorded on the follow-up task.</div>`
+      : `<div class="text-sm" style="color:#92400e;">No open follow-up task — nothing is prompting anyone to chase this. Add one from the Tasks page, or mark the enquiry lapsed.</div>`}
+  `;
+
+  const stillOpen = e.status === 'prospective';
+  document.getElementById('dLapseBtn').style.display  = stillOpen ? '' : 'none';
+  // Deleting a converted enquiry would take a real student with it
+  document.getElementById('dDeleteBtn').style.display =
+    (e.status === 'prospective' || e.status === 'lapsed') ? '' : 'none';
+
+  const taskBtn = document.getElementById('dTaskBtn');
+  if (e.task) {
+    taskBtn.style.display = '';
+    taskBtn.href = 'tasks.html';
+    taskBtn.onclick = () => {
+      // Tell the Tasks page which one to open, rather than dropping the
+      // admin on the list to find it again.
+      sessionStorage.setItem('openTaskId', e.task.id);
+    };
+  } else {
+    taskBtn.style.display = 'none';
+  }
+
+  document.getElementById('detailModal').classList.remove('hidden');
+
+  // Look for a previous relationship — cheap, and worth knowing before
+  // the first conversation
+  findPossibleMatches(e).then(m => {
+    const box = document.getElementById('dMatches');
+    if (box) box.innerHTML = matchBanner(m);
+  }).catch(() => {});
+}
+
+function closeDetail() {
+  document.getElementById('detailModal').classList.add('hidden');
+  openEnq = null;
+}
+
+async function markLapsed() {
+  if (!openEnq) return;
+  const reason = prompt('Why did this enquiry lapse?\n(e.g. no answer after 5 attempts, chose another school, wrong instrument)');
+  if (reason === null) return;
+
+  const { error } = await db.from('students')
+    .update({ status: 'lapsed', lapsed_reason: reason.trim() || null })
+    .eq('id', openEnq.id);
+  if (error) { showToast('Could not update: ' + error.message, 'error'); return; }
+
+  // Close the follow-up task — nobody should keep chasing
+  if (openEnq.task?.status === 'open') {
+    await db.from('tasks').update({
+      status: 'done', completed_at: new Date().toISOString(), completed_by: me.id,
+    }).eq('id', openEnq.task.id);
+  }
+
+  showToast('Marked lapsed.', 'success');
+  closeDetail();
+  await loadEnquiries();
+}
+
+async function deleteEnquiry() {
+  if (!openEnq) return;
+  const name = `${openEnq.first_name} ${openEnq.last_name}`.trim();
+  if (!confirm(
+    `Delete the enquiry from ${name}?\n\n` +
+    `This removes it completely — use it for spam and fake enquiries.\n` +
+    `For a genuine enquiry that didn't convert, use "Mark lapsed" instead.`
+  )) return;
+
+  try {
+    // Tasks reference the student polymorphically, so there is no
+    // cascade — they must be removed explicitly or they would linger
+    // pointing at nothing.
+    await db.from('tasks').delete()
+      .eq('subject_type','student').eq('subject_id', openEnq.id);
+    await db.from('student_instruments').delete().eq('student_id', openEnq.id);
+    await db.from('students').delete().eq('id', openEnq.id);
+    await db.from('profiles').delete().eq('id', openEnq.user_id);
+
+    showToast('Enquiry deleted.', 'success');
+    closeDetail();
+    await loadEnquiries();
+  } catch (err) {
+    showToast('Could not delete: ' + err.message, 'error');
+  }
+}
+
+document.getElementById('addModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeAdd();
+});
+document.getElementById('detailModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeDetail();
+});
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+</script>
+</body>
+</html>
