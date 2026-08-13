@@ -238,6 +238,28 @@
     const profile = await getProfile();
     if (!profile) {
       showError(errorEl, 'Account not fully set up. Please contact your studio admin.');
+      await db.auth.signOut();
+      btn.textContent = 'Sign In';
+      btn.disabled = false;
+      return;
+    }
+
+    // Someone who has left should not still be able to sign in.
+    // profiles.status and students.status are separate — ending an
+    // enrolment sets the student record inactive and leaves the profile
+    // alone, so both have to be checked.
+    let blocked = profile.status === 'inactive';
+
+    if (!blocked && profile.role === 'student') {
+      const { data: stu } = await db.from('students')
+        .select('status').eq('user_id', profile.id).maybeSingle();
+      blocked = stu && ['inactive','lapsed','prospective'].includes(stu.status);
+    }
+
+    if (blocked) {
+      showError(errorEl,
+        'This account is no longer active. Please contact your studio if you would like to start lessons again.');
+      await db.auth.signOut();
       btn.textContent = 'Sign In';
       btn.disabled = false;
       return;

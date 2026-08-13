@@ -582,9 +582,21 @@ function renderStudents(students) {
           <button class="btn btn-ghost btn-sm" onclick="openStudentByIndex(${allStudents.indexOf(s)})">Edit</button>
           ${s.status === 'inactive'
             ? `<button class="btn btn-secondary btn-sm" onclick="reactivateStudent('${s.id}')">Reactivate</button>`
-            : `<button class="btn btn-danger btn-sm" onclick="endEnrolmentFor('${s.id}')">End enrolment</button>`}
+            : endDone[s.id]
+              ? `<button class="btn btn-ghost btn-sm" onclick="openProcess('${s.id}')"
+                    title="Checklist done — they attend until their last lesson">Leaving${
+                      lastLessonBy[s.id]
+                        ? ' after ' + formatShortDate(parseLocalDate(lastLessonBy[s.id])) : ''}</button>`
+            : endRunning[s.id]
+              ? `<button class="btn btn-ghost btn-sm" onclick="openProcess('${s.id}')"
+                    title="The end-enrolment checklist is under way">Ending — in progress</button>`
+            : endPending[s.id]
+              ? `<button class="btn btn-ghost btn-sm" onclick="openEndTask('${s.id}')"
+                    title="An ending is already planned">Ending ${
+                      endPending[s.id].due_date
+                        ? formatShortDate(parseLocalDate(endPending[s.id].due_date)) : 'soon'}</button>`
+              : `<button class="btn btn-danger btn-sm" onclick="endEnrolmentFor('${s.id}')">End enrolment</button>`}
           <button class="btn btn-ghost btn-sm" onclick="resetPassword('${s.user_id}','${s.profiles?.first_name ?? ''} ${s.profiles?.last_name ?? ''}')">Reset PW</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteStudent('${s.id}','${s.user_id}','${s.profiles?.first_name ?? ''} ${s.profiles?.last_name ?? ''}')">Delete</button>
         </div>
       </td>
     </tr>`;
@@ -595,11 +607,30 @@ function renderStudents(students) {
 // ENROLMENT PROCESSES
 // ============================================================
 let procByStudent = {};   // studentId -> { proc, items, checks }
+let endPending    = {};   // studentId -> the open end-enrolment task
+let endRunning    = {};   // studentId -> an end-enrolment already under way
+let endDone       = {};   // studentId -> a finished ending, lessons still to run
+let lastLessonBy  = {};   // studentId -> their final lesson date
 
 async function loadProcesses() {
   procByStudent = {};
+  endPending    = {};
+  endRunning    = {};
+  endDone       = {};
+  lastLessonBy  = {};
   const ids = allStudents.map(s => s.id);
   if (!ids.length) return;
+
+  // An ending already planned. Two end-enrolment tasks for one student
+  // is never deliberate, and would mean two farewell emails.
+  const { data: openTasks } = await db.from('tasks')
+    .select('id,title,due_date,subject_id')
+    .eq('subject_type','student').in('subject_id', ids).eq('status','open');
+  (openTasks ?? []).forEach(t => {
+    if (String(t.title ?? '').toLowerCase().startsWith('end enrolment')) {
+      endPending[t.subject_id] = t;
+    }
+  });
 
   const { data: procs } = await db.from('student_processes')
     .select('*').in('student_id', ids).order('started_at', { ascending: false });
@@ -628,6 +659,14 @@ async function loadProcesses() {
   const blockedDone = await blockedTaskStatuses(items ?? []);
   Object.values(checksFor).forEach(ch => { ch._blockedDone = blockedDone; });
 
+  // An ending under way blocks another being started. Populated before
+  // the reconciliation below, which clears any that have finished.
+  procs.forEach(p => {
+    if (p.process_type === 'end_enrolment' && p.status === 'in_progress') {
+      endRunning[p.student_id] = p;
+    }
+  });
+
   // Most recent process per student wins the badge
   procs.forEach(p => {
     if (procByStudent[p.student_id]) return;
@@ -635,6 +674,44 @@ async function loadProcesses() {
       proc: p, items: byProc[p.id] ?? [], checks: checksFor[p.student_id] ?? {},
     };
   });
+
+  // Reconcile on load. Automatic items tick themselves, so a checklist
+  // can finish without anyone touching it — completion has to be
+  // computed here, not only when an item is toggled.
+  for (const p of procs) {
+    if (p.status !== 'in_progress') continue;
+    const prog = processProgress(byProc[p.id] ?? [], checksFor[p.student_id] ?? {});
+    if (!prog.complete) continue;
+
+    await db.from('student_processes').update({
+      status: 'complete', completed_at: new Date().toISOString(),
+    }).eq('id', p.id);
+    p.status = 'complete';
+    delete endRunning[p.student_id];
+  }
+
+  // A finished ending where the student is still attending. They keep
+  // teaching until the last lesson, so "End enrolment" would invite a
+  // second one — but "in progress" is no longer true either.
+  procs.forEach(p => {
+    if (p.process_type === 'end_enrolment' && p.status === 'complete') {
+      const stu = allStudents.find(s => s.id === p.student_id);
+      if (stu && stu.status !== 'inactive') endDone[p.student_id] = p;
+    }
+  });
+
+  // When does each of them actually finish?
+  await Promise.all(Object.keys(endDone).map(async sid => {
+    const { data: ls } = await db.from('lesson_students')
+      .select('lesson_id').eq('student_id', sid);
+    const lids = (ls ?? []).map(r => r.lesson_id);
+    if (!lids.length) return;
+    const { data: occ } = await db.from('lesson_occurrences')
+      .select('date').in('lesson_id', lids)
+      .neq('status', 'cancelled')
+      .order('date', { ascending: false }).limit(1);
+    if (occ?.[0]?.date) lastLessonBy[sid] = occ[0].date;
+  }));
 }
 
 function renderProcCell(studentId) {
@@ -686,6 +763,13 @@ async function planEndEnrolment() {
   const studentId = document.getElementById('procPlanBtn').dataset.studentId;
   const s = allStudents.find(x => x.id === studentId);
   const name = `${s?.profiles?.first_name ?? ''} ${s?.profiles?.last_name ?? ''}`.trim();
+
+  if (endPending[studentId]) {
+    const t = endPending[studentId];
+    const when = t.due_date ? formatShortDate(parseLocalDate(t.due_date)) : 'a date not yet set';
+    showToast(`Already planned to end on ${when}. Open that task to change it.`, 'warning');
+    return;
+  }
 
   const when = prompt(
     `When should ${name}'s enrolment end?\n\n` +
@@ -781,10 +865,23 @@ async function openProcess(studentId) {
     nextBtn.style.display = '';
 
     // Ending is usually planned rather than done on the spot — the
-    // task carries the reason and the date it takes effect
-    if (next.type === 'end_enrolment' && !blockedByProgress) {
+    // task carries the reason and the date it takes effect. Hidden
+    // once one exists, so a second can't be raised by accident.
+    if (next.type === 'end_enrolment' && !blockedByProgress
+        && !endPending[studentId] && !endRunning[studentId] && !endDone[studentId]) {
       planBtn.style.display = '';
       planBtn.dataset.studentId = studentId;
+    }
+    if (next.type === 'end_enrolment' && (endRunning[studentId] || endDone[studentId])) {
+      nextBtn.disabled      = true;
+      nextBtn.style.opacity = '0.45';
+      nextBtn.title         = 'This checklist is the ending — it is already under way';
+    } else if (next.type === 'end_enrolment' && endPending[studentId]) {
+      const t = endPending[studentId];
+      nextBtn.disabled      = true;
+      nextBtn.style.opacity = '0.45';
+      nextBtn.title         = `Already planned for ${
+        t.due_date ? formatShortDate(parseLocalDate(t.due_date)) : 'a date not yet set'}`;
     }
   } else {
     nextBtn.style.display = 'none';
@@ -866,19 +963,28 @@ async function blockItem(studentId, itemId) {
   const name = `${s?.profiles?.first_name ?? ''} ${s?.profiles?.last_name ?? ''}`.trim();
   if (!it) return;
 
+  // Tie the due date to the lessons — an eWay payment wants setting up
+  // before the first lesson, not on whichever day the admin deferred it.
+  let due = null;
+  try {
+    due = await deferredItemDueDate(studentId, proc.process_type, proc.started_at, it.label);
+  } catch (_) { /* fall back to today */ }
+  const dueDate  = due ?? toISODate(new Date());
+  const dueLabel = due
+    ? formatShortDate(parseLocalDate(due))
+    : 'today (no lessons booked yet)';
+
   if (!confirm(
     `Create a task for "${it.label}"?\n\n` +
-    `It will be due today and assigned to you. The checklist shows this ` +
-    `step as outstanding until the task is done.`)) return;
+    `Due ${dueLabel}, assigned to you. The checklist shows this step as ` +
+    `outstanding until the task is done.`)) return;
 
   const { data: task, error: tErr } = await db.from('tasks').insert({
     title:        `${it.label} — ${name}`,
     subject_type: 'student', subject_id: studentId,
     studio_id:    s?.studio_id ?? null,
     assigned_to:  currentProfile.id,
-    // Due today by default. Without a date it would never appear in any
-    // dashboard bucket, which defeats the point of raising it.
-    due_date:     toISODate(new Date()),
+    due_date:     dueDate,
     created_by:   currentProfile.id,
     source:       'process',
     process_id:   proc.id,
@@ -907,12 +1013,26 @@ async function syncProcessStatus(studentId) {
   }).eq('id', proc.id);
   proc.status = want;
 
-  // Finishing the end-enrolment checklist is what makes someone
-  // inactive — the status follows the process rather than an admin
-  // having to remember a separate step.
+  // Finishing the checklist means the paperwork is done — but with four
+  // weeks' notice the student is usually still attending. Marking them
+  // inactive now would remove them from the active list while they are
+  // still turning up, so it waits until their lessons have run out.
   if (want === 'complete' && proc.process_type === 'end_enrolment') {
-    await db.from('students').update({ status: 'inactive' }).eq('id', studentId);
-    showToast('Enrolment ended — student marked inactive.', 'success');
+    const { data: future } = await db.from('student_schedule_view')
+      .select('occurrence_id')
+      .eq('student_id', studentId)
+      .gte('date', toISODate(new Date()))
+      .neq('occurrence_status', 'cancelled')
+      .limit(1);
+
+    if (!future?.length) {
+      await db.from('students').update({ status: 'inactive' }).eq('id', studentId);
+      showToast('Enrolment ended — student marked inactive.', 'success');
+    } else {
+      showToast(
+        'Checklist complete. They stay active until their last lesson — ' +
+        'the "Mark student inactive" task will prompt you then.', 'success');
+    }
     await loadStudents();
   }
 }
@@ -1004,32 +1124,22 @@ async function resetPassword(userId, name) {
   }
 }
 
-async function deleteStudent(studentId, userId, name) {
-  if (!confirm(`Are you sure you want to permanently delete ${name.trim()}? This cannot be undone.`)) return;
-
-  await db.from('student_instruments').delete().eq('student_id', studentId);
-  await db.from('student_teachers').delete().eq('student_id', studentId);
-  await db.from('attendance').delete().in('lesson_occurrence_id',
-    (await db.from('lesson_occurrences').select('id')
-      .in('lesson_id', (await db.from('lessons').select('id').eq('student_id', studentId)).data?.map(l => l.id) ?? [])
-    ).data?.map(o => o.id) ?? []
-  );
-  await db.from('lessons').delete().eq('student_id', studentId);
-  await db.from('students').delete().eq('id', studentId);
-  await db.from('profiles').delete().eq('id', userId);
-
-  const res = await fetch('/.netlify/functions/create-user', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'delete-user', userId }),
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    showToast('Student deleted but auth account may remain: ' + (data.error ?? ''), 'warning');
-  } else {
-    showToast(`${name.trim()} deleted successfully.`, 'success');
-  }
-  await loadStudents();
-}
+// Student deletion was removed deliberately.
+//
+// It was built in Phase 2 as ordinary CRUD, before the lifecycle
+// existed. By the time it did, it was both stale and dangerous: it
+// removed lessons via the legacy `lessons.student_id` column, which
+// nothing has used since group lessons arrived, so it deleted the
+// profile and auth account while leaving orphaned lesson_students rows
+// behind. Even working correctly it would destroy attendance history
+// and lesson notes.
+//
+// Every legitimate case is covered elsewhere:
+//   · enrolment ending  → End enrolment checklist
+//   · spam enquiry      → Discard as spam, on the task
+//   · enquiry that went nowhere → Lapsed
+//
+// A record created by mistake is rare enough to fix in SQL.
 
 function openStudentByIndex(idx) {
   openStudentModal(allStudents[idx]);
@@ -1179,9 +1289,40 @@ async function saveStudent() {
 // Ending an enrolment is a process, not a status flag. The old
 // Deactivate button set the status and left the lessons running, so a
 // "deactivated" student still appeared on their teacher's schedule.
+function openEndTask(studentId) {
+  const t = endPending[studentId];
+  if (!t) return;
+  sessionStorage.setItem('openTaskId', t.id);
+  window.location.href = 'tasks.html';
+}
+
 async function endEnrolmentFor(studentId) {
   const s = allStudents.find(x => x.id === studentId);
   const name = `${s?.profiles?.first_name ?? ''} ${s?.profiles?.last_name ?? ''}`.trim();
+
+  // Already in train — one ending per student
+  if (endDone[studentId]) {
+    showToast(
+      `${name} is already leaving. They stay active until their last lesson, ` +
+      `then the "Mark student inactive" task closes it off.`, 'warning');
+    openProcess(studentId);
+    return;
+  }
+  if (endRunning[studentId]) {
+    showToast(`${name}'s end-enrolment checklist is already under way.`, 'warning');
+    openProcess(studentId);
+    return;
+  }
+  if (endPending[studentId]) {
+    const t = endPending[studentId];
+    const when = t.due_date ? formatShortDate(parseLocalDate(t.due_date)) : 'a date not yet set';
+    if (confirm(
+      `${name}'s enrolment is already planned to end on ${when}.\n\n` +
+      `Open that task to change the date or the reason?`)) {
+      openEndTask(studentId);
+    }
+    return;
+  }
 
   const answer = prompt(
     `Ending ${name}'s enrolment.\n\n` +
@@ -1258,8 +1399,21 @@ async function endLessonsFor(studentId) {
       .update({ status: 'cancelled' }).in('id', lessonIds);
     if (lErr) throw new Error(lErr.message);
 
+    // The "Mark student inactive" task is created when the process
+    // starts, before anyone has said when the last lesson is — so it
+    // falls back to today. Now the date is known, move it.
+    const d = parseLocalDate(endDate);
+    d.setDate(d.getDate() + 7);
+    const { error: tErr } = await db.from('tasks')
+      .update({ due_date: toISODate(d) })
+      .eq('subject_type', 'student').eq('subject_id', studentId)
+      .eq('status', 'open')
+      .ilike('title', 'Mark student inactive%');
+    if (tErr) console.error('[students] could not re-date the inactive task', tErr);
+
     showToast(
-      `${lessons.length} series ended. Last lesson ${formatShortDate(parseLocalDate(endDate))}.`,
+      `${lessons.length} series ended. Last lesson ${formatShortDate(parseLocalDate(endDate))}, ` +
+      `and the follow-up task moves to ${formatShortDate(d)}.`,
       'success');
     await loadStudents();
     if (procByStudent[studentId]) openProcess(studentId);
@@ -1273,8 +1427,26 @@ async function endLessonsFor(studentId) {
 // itself.
 async function reactivateStudent(studentId) {
   if (!confirm('Set this student back to active?\n\nIf they are actually returning, start a trial or enrolment instead — that sets the status and creates the lessons.')) return;
+
   const { error } = await db.from('students').update({ status: 'active' }).eq('id', studentId);
   if (error) { showToast('Could not update: ' + error.message, 'error'); return; }
+
+  // Bringing someone back means the ending is off. An unfinished
+  // end-enrolment checklist would otherwise keep showing as in
+  // progress for a student who is active again.
+  await db.from('student_processes')
+    .update({ status: 'abandoned' })
+    .eq('student_id', studentId)
+    .eq('process_type', 'end_enrolment')
+    .eq('status', 'in_progress');
+
+  // …and so is any open task chasing that ending
+  await db.from('tasks')
+    .update({ status: 'cancelled' })
+    .eq('subject_type', 'student').eq('subject_id', studentId)
+    .eq('status', 'open')
+    .ilike('title', 'Mark student inactive%');
+
   showToast('Student reactivated.', 'success');
   await loadStudents();
 }

@@ -4,8 +4,8 @@
 // Supabase Dashboard → Project Settings → API
 // ============================================================
 
-const SUPABASE_URL  = 'https://oxuyzcjgxmohpqyijpip.supabase.co';   // e.g. https://xxxxxxxxxxxx.supabase.co
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im94dXl6Y2pneG1vaHBxeWlqcGlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTQ3NzMsImV4cCI6MjEwMDQ5MDc3M30.3BiBBOqQFMwpb7mZC7xLISDp2EJCXfML-7_wq-Imwws';      // starts with eyJ...
+const SUPABASE_URL  = 'YOUR_SUPABASE_PROJECT_URL';   // e.g. https://xxxxxxxxxxxx.supabase.co
+const SUPABASE_ANON = 'YOUR_SUPABASE_ANON_KEY';      // starts with eyJ...
 
 // Load Supabase via CDN (included in each HTML page's <head>)
 // <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -36,6 +36,19 @@ async function getProfile() {
 }
 
 /** Redirect to login if not authenticated */
+// Blocks an account that has been deactivated since it last signed in.
+// A session persists, so checking only at login would let someone
+// deactivated this morning carry on until their token expired.
+async function isAccountBlocked(profile) {
+  if (!profile) return true;
+  if (profile.status === 'inactive') return true;
+  if (profile.role !== 'student') return false;
+
+  const { data: stu } = await db.from('students')
+    .select('status').eq('user_id', profile.id).maybeSingle();
+  return !!stu && ['inactive','lapsed','prospective'].includes(stu.status);
+}
+
 async function requireAuth(allowedRoles = []) {
   const session = await getSession();
   if (!session) {
@@ -158,7 +171,7 @@ function getWeekStart(date) {
   const day = d.getDay(); // 0=Sun
   const diff = (day === 0) ? -6 : 1 - day; // shift to Monday
   d.setDate(d.getDate() + diff);
-  d.setHours(12, 0, 0, 0);
+  d.setHours(12, 0, 0, 0); // use noon not midnight to avoid UTC day boundary issues
   return d;
 }
 

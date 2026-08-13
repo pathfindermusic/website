@@ -394,7 +394,6 @@ function renderTeachers() {
         </button>
         <a class="btn btn-secondary btn-sm" href="teacher-detail.html?id=${t.id}">View</a>
         <button class="btn btn-ghost btn-sm" onclick="resetPassword('${t.profiles?.id}',${allTeachers.indexOf(t)})">Reset PW</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteTeacher('${t.id}','${t.user_id}',${allTeachers.indexOf(t)})">Delete</button>
       </div>
     </div>`;
   }).join('');
@@ -430,28 +429,17 @@ async function resetPassword(userId, idx) {
   }
 }
 
-async function deleteTeacher(teacherId, userId, idx) {
-  const t    = allTeachers[idx];
-  const name = `${t.profiles?.first_name ?? ''} ${t.profiles?.last_name ?? ''}`.trim();
-  if (!confirm(`Are you sure you want to permanently delete ${name}? This cannot be undone.`)) return;
-
-  await db.from('teacher_availability').delete().eq('teacher_id', teacherId);
-  await db.from('student_teachers').delete().eq('teacher_id', teacherId);
-  await db.from('teachers').delete().eq('id', teacherId);
-  await db.from('profiles').delete().eq('id', userId);
-
-  const res = await fetch('/.netlify/functions/create-user', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'delete-user', userId }),
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    showToast('Teacher deleted but auth account may remain: ' + (data.error ?? ''), 'warning');
-  } else {
-    showToast(`${name} deleted successfully.`, 'success');
-  }
-  await loadTeachers();
-}
+// Teacher deletion was removed deliberately, for the same reasons as
+// student deletion.
+//
+// It never touched `lessons`, so it would either fail on the foreign
+// key or take a teacher's entire history with them — attendance, notes
+// and all. It also cleaned up `student_teachers`, which nothing has
+// used since group lessons arrived.
+//
+// A teacher who has left is deactivated: they keep their record, their
+// past lessons stay attributed to them, and they can be reactivated if
+// they come back. Deactivating is the answer, not deletion.
 
 function openTeacherByIndex(idx) {
   openTeacherModal(allTeachers[idx]);

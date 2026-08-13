@@ -1225,6 +1225,20 @@ async function setStatus(id, status) {
       openOutcome({ taskId: id, student: s, kind: 'trial' });
       return;
     }
+    // The lessons have run out, so this is the moment they stop being
+    // an active student. The checklist deliberately left it until now.
+    if (lower.startsWith('mark student inactive') && s && s.status !== 'inactive') {
+      if (confirm(`Mark ${s.name} as inactive?\n\nTheir lessons have finished.`)) {
+        const { error } = await db.from('students')
+          .update({ status: 'inactive' }).eq('id', t.subject_id);
+        if (error) { showToast('Could not update: ' + error.message, 'error'); return; }
+        s.status = 'inactive';
+        showToast(`${s.name} marked inactive.`, 'success');
+      } else {
+        return;   // leave the task open
+      }
+    }
+
     // An end-enrolment task is the plan; closing it is the moment to act
     if (s?.status === 'active' && isEndEnrolment) {
       if (confirm(`Start the end-enrolment checklist for ${s.name}?\n\nThis sends the farewell email.`)) {

@@ -1648,16 +1648,51 @@ async function saveLesson() {
   const newStart = timeToMins(time);
   const newEnd   = newStart + duration;
 
+  // A lesson only occupies its slot on the dates it actually falls on.
+  // Comparing day-of-week alone meant a trial lesson blocked that slot
+  // for ever, even once its single occurrence had passed — which is
+  // exactly the slot the ongoing series usually wants.
+  const newDates = new Set(plannedDates(day, startDate, recurrence, count, endDate));
+
+  const overlappingIds = (existingLessons ?? [])
+    .filter(el => {
+      const elStart = timeToMins(el.start_time);
+      const elEnd   = elStart + (el.duration_mins ?? 30);
+      return newStart < elEnd && newEnd > elStart;
+    })
+    .map(el => el.id);
+
+  const { data: existingOcc } = overlappingIds.length
+    ? await db.from('lesson_occurrences')
+        .select('lesson_id,date').in('lesson_id', overlappingIds)
+        .eq('status','scheduled')
+    : { data: [] };
+
+  const datesByLesson = {};
+  (existingOcc ?? []).forEach(o => {
+    (datesByLesson[o.lesson_id] ??= new Set()).add(o.date?.slice(0,10));
+  });
+
   for (const el of (existingLessons ?? [])) {
     const elStart = timeToMins(el.start_time);
     const elEnd   = elStart + (el.duration_mins ?? 30);
     const overlaps = newStart < elEnd && newEnd > elStart;
     if (!overlaps) continue;
 
+    // Same time of day, but do they ever fall on the same date?
+    const theirDates = datesByLesson[el.id];
+    if (!theirDates || ![...theirDates].some(d => newDates.has(d))) continue;
+
     // Teacher clash
+    const sharedDates = [...theirDates].filter(d => newDates.has(d)).sort();
+    const firstShared  = sharedDates[0]
+      ? formatShortDate(parseLocalDate(sharedDates[0])) : DAY_NAMES[day];
+
     if (el.teacher_id === teacherId) {
-      const msg = `Teacher is already teaching another lesson at this time on ${DAY_NAMES[day]}.`;
-      showClashError(msg); return;
+      showClashError(
+        `Teacher is already teaching another lesson at this time on ${firstShared}` +
+        (sharedDates.length > 1 ? ` (and ${sharedDates.length - 1} other date${sharedDates.length > 2 ? 's' : ''})` : '') +
+        '.'); return;
     }
 
     // Student clash
@@ -1666,7 +1701,10 @@ async function saveLesson() {
     if (clash) {
       const student = allStudents.find(s => s.id === clash);
       const name    = student ? `${student.profile?.first_name ?? ''} ${student.profile?.last_name ?? ''}`.trim() : 'A student';
-      showClashError(`${name} already has a lesson at this time on ${DAY_NAMES[day]}.`); return;
+      showClashError(
+        `${name} already has a lesson at this time on ${firstShared}` +
+        (sharedDates.length > 1 ? ` (and ${sharedDates.length - 1} other date${sharedDates.length > 2 ? 's' : ''})` : '') +
+        '.'); return;
     }
 
     // Group capacity check
@@ -1739,27 +1777,35 @@ function timeToMins(timeStr) {
 }
 
 // Generate lesson occurrences
+// The dates a lesson would occupy. Used both to generate occurrences
+// and to check clashes — a lesson only occupies a slot on the dates it
+// actually falls on, which is what makes a past one-off harmless.
+function plannedDates(dayOfWeek, startDate, recurrenceType, count, endDate) {
+  const dates = [];
+  let current = parseLocalDate(startDate);
+  while (current.getDay() !== dayOfWeek) current.setDate(current.getDate() + 1);
+
+  const limit = recurrenceType === 'occurrences' ? count
+              : recurrenceType === 'date_range'  ? 999
+              : 52;
+  const end = recurrenceType === 'date_range' ? parseLocalDate(endDate) : null;
+
+  let generated = 0;
+  while (generated < limit) {
+    if (end && current > end) break;
+    dates.push(toISODate(current));
+    generated++;
+    current.setDate(current.getDate() + 7);
+  }
+  return dates;
+}
+
 async function generateOccurrences(lessonId, dayOfWeek, startDate, recurrenceType, count, endDate) {
   await db.from('lesson_occurrences').delete()
     .eq('lesson_id', lessonId).eq('status','scheduled').gte('date', startDate);
 
-  const occurrences = [];
-  let current = new Date(startDate);
-  while (current.getDay() !== dayOfWeek) {
-    current.setDate(current.getDate() + 1);
-  }
-
-  let generated = 0;
-  const limit = recurrenceType === 'occurrences' ? count :
-                recurrenceType === 'date_range'  ? 999 : 52;
-
-  while (generated < limit) {
-    const dateStr = toISODate(current);
-    if (recurrenceType === 'date_range' && current > new Date(endDate)) break;
-    occurrences.push({ lesson_id: lessonId, date: dateStr, status: 'scheduled' });
-    generated++;
-    current.setDate(current.getDate() + 7);
-  }
+  const occurrences = plannedDates(dayOfWeek, startDate, recurrenceType, count, endDate)
+    .map(date => ({ lesson_id: lessonId, date, status: 'scheduled' }));
 
   if (occurrences.length > 0) {
     await db.from('lesson_occurrences').upsert(occurrences, { onConflict: 'lesson_id,date' });

@@ -317,6 +317,42 @@ the operation failed with no useful error. This pattern is currently in the
 `task_notes`, `task_handovers` and teacher policies. It works in each case
 today — but it is doing more than it appears to.
 
+### Never write policies blind — measure first
+
+Two attempts at securing the views failed by guessing at what was needed. The
+method that worked: impersonate each role, count what they can read, and add a
+policy only where the count is zero.
+
+```sql
+BEGIN;
+  SET LOCAL role TO authenticated;
+  SET LOCAL request.jwt.claims TO '{"sub":"<user-id>","role":"authenticated"}';
+  SELECT 'lessons' AS t, COUNT(*) FROM lessons
+  UNION ALL SELECT 'lesson_occurrences', COUNT(*) FROM lesson_occurrences
+  -- …every table the view touches
+ROLLBACK;
+```
+
+Both views inner-join `lessons`, `teachers`, `profiles` and `studios`, so a
+single zero on any of those empties the entire view. Measuring first showed
+students were missing four policies and that teachers and admins needed none —
+against nine written on a guess, which locked everyone out of the portal.
+
+### A policy on a table cannot read that table
+
+`get_my_role()` reads `profiles`. A policy on `profiles` that calls it is
+circular: login can't load a profile, and the portal reports "Account not fully
+set up".
+
+The same in two hops is just as fatal — a policy on `lessons` that subqueries
+`lesson_students`, whose own policy subqueries `lessons`, gives
+`42P17: infinite recursion detected in policy`.
+
+**The fix is `SECURITY DEFINER`.** Such a function reads without RLS applying,
+so no cycle can form. `get_my_role()`, `get_my_teacher_id()`,
+`get_my_studio_ids()` and `my_lesson_ids()` all exist for this reason. Any new
+policy needing a relationship lookup should use one, not an inline subquery.
+
 ### Testing a policy as another user
 
 The SQL editor bypasses RLS, so policies look fine from there. Impersonate
@@ -442,6 +478,30 @@ no Deactivate button — it set a status and left the lessons running, so a
 "deactivated" student still appeared on their teacher's schedule. Ending an
 enrolment is a process, not a flag.
 
+**Nothing with history gets deleted.** Student and teacher deletion were both
+removed — they were built as ordinary CRUD in Phase 2, before the lifecycle
+existed, and by the time it did they were stale as well as destructive. Student
+deletion removed lessons via the legacy `lessons.student_id` column, so it
+deleted the profile and auth account while leaving orphaned `lesson_students`
+rows; teacher deletion never touched `lessons` at all.
+
+Deactivate is the answer in both cases: the record survives, past lessons stay
+attributed, and they can come back. Delete remains only on Studios and Admins,
+where it is Super User only and genuinely rare.
+
+**Known gap: admins are not studio-scoped in the database.** A Kilsyth admin
+can read Ringwood's lessons and students — the policies on those tables test the
+role, not the studio. Page queries filter by studio so the dashboards look
+correct, but the restriction isn't enforced where it matters.
+`get_my_studio_ids()` exists and the task policies use it; applying the same to
+students and lessons is a behavioural change worth deciding rather than
+assuming.
+
+**Known gap:** deleting a studio does not check for live lessons. It cleans up
+teacher references and availability, but a studio with a running schedule would
+leave those lessons pointing at nothing. Worth a guard before a fourth studio
+exists.
+
 **Ending lessons cancels, never deletes.** Occurrences up to the last-lesson
 date are kept, everything after is cancelled. The slot frees for rebooking
 either way, but attendance and notes survive.
@@ -556,6 +616,9 @@ Run in order. All are re-runnable.
 21. `phase4c-series-check.sql` — series vs one-off trial lesson
 22. `phase4c-deferrable.sql` — `process_items.can_defer`
 23. `phase4c-lesson-created-at.sql` — `lessons.created_at`
+24. `phase5-security-lints.sql` — drops the `zoho_leads_import` staging table
+25. `phase5-view-rls.sql` — `my_lesson_ids()`, four student read policies,
+    `security_invoker` on both views
 
 ---
 
@@ -599,6 +662,17 @@ Tested: enquiry acknowledgement, trial confirmation, conversion to trial and to
 enrolment, task date realignment, check-in email, deferred items clearing.
 **Not yet tested: the full end-enrolment path**, including `End lessons…` and
 the student going inactive on completion.
+
+**Supabase security lints closed.** Both views now run with
+`security_invoker = on` and enforce RLS; the `zoho_leads_import` staging table
+was dropped. Verified against all four roles in the browser.
+
+**Inactive accounts can no longer log in.** `profiles.status` and
+`students.status` are separate — ending an enrolment sets the student record
+inactive and leaves the profile alone — so login checks both. Note this is
+checked at login only: an existing session survives until it expires.
+`isAccountBlocked()` in `supabase-client.js` is there for wiring into
+`requireAuth` if per-page enforcement is ever wanted.
 
 **Next up:** finish end-enrolment testing; Phase 4d (website form posts to the
 portal, Zoho retired); attendance report page; RLS on views before go-live.

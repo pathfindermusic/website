@@ -698,3 +698,48 @@ async function realignProcessTasks(studentId) {
     await db.from('tasks').update({ due_date: want }).eq('id', t.id);
   }
 }
+
+
+// ------------------------------------------------------------
+// A deferred checklist item is due when the work actually needs
+// to be finished, which is tied to the lessons rather than to the
+// day the admin happened to defer it.
+//
+// Falls back to null when the lessons don't exist yet — the
+// caller then uses today, since there is nothing better to go on.
+// ------------------------------------------------------------
+async function lastOccurrenceDate(studentId) {
+  const { all } = await lessonsFor(studentId);
+  if (!all.length) return null;
+  const { data: occ } = await db.from('lesson_occurrences')
+    .select('date').in('lesson_id', all)
+    .neq('status','cancelled')
+    .order('date', { ascending: false }).limit(1);
+  return occ?.[0]?.date ?? null;
+}
+
+async function deferredItemDueDate(studentId, processType, since, label = '') {
+  const isEway = /eway/i.test(label);
+
+  switch (processType) {
+    case 'ongoing_enrolment': {
+      const first = await firstOccurrenceDate(studentId, true, since);
+      if (!first) return null;
+      // Recurring payments process the day before each lesson, so the
+      // setup has to be in place before that. Three days gives room,
+      // and the studios are closed on Sundays — a Wednesday first
+      // lesson would otherwise land the deadline on one.
+      if (!isEway) return first;
+      let due = plusDays(first, -3);
+      if (parseLocalDate(due).getDay() === 0) due = plusDays(due, -1);  // Sunday → Saturday
+      return due;
+    }
+    case 'trial_confirmation':
+      return await firstOccurrenceDate(studentId, false, since);
+    // Closing things down happens around the last lesson
+    case 'end_enrolment':
+      return await lastOccurrenceDate(studentId);
+    default:
+      return null;
+  }
+}
