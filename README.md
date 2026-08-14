@@ -353,6 +353,23 @@ so no cycle can form. `get_my_role()`, `get_my_teacher_id()`,
 `get_my_studio_ids()` and `my_lesson_ids()` all exist for this reason. Any new
 policy needing a relationship lookup should use one, not an inline subquery.
 
+### Tightening scope can silently clear data
+
+Any `<select>` populated from a scoped query drops values the current user
+cannot see. The control then reads empty, and saving writes that absence as a
+deliberate change.
+
+Studio-scoping students did exactly this: a Kilsyth admin opened a task about a
+Ringwood prospective student, the subject dropdown had no matching option, and
+saving set `subject_type` and `subject_id` to null. The task survived; its link
+to the student did not, and the Enquiries page then correctly reported "Needs a
+task" for an enquiry whose task existed but pointed at nobody.
+
+`tasks.html` now keeps the original subject when it wasn't among the options,
+and shows it as "Student at another studio". **Check every dropdown with the
+same shape before tightening scope anywhere else** — the assignee and studio
+pickers have it too.
+
 ### Testing a policy as another user
 
 The SQL editor bypasses RLS, so policies look fine from there. Impersonate
@@ -489,13 +506,17 @@ Deactivate is the answer in both cases: the record survives, past lessons stay
 attributed, and they can come back. Delete remains only on Studios and Admins,
 where it is Super User only and genuinely rare.
 
-**Known gap: admins are not studio-scoped in the database.** A Kilsyth admin
-can read Ringwood's lessons and students — the policies on those tables test the
-role, not the studio. Page queries filter by studio so the dashboards look
-correct, but the restriction isn't enforced where it matters.
-`get_my_studio_ids()` exists and the task policies use it; applying the same to
-students and lessons is a behavioural change worth deciding rather than
-assuming.
+**Students and enquiries are studio-scoped**, matching tasks. An admin sees only
+their own studios' students; a student with no studio stays visible to everyone.
+The `WITH CHECK` is role-only, so a student can be handed *out* to another studio
+but not pulled in — the same asymmetry as tasks.
+
+Changing a student's studio hands them over: a trigger moves their open tasks to
+the receiving studio's queue, unassigned, with a handover record explaining why.
+Enquiries have a **Move studio** button for this; moving an enquiry's follow-up
+task offers to move the enquiry too, since they are the same piece of work.
+
+**Known gap: lessons are not studio-scoped.** Only students and tasks are.
 
 **Known gap:** deleting a studio does not check for live lessons. It cleans up
 teacher references and availability, but a studio with a running schedule would
@@ -619,6 +640,7 @@ Run in order. All are re-runnable.
 24. `phase5-security-lints.sql` — drops the `zoho_leads_import` staging table
 25. `phase5-view-rls.sql` — `my_lesson_ids()`, four student read policies,
     `security_invoker` on both views
+26. `phase5-scope-students.sql` — admins see only their own studios' students
 
 ---
 
@@ -673,6 +695,17 @@ inactive and leaves the profile alone — so login checks both. Note this is
 checked at login only: an existing session survives until it expires.
 `isAccountBlocked()` in `supabase-client.js` is there for wiring into
 `requireAuth` if per-page enforcement is ever wanted.
+
+**Website enquiries reach the portal (parallel run).** The contact form still
+posts to Zoho, which stays authoritative and still sends both the
+acknowledgement and the studio notification. A `keepalive` fetch also creates
+the enquiry and its follow-up task in the portal, so admins can work it in both
+systems. `receive-enquiry.js` sends nothing — see `SEND_ACKNOWLEDGEMENT` for
+the cutover.
+
+Protections are an origin check, a honeypot field and duplicate suppression
+within the hour. reCAPTCHA is **not** verified: Zoho consumes the token and
+Google allows one verification per token. At cutover the portal takes it over.
 
 **Next up:** finish end-enrolment testing; Phase 4d (website form posts to the
 portal, Zoho retired); attendance report page; RLS on views before go-live.

@@ -776,7 +776,18 @@ async function openTaskModal(id) {
   onKindChange();
 
   if (!isTeacher) {
-    document.getElementById('tmSubject').value  = t.subject_type ? `${t.subject_type}:${t.subject_id}` : '';
+    const subjVal = t.subject_type ? `${t.subject_type}:${t.subject_id}` : '';
+    const subjSel = document.getElementById('tmSubject');
+    subjSel.value = subjVal;
+
+    // A subject at another studio isn't in the list. Show it as
+    // present-but-not-mine rather than letting it read as blank.
+    if (subjVal && subjSel.value !== subjVal) {
+      const label = t.subject_type === 'student' ? 'Student' : 'Teacher';
+      subjSel.insertAdjacentHTML('afterbegin',
+        `<option value="${subjVal}">${label} at another studio</option>`);
+      subjSel.value = subjVal;
+    }
     document.getElementById('tmStudio').value   = t.studio_id   ?? '';
     document.getElementById('tmAssignee').value = t.assigned_to ?? '';
   }
@@ -1130,7 +1141,19 @@ function snooze(days) {
 async function saveTask() {
   const id  = document.getElementById('tmId').value;
   const raw = document.getElementById('tmSubject').value;
-  const [sType, sId] = raw ? raw.split(':') : [null, null];
+  let [sType, sId] = raw ? raw.split(':') : [null, null];
+
+  // Was the task's existing subject actually offered in the dropdown?
+  // If not, the empty value means "not visible to me", not "cleared".
+  if (!raw && openTask?.subject_id) {
+    const known = openTask.subject_type === 'student'
+      ? studentOpts.some(s => s.id === openTask.subject_id)
+      : teacherOpts.some(t => t.id === openTask.subject_id);
+    if (!known) {
+      sType = openTask.subject_type;
+      sId   = openTask.subject_id;
+    }
+  }
   const title = document.getElementById('tmTitleInput').value.trim();
   if (!title) { showToast('A task needs a title.', 'error'); return; }
 
@@ -1154,6 +1177,22 @@ async function saveTask() {
     console.error('[tasks] task update failed:', error);
     showToast('Could not save the task: ' + error.message, 'error');
     return;
+  }
+
+  // For an enquiry, the follow-up task and the enquiry are the same
+  // piece of work — moving one without the other strands it.
+  if (movedStudio && sType === 'student') {
+    const subj = studentOpts.find(x => x.id === sId);
+    if (subj?.status === 'prospective') {
+      const to = studios.find(s => s.id === newStudio)?.name ?? 'the other studio';
+      if (confirm(
+        `Move ${subj.name}'s enquiry to ${to} as well?\n\n` +
+        `Otherwise the enquiry stays where it is and shows as having no task.`)) {
+        const { error: sErr } = await db.from('students')
+          .update({ studio_id: newStudio }).eq('id', sId);
+        if (sErr) showToast('Task moved, but the enquiry did not: ' + sErr.message, 'warning');
+      }
+    }
   }
 
   // Ownership changes go through hand_over_task(), which records the

@@ -207,6 +207,7 @@
       <button class="btn btn-danger btn-sm" onclick="deleteEnquiry()" id="dDeleteBtn">Delete</button>
       <div class="flex gap-1">
         <button class="btn btn-ghost" onclick="closeDetail()">Close</button>
+        <button class="btn btn-secondary" id="dStudioBtn" onclick="changeEnquiryStudio()">Move studio</button>
         <button class="btn btn-secondary" id="dLapseBtn" onclick="markLapsed()">Mark lapsed</button>
         <a class="btn btn-primary" id="dTaskBtn" href="tasks.html">Open follow-up task</a>
       </div>
@@ -580,6 +581,7 @@ function openDetail(id) {
   `;
 
   const stillOpen = e.status === 'prospective';
+  document.getElementById('dStudioBtn').style.display = stillOpen ? '' : 'none';
   document.getElementById('dLapseBtn').style.display  = stillOpen ? '' : 'none';
   // Deleting a converted enquiry would take a real student with it
   document.getElementById('dDeleteBtn').style.display =
@@ -611,6 +613,40 @@ function openDetail(id) {
 function closeDetail() {
   document.getElementById('detailModal').classList.add('hidden');
   openEnq = null;
+}
+
+// Moving an enquiry to the other studio. The trigger on students
+// carries their open tasks across and writes a handover record, so the
+// receiving admin picks up the follow-up with its full history.
+async function changeEnquiryStudio() {
+  if (!openEnq) return;
+  const name = `${openEnq.first_name} ${openEnq.last_name}`.trim();
+  const current = studios.find(s => s.id === openEnq.studio_id)?.name ?? 'none';
+
+  const options = studios
+    .map((s, i) => `  ${i + 1} — ${s.name}${s.id === openEnq.studio_id ? '  (current)' : ''}`)
+    .join('\n');
+
+  const answer = prompt(
+    `Move ${name} to which studio?\n\nCurrently: ${current}\n\n${options}\n\nEnter a number:`);
+  if (answer === null) return;
+
+  const picked = studios[parseInt(answer.trim(), 10) - 1];
+  if (!picked) { showToast('Enter one of the numbers listed.', 'warning'); return; }
+  if (picked.id === openEnq.studio_id) { showToast('Already at that studio.', 'warning'); return; }
+
+  if (!confirm(
+    `Move ${name} to ${picked.name}?\n\n` +
+    `Their follow-up task moves too, and lands in ${picked.name}'s queue. ` +
+    `This enquiry will leave your list.`)) return;
+
+  const { error } = await db.from('students')
+    .update({ studio_id: picked.id }).eq('id', openEnq.id);
+  if (error) { showToast('Could not move: ' + error.message, 'error'); return; }
+
+  showToast(`${name} moved to ${picked.name}. Their task went with them.`, 'success');
+  closeDetail();
+  await loadEnquiries();
 }
 
 async function markLapsed() {
