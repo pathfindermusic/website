@@ -1780,6 +1780,9 @@ function timeToMins(timeStr) {
 // The dates a lesson would occupy. Used both to generate occurrences
 // and to check clashes — a lesson only occupies a slot on the dates it
 // actually falls on, which is what makes a past one-off harmless.
+// How far ahead an "indefinite" series is generated.
+const INDEFINITE_YEARS = 3;
+
 function plannedDates(dayOfWeek, startDate, recurrenceType, count, endDate) {
   const dates = [];
   let current = parseLocalDate(startDate);
@@ -1787,12 +1790,35 @@ function plannedDates(dayOfWeek, startDate, recurrenceType, count, endDate) {
 
   const limit = recurrenceType === 'occurrences' ? count
               : recurrenceType === 'date_range'  ? 999
-              : 52;
+              : null;                              // indefinite — see below
   const end = recurrenceType === 'date_range' ? parseLocalDate(endDate) : null;
 
+  // An indefinite series runs INDEFINITE_YEARS ahead of today, not from
+  // whenever it began. A migrated student whose lessons started in early
+  // 2025 would otherwise get occurrences that have all already happened,
+  // and their lesson would appear nowhere.
+  //
+  // Every occurrence is a row: roughly 26,000 a year at 500 weekly
+  // students. Three years is far enough that nobody thinks about it and
+  // small enough to stay manageable — these are also the rows rewritten
+  // whenever a series is cancelled.
+  let horizon = null;
+  if (recurrenceType === 'indefinite') {
+    horizon = new Date();
+    horizon.setFullYear(horizon.getFullYear() + INDEFINITE_YEARS);
+    if (horizon < current) {
+      horizon = new Date(current.getTime());
+      horizon.setFullYear(horizon.getFullYear() + INDEFINITE_YEARS);
+    }
+  }
+
   let generated = 0;
-  while (generated < limit) {
+  while (true) {
+    if (limit !== null && generated >= limit) break;
     if (end && current > end) break;
+    if (horizon && current > horizon) break;
+    if (generated > 1040) break;                   // twenty years, a safety stop
+
     dates.push(toISODate(current));
     generated++;
     current.setDate(current.getDate() + 7);

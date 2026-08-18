@@ -470,7 +470,8 @@ async function loadStudents() {
   // the Enquiries page and would otherwise clutter this list.
   const { data: studentData, error } = await db
     .from('students')
-    .select('id, status, user_id, studio_id')
+    .select('id, status, user_id, studio_id, email, parent_name, parent_phone, ' +
+            'parent_email, enquiry_notes, enquiry_date, enquiry_source')
     .in('status', ['trial','active','inactive'])
     .order('id');
 
@@ -717,6 +718,16 @@ async function loadProcesses() {
 function renderProcCell(studentId) {
   const entry = procByStudent[studentId];
   if (!entry) {
+    const s = allStudents.find(x => x.id === studentId);
+    const avail = availableProcesses(s?.status);
+    if (!avail.length) {
+      return `<span class="text-muted" style="font-size:0.78rem;">—</span>`;
+    }
+    // One option is a button, not a menu
+    if (avail.length === 1) {
+      return `<button class="proc-pill" style="background:var(--off-white);border-color:var(--border);color:var(--mid-grey);"
+                onclick="offerStartProcess('${studentId}')">${avail[0].short}</button>`;
+    }
     return `<button class="proc-pill" style="background:var(--off-white);border-color:var(--border);color:var(--mid-grey);"
               onclick="offerStartProcess('${studentId}')">Start…</button>`;
   }
@@ -804,21 +815,57 @@ async function planEndEnrolment() {
   showToast(`Task created, due ${formatShortDate(parseLocalDate(when.trim()))}. Closing it starts the end-enrolment checklist.`, 'success');
 }
 
+// What can sensibly be started from where they are now.
+//
+// A student migrated from MyMusicStaff is already enrolled — offering
+// them an enrolment checklist is meaningless. And a trial is never run
+// for someone already active: a second instrument is just another
+// lesson, booked and notified, not a trial.
+// What can be started from the Enrolment column.
+//
+// Ending is deliberately absent: the row's own button owns the leaving
+// lifecycle, offering plan-or-now and then showing "Ending 20 Aug" and
+// "Leaving after 27 Aug" as it progresses. Two routes to the same thing
+// was one too many.
+//
+// A student migrated from MyMusicStaff is already enrolled, so an
+// enrolment checklist would be meaningless — hence nothing for active.
+// And a trial is never run for someone already active: a second
+// instrument is just another lesson, booked and notified.
+function availableProcesses(status) {
+  switch (status) {
+    case 'trial':
+      return [{ type: 'ongoing_enrolment', label: 'Ongoing enrolment', short: 'Enrol…' }];
+    default:
+      return [];
+  }
+}
+
 async function offerStartProcess(studentId) {
   const s = allStudents.find(x => x.id === studentId);
-  const answer = prompt(
-    `Start which process for ${s?.profiles?.first_name ?? 'this student'}?\n\n` +
-    `  1 — Trial confirmation\n` +
-    `  2 — Ongoing enrolment\n` +
-    `  3 — End enrolment\n\nEnter 1, 2 or 3:`);
-  if (answer === null) return;
-  const type = { '1':'trial_confirmation', '2':'ongoing_enrolment', '3':'end_enrolment' }[answer.trim()];
-  if (!type) { showToast('Enter 1, 2 or 3.', 'warning'); return; }
+  const name = `${s?.profiles?.first_name ?? ''} ${s?.profiles?.last_name ?? ''}`.trim() || 'this student';
+  const avail = availableProcesses(s?.status);
+
+  if (!avail.length) { showToast('Nothing to start for a student at this status.', 'warning'); return; }
+
+  let type;
+  if (avail.length === 1) {
+    type = avail[0].type;
+    if (!confirm(`Start the ${avail[0].label.toLowerCase()} checklist for ${name}?`)) return;
+  } else {
+    const menu = avail.map((a, i) => `  ${i + 1} — ${a.label}`).join('\n');
+    const answer = prompt(`Start which process for ${name}?\n\n${menu}\n\nEnter a number:`);
+    if (answer === null) return;
+    const picked = avail[parseInt(answer.trim(), 10) - 1];
+    if (!picked) { showToast('Enter one of the numbers listed.', 'warning'); return; }
+    type = picked.type;
+  }
 
   try {
     await startProcess(studentId, type, currentProfile.id);
-    showToast('Checklist started.', 'success');
     await loadStudents();
+    if (procByStudent[studentId]) openProcess(studentId);
+    showToast('Checklist started.', 'success');
   } catch (err) { showToast(err.message, 'error'); }
 }
 

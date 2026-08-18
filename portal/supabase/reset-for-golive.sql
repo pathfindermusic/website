@@ -86,8 +86,8 @@ DELETE FROM email_log;
 -- Skip this section entirely to keep them.
 -- ============================================================
 
--- DELETE FROM teacher_availability;
--- DELETE FROM teachers;
+DELETE FROM teacher_availability;
+DELETE FROM teachers;
 
 
 -- ============================================================
@@ -106,9 +106,9 @@ SELECT p.id, p.first_name, p.last_name, p.role
  ORDER BY p.role, p.first_name;
 
 -- Then:
--- DELETE FROM profiles p
---  WHERE p.role NOT IN ('superuser','admin')
---    AND NOT EXISTS (SELECT 1 FROM teachers t WHERE t.user_id = p.id);
+DELETE FROM profiles p
+ WHERE p.role NOT IN ('superuser','admin')
+   AND NOT EXISTS (SELECT 1 FROM teachers t WHERE t.user_id = p.id);
 
 
 -- ============================================================
