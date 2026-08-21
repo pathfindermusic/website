@@ -4,8 +4,8 @@
 // Supabase Dashboard → Project Settings → API
 // ============================================================
 
-const SUPABASE_URL  = 'https://oxuyzcjgxmohpqyijpip.supabase.co';   // e.g. https://xxxxxxxxxxxx.supabase.co
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im94dXl6Y2pneG1vaHBxeWlqcGlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTQ3NzMsImV4cCI6MjEwMDQ5MDc3M30.3BiBBOqQFMwpb7mZC7xLISDp2EJCXfML-7_wq-Imwws';      // starts with eyJ...
+const SUPABASE_URL  = 'YOUR_SUPABASE_PROJECT_URL';   // e.g. https://xxxxxxxxxxxx.supabase.co
+const SUPABASE_ANON = 'YOUR_SUPABASE_ANON_KEY';      // starts with eyJ...
 
 // Load Supabase via CDN (included in each HTML page's <head>)
 // <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -229,6 +229,7 @@ function skillLabel(level) {
   return `Advanced (${level})`;
 }
 
+
 // ------------------------------------------------------------
 // Default a studio filter to the admin's own studio.
 //
@@ -239,24 +240,11 @@ function skillLabel(level) {
 // ------------------------------------------------------------
 function applyDefaultStudio(selectId, myStudioIds, onChange) {
   const sel = document.getElementById(selectId);
-  if (!sel) { console.warn(`[studio default] no #${selectId} on this page`); return; }
- 
-  if (!Array.isArray(myStudioIds) || myStudioIds.length !== 1) {
-    // Covering several studios, or none resolved — either way there is no
-    // single studio to default to. Worth saying: a query that forgets to
-    // select studio_ids lands here silently and the default never applies.
-    console.info('[studio default] not applied — covers',
-      Array.isArray(myStudioIds) ? myStudioIds.length : 'unknown', 'studios');
-    return;
-  }
- 
+  if (!sel || !Array.isArray(myStudioIds) || myStudioIds.length !== 1) return;
+
   const wanted = myStudioIds[0];
-  if (![...sel.options].some(o => o.value === wanted)) {
-    console.warn('[studio default] options not populated yet — call this after filling the select');
-    return;
-  }
- 
+  if (![...sel.options].some(o => o.value === wanted)) return;
+
   sel.value = wanted;
   if (typeof onChange === 'function') onChange();
 }
- 

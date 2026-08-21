@@ -197,6 +197,21 @@
           <div class="placeholder-help">
             You can personalise using <code>{{first_name}}</code> and <code>{{student_name}}</code>.
             Each student receives their own individual email — no one sees anyone else's address.
+            <br>
+            <strong>Paste a screenshot</strong> straight into the box to include an image.
+          </div>
+
+          <!-- Shown once an image has been added. Deliberately in view: a
+               public URL is the only thing an email client can load, and
+               it stays reachable long after the email is deleted. -->
+          <div class="hidden" id="imageWarning"
+               style="background:#fef3c7;border:1px solid #fcd34d;border-radius:var(--r-sm);
+                      padding:0.6rem 0.75rem;margin-top:0.6rem;font-size:0.78rem;
+                      color:#92400e;line-height:1.55;">
+            ⚠️ Images are stored on a public web address so email apps can display them.
+            Anyone with the link can view it, and it stays available after the email is
+            deleted. Fine for a flyer or a map — not for anything showing other students'
+            names or payment details.
           </div>
         </div>
 
@@ -241,6 +256,61 @@
 <div id="toastWrap" class="toast-wrap"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-client.js"></script>
+<script>
+// ============================================================
+// Pasted screenshots
+//
+// Admins wanted to paste rather than save a file and share a link.
+// The image goes to a PUBLIC bucket — email clients fetch images
+// with no session, so it has to be — and stays reachable for ever.
+// The warning below is deliberately in view rather than buried.
+// ============================================================
+const IMG_BUCKET = 'notification-images';
+const MAX_IMAGE  = 5 * 1024 * 1024;
+
+async function handleImagePaste(e) {
+  const items = [...(e.clipboardData?.items ?? [])];
+  const item  = items.find(i => i.type.startsWith('image/'));
+  if (!item) return;                       // ordinary text paste
+
+  e.preventDefault();
+  const file = item.getAsFile();
+  if (!file) return;
+
+  if (file.size > MAX_IMAGE) {
+    showToast('That image is over 5 MB. Crop it or save it smaller.', 'error');
+    return;
+  }
+
+  const box = document.getElementById('bodyText');
+  const at  = box.selectionStart ?? box.value.length;
+  const tag = `\n[[image:uploading…]]\n`;
+  box.value = box.value.slice(0, at) + tag + box.value.slice(at);
+
+  try {
+    const ext  = (file.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+    const name = `${crypto.randomUUID()}.${ext}`;
+
+    const { error } = await db.storage.from(IMG_BUCKET)
+      .upload(name, file, { contentType: file.type, upsert: false });
+    if (error) throw new Error(error.message);
+
+    const { data } = db.storage.from(IMG_BUCKET).getPublicUrl(name);
+    box.value = box.value.replace('[[image:uploading…]]', `[[image:${data.publicUrl}]]`);
+
+    document.getElementById('imageWarning').classList.remove('hidden');
+    updatePreview?.();
+    showToast('Image added to the message.', 'success');
+  } catch (err) {
+    box.value = box.value.replace(tag, '');
+    showToast('Could not upload that image: ' + err.message, 'error');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('bodyText')?.addEventListener('paste', handleImagePaste);
+});
+</script>
 <script>
 const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 

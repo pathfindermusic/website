@@ -288,6 +288,19 @@ async function loadStudios() {
     f.innerHTML += `<option value="${s.id}">${s.name}</option>`;
     a.innerHTML += `<option value="${s.id}">${s.name}</option>`;
   });
+
+  // Which studio does this admin cover? Used to default the filter —
+  // everything stays visible, but the day starts on your own.
+  let mine = [];
+  if (me.role === 'superuser') {
+    mine = studios.map(s => s.id);
+  } else {
+    const { data: row } = await db.from('admins')
+      .select('studio_ids').eq('user_id', me.id).maybeSingle();
+    mine = row?.studio_ids?.length ? row.studio_ids : studios.map(s => s.id);
+  }
+  applyDefaultStudio('filterStudio', mine, render);
+  if (mine.length === 1) a.value = mine[0];   // and pre-select it when adding
 }
 
 // ============================================================

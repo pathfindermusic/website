@@ -719,11 +719,23 @@ async function loadStudios() {
   allStudios = data ?? [];
   const filterSel = document.getElementById('filterStudio');
   const lStudio   = document.getElementById('lStudio');
-  const agTeacher = document.getElementById('agendaTeacher'); // populated separately
   allStudios.forEach(s => {
     filterSel.innerHTML += `<option value="${s.id}">${s.name}</option>`;
     lStudio.innerHTML   += `<option value="${s.id}">${s.name}</option>`;
   });
+
+  // Start on this admin's own studio. Every studio remains visible —
+  // it is one dropdown away — but the day begins with your own.
+  let mine = [];
+  if (currentProfile.role === 'superuser') {
+    mine = allStudios.map(s => s.id);
+  } else {
+    const { data: row } = await db.from('admins')
+      .select('studio_ids').eq('user_id', currentProfile.id).maybeSingle();
+    mine = row?.studio_ids?.length ? row.studio_ids : allStudios.map(s => s.id);
+  }
+  applyDefaultStudio('filterStudio', mine);   // loadView() runs after this
+  if (mine.length === 1) lStudio.value = mine[0];   // and when booking
 }
 
 async function loadTeachers() {
@@ -859,9 +871,22 @@ function syncDatePicker(date) {
 }
 
 async function loadView() {
-  if (currentView === 'daily')        await loadDailyView();
-  else if (currentView === 'monthly') await loadMonthlyView();
-  else                                await loadWeeklyView();
+  try {
+    if (currentView === 'daily')        await loadDailyView();
+    else if (currentView === 'monthly') await loadMonthlyView();
+    else                                await loadWeeklyView();
+  } catch (err) {
+    // Without this a throw part-way through a loader leaves the spinner
+    // turning for ever, with nothing to indicate what went wrong.
+    console.error('[lessons] view failed to load', err);
+    document.getElementById('viewContent').innerHTML =
+      `<div class="empty-state">
+         <div class="empty-state-icon">⚠️</div>
+         <h3>Could not load this view</h3>
+         <p>${String(err?.message ?? err)}</p>
+         <button class="btn btn-secondary btn-sm" onclick="loadView()">Try again</button>
+       </div>`;
+  }
 }
 
 // Picking a student switches to the monthly view — a weekly lesson is
@@ -1230,13 +1255,18 @@ async function loadWeeklyView() {
   const { data, error } = await query;
   if (error) { wrap.innerHTML = `<div class="empty-state"><p style="color:#dc2626;">${error.message}</p></div>`; return; }
 
-  // Filter: hide cancelled occurrences where the whole series is also cancelled
   allOccurrences = (data ?? []).filter(o => {
+    // Filtering on a joined column gives a LEFT join: occurrences from
+    // the other studio still come back, with lessons set to null. They
+    // cannot be rendered, and letting them through threw part-way and
+    // left the spinner turning for ever.
+    if (!o.lessons) return false;
+
     // Cancelling a series marks every occurrence from the cancellation
     // point onwards as cancelled. Hide exactly those — earlier lessons
     // still happened and stay on the grid as history, whether or not
     // their attendance was ever marked.
-    if (o.lessons?.status !== 'active') return o.status !== 'cancelled';
+    if (o.lessons.status !== 'active') return o.status !== 'cancelled';
 
     // Active series: show everything. A cancelled occurrence here is a
     // deliberate one-off and renders with a red ✕.

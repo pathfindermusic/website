@@ -12,6 +12,13 @@ Pathfinder Music Portal Login and Temporary Password
 - Vikatoa Tupou: vikatoa2po@gmail.com/Welcome-8846!
 - Cameron Bailey: drawcameronbailey@gmail.com/Welcome-4951!
 - Ananya Anish: ananyaanish07@gmail.com/Welcome-3172!
+- Lily Alexander: alily3104@gmail.com/Welcome-5361!
 
 2. Students
 - Anthony Eden: lizshall4@gmail.com/Welcome-9180!
+- Max Knorr: Lorna.Knorr@gmail.com/Welcome-7163!
+- Mark Gower: stkilda_23@hotmail.com/Welcome-6909!
+- Paul Nelson: tackman66@icloud.com/Welcome-3168!
+- Arman and Adrian Pook: vidyadanani@gmail.com/
+- Thomas and Teddy McGregor: rebeccakmcgregor@gmail.com/Welcome-5545!
+- Ariana Aycardo: aycardo.kat@gmail.com

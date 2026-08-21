@@ -281,8 +281,13 @@
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Email Address *</label>
-          <input class="form-input" type="email" id="sEmail" placeholder="student or parent email">
+          <label class="form-label">Email Address</label>
+          <input class="form-input" type="email" id="sEmail"
+                 placeholder="leave blank if they share a family login">
+          <div class="form-hint">
+            Gives this student their own portal login. Leave blank for a
+            sibling who will share one — you can link them afterwards.
+          </div>
         </div>
         <div class="form-group">
           <label class="form-label">Phone</label>
@@ -431,6 +436,7 @@
 const INSTRUMENTS = ['Guitar','Bass','Drums','Piano / Keyboard','Voice / Singing','Violin','Ukulele','Music Theory','Saxophone','Band','Other'];
 let allStudents  = [];
 let allStudiosMap = {};
+let myStudioIds   = [];   // studios this admin may create students in
 let csvData      = [];
 let currentProfile = null;
 
@@ -454,6 +460,16 @@ async function loadStudios() {
   const { data } = await db.from('studios').select('id, name').eq('status','active').order('name');
   (data ?? []).forEach(s => { allStudiosMap[s.id] = s.name; });
 
+  // Which studios may this admin create students in? An insert elsewhere
+  // succeeds as a write and then fails when the row is read back.
+  if (currentProfile.role === 'superuser') {
+    myStudioIds = (data ?? []).map(s => s.id);
+  } else {
+    const { data: me } = await db.from('admins')
+      .select('studio_ids').eq('user_id', currentProfile.id).maybeSingle();
+    myStudioIds = me?.studio_ids?.length ? me.studio_ids : (data ?? []).map(s => s.id);
+  }
+
   // Populate filter and form selects
   const filterSel = document.getElementById('filterStudio');
   const formSel   = document.getElementById('sStudio');
@@ -461,6 +477,12 @@ async function loadStudios() {
     filterSel.innerHTML += `<option value="${s.id}">${s.name}</option>`;
     formSel.innerHTML   += `<option value="${s.id}">${s.name}</option>`;
   });
+
+  // Default to this admin's own studio — AFTER the options exist, or
+  // the helper finds no matching option and gives up silently.
+  // Everything stays visible; the other studio is one dropdown away.
+  applyDefaultStudio('filterStudio', myStudioIds, filterStudents);
+  if (myStudioIds.length === 1) formSel.value = myStudioIds[0];
 }
 
 // ---- Load students ----
@@ -490,7 +512,7 @@ async function loadStudents() {
       ? db.from('student_instruments').select('student_id, instrument, skill_level').in('student_id', studentIds)
       : Promise.resolve({ data: [] }),
     studentIds.length > 0
-      ? db.from('student_teachers').select('student_id, teacher_id, instrument').in('student_id', studentIds)
+      ? db.from('lesson_students').select('student_id, lesson_id').in('student_id', studentIds)
       : Promise.resolve({ data: [] }),
   ]);
 
@@ -503,14 +525,29 @@ async function loadStudents() {
     instrMap[i.student_id].push(i);
   });
 
+  // Which lessons is each student in, and who teaches them? Only
+  // active lessons count — a teacher from a series that ended last
+  // year is not their teacher now.
+  const lessonIds = [...new Set((assignRes.data ?? []).map(r => r.lesson_id))];
+  const { data: lessonRows } = lessonIds.length > 0
+    ? await db.from('lessons').select('id, teacher_id, instrument, status').in('id', lessonIds)
+    : { data: [] };
+
+  const lessonById = {};
+  (lessonRows ?? []).forEach(l => { if (l.status === 'active') lessonById[l.id] = l; });
+
   const assignMap = {};
-  (assignRes.data ?? []).forEach(a => {
-    if (!assignMap[a.student_id]) assignMap[a.student_id] = [];
-    assignMap[a.student_id].push(a);
+  (assignRes.data ?? []).forEach(r => {
+    const l = lessonById[r.lesson_id];
+    if (!l) return;
+    if (!assignMap[r.student_id]) assignMap[r.student_id] = [];
+    assignMap[r.student_id].push({
+      student_id: r.student_id, teacher_id: l.teacher_id, instrument: l.instrument,
+    });
   });
 
   // Fetch teacher profiles for display
-  const teacherIds = [...new Set((assignRes.data ?? []).map(a => a.teacher_id))];
+  const teacherIds = [...new Set(Object.values(assignMap).flat().map(a => a.teacher_id))];
   const { data: teacherData } = teacherIds.length > 0
     ? await db.from('teachers').select('id, user_id').in('id', teacherIds)
     : { data: [] };
@@ -539,7 +576,7 @@ async function loadStudents() {
     `${allStudents.filter(s => s.status === 'active').length} active · ${allStudents.length} total`;
 
   await loadProcesses();
-  renderStudents(allStudents);
+  filterStudents();   // keep the active filter — never render the raw list
 
   // Arrived here straight after converting someone — open their checklist
   const wanted = sessionStorage.getItem('openProcessStudentId');
@@ -597,7 +634,11 @@ function renderStudents(students) {
                       endPending[s.id].due_date
                         ? formatShortDate(parseLocalDate(endPending[s.id].due_date)) : 'soon'}</button>`
               : `<button class="btn btn-danger btn-sm" onclick="endEnrolmentFor('${s.id}')">End enrolment</button>`}
-          <button class="btn btn-ghost btn-sm" onclick="resetPassword('${s.user_id}','${s.profiles?.first_name ?? ''} ${s.profiles?.last_name ?? ''}')">Reset PW</button>
+          ${s.email
+            ? `<button class="btn btn-ghost btn-sm" onclick="resetPassword('${s.user_id}','${s.profiles?.first_name ?? ''} ${s.profiles?.last_name ?? ''}')">Reset PW</button>`
+            : sharesLoginWith(s)
+              ? `<button class="btn btn-ghost btn-sm" disabled title="Signs in with ${sharesLoginWith(s)}">Shared login</button>`
+              : `<button class="btn btn-ghost btn-sm" onclick="addLogin('${s.id}')" title="No portal login yet">Add login</button>`}
         </div>
       </td>
     </tr>`;
@@ -997,7 +1038,7 @@ async function toggleItem(studentId, itemId) {
   if (next) it.blocked_task_id = null;
   await syncProcessStatus(studentId);
   renderProcessBody(studentId);
-  renderStudents(allStudents);
+  filterStudents();   // keep the active filter — never render the raw list
 }
 
 // An item that can't be done yet gets a task instead of a false tick.
@@ -1044,7 +1085,7 @@ async function blockItem(studentId, itemId) {
 
   it.blocked_task_id = task.id;
   renderProcessBody(studentId);
-  renderStudents(allStudents);
+  filterStudents();   // keep the active filter — never render the raw list
   showToast('Task created — the checklist shows this step as blocked.', 'success');
 }
 
@@ -1145,6 +1186,82 @@ function removeInstrumentRow(id) {
 }
 
 // ---- Open/close student modal ----
+// A student who shares a family address has no login. If they later need
+// portal access they need an address of their own — a login cannot be
+// created against one already in use.
+// Which address does this student sign in with, if they share a
+// sibling's login? Null when they have no login at all.
+function sharesLoginWith(s) {
+  if (s.email || !s.user_id) return null;
+  const owner = allStudents.find(x => x.id !== s.id && x.user_id === s.user_id && x.email);
+  return owner ? owner.email : null;
+}
+
+// Undo a half-made student. Without this, a failure after the auth
+// account was created left the email address taken by an account with
+// no student attached — invisible in the portal, and the next attempt
+// failed with "already used" for a student nobody could find.
+async function rollbackNewUser(userId, hadAuthAccount) {
+  try {
+    await db.from('profiles').delete().eq('id', userId);
+    if (hadAuthAccount) {
+      await fetch('/.netlify/functions/create-user', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete-user', userId }),
+      });
+    }
+  } catch (err) {
+    console.error('[students] could not roll back a failed create', err);
+  }
+}
+
+async function addLogin(studentId) {
+  const s = allStudents.find(x => x.id === studentId);
+  const first = s?.profiles?.first_name ?? '';
+  const name  = `${first} ${s?.profiles?.last_name ?? ''}`.trim();
+
+  const email = prompt(
+    `Give ${name} their own email address to sign in with.\n\n` +
+    `It must differ from every other account. Where a family shares one ` +
+    `address, most providers accept a suffix — for example\n` +
+    `  parent+${(first || 'child').toLowerCase()}@gmail.com`);
+  if (email === null) return;
+
+  const addr = email.trim().toLowerCase();
+  if (!/^[^@\s]+@[^@.\s]+(\.[^@.\s]+)+$/.test(addr)) {
+    showToast('That does not look like an email address.', 'warning'); return;
+  }
+
+  try {
+    const res = await fetch('/.netlify/functions/create-user', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: addr, role: 'student' }),
+    });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error ?? 'Could not create the login.', 'error'); return; }
+
+    // Move the student onto the new auth id. Their lessons, attendance
+    // and notes hang off students.id, so nothing is disturbed.
+    const oldUserId = s.user_id;
+    await db.from('profiles').upsert({
+      id: data.id,
+      first_name: s.profiles?.first_name, last_name: s.profiles?.last_name,
+      phone: s.profiles?.phone ?? null, role: 'student', status: 'active',
+      must_change_password: true,
+    }, { onConflict: 'id' });
+
+    await db.from('students').update({ user_id: data.id, email: addr }).eq('id', studentId);
+    if (oldUserId && oldUserId !== data.id) {
+      await db.from('profiles').delete().eq('id', oldUserId);
+    }
+
+    showPasswordModal(name, data.email ?? addr, data.tempPassword ?? data.password);
+    await loadStudents();
+  } catch (err) {
+    showToast('Could not create the login: ' + err.message, 'error');
+  }
+}
+
 async function resetPassword(userId, name) {
   // Get email first
   const emailRes  = await fetch('/.netlify/functions/create-user', {
@@ -1253,7 +1370,7 @@ async function saveStudent() {
   const editId      = document.getElementById('editStudentId').value;
   const editUserId  = document.getElementById('editUserId').value;
 
-  if (!firstName || !lastName || !email || !studioId) {
+  if (!firstName || !lastName || !studioId) {
     showToast('Please fill in all required fields.', 'error'); return;
   }
 
@@ -1274,35 +1391,66 @@ async function saveStudent() {
     if (!editId) {
       // Call Netlify Function to create the auth user server-side
       // (uses service role key securely — never exposed in the browser)
-      const createRes = await fetch('/.netlify/functions/create-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, role: 'student' }),
-      });
-      const createData = await createRes.json();
-      if (!createRes.ok) {
-        showToast(createData.error ?? 'Could not create user account.', 'error');
-        return;
+      // A student with no address of their own gets no login. Siblings
+      // commonly share one family email, and auth.users.email must be
+      // unique — so a login for each child is impossible. They are still
+      // fully contactable: notifications fall back to parent_email.
+      let tempPassword = null;
+      let loginEmail   = null;
+      let alreadyExisted = false;
+
+      if (email) {
+        const createRes = await fetch('/.netlify/functions/create-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, role: 'student' }),
+        });
+        const createData = await createRes.json();
+        if (!createRes.ok) {
+          showToast(createData.error ?? 'Could not create user account.', 'error');
+          return;
+        }
+        userId         = createData.id;
+        tempPassword   = createData.tempPassword ?? createData.password ?? null;
+        loginEmail     = createData.email ?? email;
+        alreadyExisted = !!createData.existed;
+      } else {
+        // No login. profiles.id has no foreign key to auth.users, which
+        // is what lets a student exist as a record without an account —
+        // the same mechanism the bulk import relies on.
+        userId = crypto.randomUUID();
       }
-      userId = createData.id;
 
       // Insert or update profile
-      await db.from('profiles').upsert({
+      const { error: pErr } = await db.from('profiles').upsert({
         id: userId, first_name: firstName, last_name: lastName, phone, role: 'student', status: 'active',
-        must_change_password: true,
+        must_change_password: !!email,
       }, { onConflict: 'id' });
 
-      // Insert student record
+      if (pErr) {
+        await rollbackNewUser(userId, !!email);
+        throw new Error('Could not save the profile: ' + pErr.message);
+      }
+
+      // Insert student record. If this fails the auth account created
+      // above would be stranded — the address taken, with no student to
+      // show for it — so it is removed again.
       const { data: sData, error: sErr } = await db.from('students').insert({
-        user_id: userId, status, studio_id: studioId || null, email,
+        user_id: userId, status, studio_id: studioId || null, email: email || null,
         parent_name: parentName || null, parent_phone: parentPhone || null, parent_email: parentEmail || null,
       }).select('id').single();
-      if (sErr) throw new Error(sErr.message);
+
+      if (sErr) {
+        await rollbackNewUser(userId, !!email);
+        throw new Error(sErr.message);
+      }
       studentId = sData.id;
 
-      // Show temp password in a modal so admin can copy it
-      if (!createData.existed) {
-        showPasswordModal(firstName, createData.email, createData.tempPassword);
+      // Show the temporary password so the admin can pass it on. Only
+      // where a login was actually created — a sibling sharing a family
+      // address has none.
+      if (tempPassword && !alreadyExisted) {
+        showPasswordModal(firstName, loginEmail, tempPassword);
       }
 
     } else {
@@ -1323,7 +1471,24 @@ async function saveStudent() {
       );
     }
 
-    showToast(editId ? 'Student updated.' : 'Student added.', 'success');
+    // A student handed to another studio leaves this admin's list, so say
+    // so rather than letting them vanish silently.
+    // Moving a student to another studio still hands their tasks over —
+    // worth saying, even though both admins can now see everything.
+    const handedOver = editId && studioId && currentProfile.role !== 'superuser'
+      && myStudioIds.length && !myStudioIds.includes(studioId);
+
+    if (handedOver) {
+      showToast(
+        `${firstName} moved to ${allStudiosMap[studioId] ?? 'the other studio'}. ` +
+        `Their open tasks went with them.`, 'success');
+    } else if (!editId && !email && !parentEmail) {
+      showToast(
+        'Student added, but with no email address anywhere they cannot receive ' +
+        'notifications. Add a parent email when you have one.', 'warning');
+    } else {
+      showToast(editId ? 'Student updated.' : 'Student added.', 'success');
+    }
     closeStudentModal();
     await loadStudents();
 

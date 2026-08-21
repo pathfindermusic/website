@@ -353,6 +353,73 @@ so no cycle can form. `get_my_role()`, `get_my_teacher_id()`,
 `get_my_studio_ids()` and `my_lesson_ids()` all exist for this reason. Any new
 policy needing a relationship lookup should use one, not an inline subquery.
 
+### Studio access is a default, not a boundary
+
+Admins see and work on every studio. Their pages simply *default* the studio
+filter to their own, so the day starts with their own work and the other studio
+is one dropdown away.
+
+This replaced database-level scoping, which was the wrong tool. Being a `FOR
+ALL` policy it restricted writing as well as reading, and the failures surfaced
+as opaque `42501` errors rather than clear refusals. Three bugs came from it in
+two days — an invisible task that made an enquiry report "Needs a task", a task
+silently losing its subject when edited by an admin who couldn't see that
+student, and a student creation that inserted fine and then failed on the
+read-back.
+
+The lesson worth keeping: **scoping in the database enforces a boundary;
+scoping in the interface expresses a preference.** The admins wanted a
+preference, and said so once asked directly.
+
+`applyDefaultStudio()` in `supabase-client.js` does it, and only where an admin
+covers exactly one studio.
+
+### Historical note: studio scoping restricted writing, not just reading
+
+`admins_manage_students_in_their_studios` is a `FOR ALL` policy, so its
+`USING` clause governs reads *and* the read-back after a write. A request with
+`Prefer: return=representation` — which supabase-js sends whenever `.select()`
+follows an insert — therefore fails with `42501` when an admin creates a
+student at another studio: the insert succeeds, the read-back is denied, and
+the error names row-level security rather than the actual problem.
+
+`students.html` blocks this case with a plain message. The workaround is to
+create the student at your own studio and move them across, which carries
+their tasks over.
+
+**Decided:** creating for another studio stays forbidden. It is rare, and
+admins can hand it over between themselves.
+
+### A student may have no login of their own
+
+Around 5% of students are siblings sharing one family email address, and
+`auth.users.email` must be unique — so a login each is impossible.
+
+Email is therefore optional. A student without one gets no auth account and
+exists as a record only, exactly like the bulk-imported students; notifications
+reach them through `parent_email`. `students.user_id` is not unique, so several
+students can share one profile — that is how a family login works.
+
+The student dashboard shows a child switcher when the login owns more than one
+student, and one child at a time: practice notes and attendance are per child,
+and combining them invites reading the wrong child's feedback. A single child
+sees no switcher.
+
+**Creating a student is not atomic.** The auth account is made first, then the
+profile, then the student row. A failure partway used to leave an auth account
+holding the email address with no student attached — invisible in the portal,
+and the next attempt failed with "already used" for a student nobody could
+find. Both later steps now roll the account back. If this recurs, look for
+orphans:
+
+```sql
+SELECT u.id, u.email, u.created_at
+  FROM auth.users u
+ WHERE NOT EXISTS (SELECT 1 FROM students s WHERE s.user_id = u.id)
+   AND NOT EXISTS (SELECT 1 FROM admins  a WHERE a.user_id = u.id)
+   AND NOT EXISTS (SELECT 1 FROM teachers t WHERE t.user_id = u.id);
+```
+
 ### Tightening scope can silently clear data
 
 Any `<select>` populated from a scoped query drops values the current user
@@ -517,6 +584,23 @@ Enquiries have a **Move studio** button for this; moving an enquiry's follow-up
 task offers to move the enquiry too, since they are the same piece of work.
 
 **Known gap: lessons are not studio-scoped.** Only students and tasks are.
+
+**An indefinite lesson series runs three years ahead of today**, not from
+whenever it began. Generating 52 weeks from the start date meant a migrated
+student whose lessons began in early 2025 got occurrences that had all already
+happened — their lesson appeared in no view at all, and could not be fixed
+through the portal. `INDEFINITE_YEARS` in `lessons.html` controls the horizon.
+Nothing tops series up as time passes, so that horizon is a real deadline.
+
+After any bulk import, check for series that are already exhausted:
+
+```sql
+SELECT l.id, l.instrument, MAX(o.date) AS last_occurrence
+  FROM lessons l JOIN lesson_occurrences o ON o.lesson_id = l.id
+ WHERE l.status = 'active'
+ GROUP BY l.id, l.instrument
+HAVING MAX(o.date) < CURRENT_DATE;
+```
 
 **Known gap:** deleting a studio does not check for live lessons. It cleans up
 teacher references and availability, but a studio with a running schedule would

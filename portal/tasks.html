@@ -422,7 +422,7 @@ function renderSidebar() {
 async function loadOptions() {
   const [stRes, adRes, studRes, teachRes] = await Promise.all([
     db.from('studios').select('id,name').eq('status','active').order('name'),
-    db.from('admins').select('id,user_id'),
+    db.from('admins').select('id,user_id,studio_ids'),
     db.from('students').select('id,user_id,status,enquiry_notes,enquiry_date,email')
       .in('status',['active','trial','prospective','lapsed','inactive']),
     db.from('teachers').select('id,user_id'),
@@ -491,6 +491,10 @@ async function loadOptions() {
 
   const fs = document.getElementById('filterStudio');
   studios.forEach(s => { fs.innerHTML += `<option value="${s.id}">${s.name}</option>`; });
+
+  // Start on this admin's own studio. Everything is visible — the other
+  // studio is one dropdown away — but the day begins with your own.
+  applyDefaultStudio('filterStudio', myStudios, render);
 
   const fa = document.getElementById('filterAssignee');
   admins.forEach(a => { fa.innerHTML += `<option value="${a.id}">${a.name}</option>`; });

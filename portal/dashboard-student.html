@@ -115,6 +115,23 @@
 
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
+    .child-switcher {
+      display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1.25rem;
+    }
+    .child-btn {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem;
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 0.6rem 1rem; cursor: pointer;
+      font-family: 'Inter', sans-serif; text-align: left;
+      transition: all 0.15s; box-shadow: var(--shadow);
+    }
+    .child-btn:hover { border-color: var(--orange); }
+    .child-btn.active { border-color: var(--orange); background: rgba(232,73,30,0.05); }
+    .child-name {
+      font-size: 0.92rem; font-weight: 600; color: var(--charcoal); line-height: 1.2;
+    }
+    .child-btn.active .child-name { color: var(--orange); }
+    .child-sub { font-size: 0.72rem; color: var(--mid-grey); }
   </style>
 </head>
 <body>
@@ -165,6 +182,9 @@
   <main class="main">
 
     <!-- Stats row -->
+    <!-- Shown only when one login owns more than one student -->
+    <div class="child-switcher hidden" id="childSwitcher"></div>
+
     <div class="stats-row">
       <div class="stat-card">
         <div class="stat-card-top">
@@ -267,6 +287,7 @@
 
 let currentProfile = null;
 let studentRecord   = null;
+let myStudents      = [];   // a family login may own several
 let weekStart       = getWeekStart(new Date());
 let tabsLoaded      = { schedule: false, notes: false, attendance: false, progress: false };
 
@@ -278,13 +299,78 @@ let tabsLoaded      = { schedule: false, notes: false, attendance: false, progre
   renderTopNavUser(currentProfile);
   if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
 
-  // Get student record
-  const { data: s } = await db.from('students').select('*').eq('user_id', currentProfile.id).single();
-  studentRecord = s;
+  // A family may share one login. Children are viewed one at a time —
+  // practice notes and attendance are per child, and mixing them invites
+  // reading the wrong child's feedback.
+  const { data: mine } = await db.from('students')
+    .select('*').eq('user_id', currentProfile.id).order('id');
 
+  myStudents = mine ?? [];
+  if (!myStudents.length) {
+    document.getElementById('panel-schedule').innerHTML =
+      `<div class="empty-state"><div class="empty-state-icon">🎵</div>
+        <h3>No student record</h3>
+        <p>Please contact your studio so they can set this up.</p></div>`;
+    return;
+  }
+
+  const remembered = sessionStorage.getItem('activeStudentId');
+  studentRecord = myStudents.find(s => s.id === remembered) ?? myStudents[0];
+
+  await renderChildSwitcher();
   await Promise.all([loadStats(), loadSchedule()]);
   tabsLoaded.schedule = true;
 })();
+
+// Only shown where there is more than one — a single child needs no
+// switcher and should see no sign that one exists.
+async function renderChildSwitcher() {
+  const wrap = document.getElementById('childSwitcher');
+  if (!wrap || myStudents.length < 2) return;
+
+  const { data: profs } = await db.from('profiles')
+    .select('id,first_name,last_name')
+    .in('id', myStudents.map(s => s.user_id).filter(Boolean));
+
+  // Siblings sharing a login share a profile, so fall back to the
+  // instrument to tell them apart.
+  const names = {};
+  (profs ?? []).forEach(p => { names[p.id] = `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim(); });
+
+  const { data: insts } = await db.from('student_instruments')
+    .select('student_id,instrument').in('student_id', myStudents.map(s => s.id));
+  const instBy = {};
+  (insts ?? []).forEach(i => { (instBy[i.student_id] ??= []).push(i.instrument); });
+
+  wrap.innerHTML = myStudents.map(s => {
+    const label = names[s.user_id] || (instBy[s.id]?.[0] ?? 'Student');
+    const sub   = (instBy[s.id] ?? []).join(', ');
+    const on    = s.id === studentRecord.id;
+    return `<button class="child-btn ${on ? 'active' : ''}" onclick="switchChild('${s.id}')">
+      <span class="child-name">${label}</span>
+      ${sub ? `<span class="child-sub">${sub}</span>` : ''}
+    </button>`;
+  }).join('');
+  wrap.classList.remove('hidden');
+}
+
+async function switchChild(studentId) {
+  const next = myStudents.find(s => s.id === studentId);
+  if (!next || next.id === studentRecord.id) return;
+
+  studentRecord = next;
+  sessionStorage.setItem('activeStudentId', studentId);
+
+  // Everything on the page is per child, so nothing may survive
+  tabsLoaded = { schedule: false, notes: false, attendance: false, progress: false };
+
+  await renderChildSwitcher();
+  await Promise.all([loadStats(), loadSchedule()]);
+  tabsLoaded.schedule = true;
+
+  const active = document.querySelector('.tab-btn.active')?.id?.replace('tab-', '');
+  if (active && active !== 'schedule') switchTab(active);
+}
 
 // ---- Tab switching ----
 function switchTab(tab) {
