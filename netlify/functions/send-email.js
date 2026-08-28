@@ -447,15 +447,6 @@ function escapeHtml(s) {
 function emailTemplate(bodyText, studioEmail) {
   const inlineBold = (s) => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 
-  // [[image:URL]] — pasted screenshots. The body is escaped before any
-  // of this runs, so a raw <img> tag would appear as text; the
-  // placeholder survives escaping and becomes an image here.
-  const IMG = /\[\[image:(https:\/\/[^\]\s]+)\]\]/g;
-
-  const withImages = (html) => html.replace(IMG, (_, url) =>
-    `<img src="${url}" alt=""
-          style="max-width:100%;height:auto;border-radius:4px;margin:6px 0;display:block;">`);
-
   const para = (p) => {
     const t = p.trim();
     // A paragraph of only dashes is a section break
@@ -467,10 +458,7 @@ function emailTemplate(bodyText, studioEmail) {
       return `<p style="margin:0 0 10px;font-size:12px;font-weight:bold;letter-spacing:0.08em;
               text-transform:uppercase;color:#E8491E;">${t}</p>`;
     }
-    // An image on its own line needs no paragraph wrapper around it
-    if (/^\[\[image:https:\/\/[^\]\s]+\]\]$/.test(t)) return withImages(t);
-
-    return `<p style="margin:0 0 14px;">${withImages(inlineBold(t.replace(/\n/g, '<br>')))}</p>`;
+    return `<p style="margin:0 0 14px;">${inlineBold(t.replace(/\n/g, '<br>'))}</p>`;
   };
 
   const callout = (inner) =>
@@ -479,7 +467,7 @@ function emailTemplate(bodyText, studioEmail) {
         <td style="width:4px;background:#E8491E;border-radius:2px 0 0 2px;">&nbsp;</td>
         <td style="background:#f5f5f7;padding:14px 16px;border-radius:0 2px 2px 0;font-size:15px;line-height:1.6;color:#1c1c1e;">
           ${inner.split(/\n\s*\n/).map(b =>
-            `<div style="margin:0 0 10px;">${withImages(inlineBold(b.trim().replace(/\n/g, '<br>')))}</div>`
+            `<div style="margin:0 0 10px;">${inlineBold(b.trim().replace(/\n/g, '<br>'))}</div>`
           ).join('')}
         </td>
       </tr>

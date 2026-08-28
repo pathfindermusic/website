@@ -338,9 +338,9 @@
         <option value="">All Studios</option>
       </select>
       <select class="filter-select" id="filterStatus" onchange="loadView()">
-        <option value="scheduled">Scheduled</option>
-        <option value="">All statuses</option>
-        <option value="cancelled">Cancelled</option>
+        <option value="">Scheduled &amp; cancelled</option>
+        <option value="scheduled">Scheduled only</option>
+        <option value="cancelled">Cancelled only</option>
       </select>
       <select class="filter-select" id="filterStudent" onchange="onStudentFilter()">
         <option value="">All students</option>
@@ -513,6 +513,42 @@
       <div class="form-group">
         <label class="form-label">Students in this lesson</label>
         <div id="occStudentsList" style="font-size:0.875rem;color:var(--dark-grey);"></div>
+
+        <!-- A substitution is one lesson, not a change of teacher, so it
+             lives on the occurrence. Two cases: another member of staff,
+             who then sees it in their own schedule; or someone external,
+             whose name is simply recorded. -->
+        <div style="border-top:1px solid var(--border);padding-top:0.85rem;margin-top:0.85rem;">
+          <div class="form-label" style="margin-bottom:0.5rem;">Covered by someone else?</div>
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom:0.5rem;">
+              <select class="form-select" id="occSubTeacher" onchange="onSubTeacherChange()">
+                <option value="">Not covered — the usual teacher</option>
+                <option value="__external">Someone not on staff…</option>
+              </select>
+            </div>
+            <div class="form-group hidden" id="occSubNameWrap" style="margin-bottom:0.5rem;">
+              <input class="form-input" type="text" id="occSubName"
+                     placeholder="Substitute's name">
+            </div>
+          </div>
+          <div class="form-hint" id="occSubHint">
+            A staff substitute sees the lesson in their own schedule. Someone external
+            has no portal access, so record their name and mark the attendance they report.
+          </div>
+        </div>
+
+        <!-- Marking on a teacher's behalf. Needed when a substitute takes
+             the lesson: substitutes have no portal access, so an admin
+             records it for them. marked_by keeps the trail. -->
+        <div style="border-top:1px solid var(--border);padding-top:0.85rem;margin-top:0.85rem;">
+          <div class="form-label" style="margin-bottom:0.5rem;">Attendance</div>
+          <div id="occAttendance"></div>
+          <div class="form-hint" style="margin-top:0.5rem;">
+            Normally the teacher marks this. Record it here when a substitute
+            has taken the lesson.
+          </div>
+        </div>
       </div>
 
       <!-- Add student to group lesson -->
@@ -545,6 +581,7 @@
       <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:0.5rem;">
         <div class="form-label" style="margin-bottom:0.65rem;">Cancel options</div>
         <div class="flex gap-1" style="flex-wrap:wrap;">
+          <button class="btn btn-secondary btn-sm" onclick="editSeries()">Edit series…</button>
           <button class="btn btn-danger btn-sm" onclick="cancelOccurrence('single')">Cancel this lesson only</button>
           <button class="btn btn-danger btn-sm" onclick="cancelOccurrence('future')">Cancel this + all future</button>
           <button class="btn btn-danger btn-sm" onclick="cancelOccurrence('all')">Cancel entire series</button>
@@ -659,6 +696,7 @@ let allStudios      = [];
 let allTeachers     = [];
 let allStudents     = [];
 let lessonStudents  = []; // students added to current lesson being edited
+let attByOccurrence = {}; // occurrenceId -> { studentId: status }, for the grid
 let allOccurrences  = []; // cached occurrences for current view
 
 // ============================================================
@@ -999,7 +1037,13 @@ async function loadMonthlyView() {
                        border-left:2px solid ${cancelled ? 'var(--light-grey)' : 'var(--orange)'};
                        ${cancelled ? 'opacity:0.55;text-decoration:line-through;' : ''}">
                 <div style="font-weight:600;color:var(--charcoal);">${formatTime(r.start_time)}</div>
-                <div style="color:var(--dark-grey);">${studentId ? r.instrument : who}</div>
+                <div style="color:var(--dark-grey);">${
+                  studentId
+                    ? nameWithAttendance(r.instrument, r.attendance_status)
+                    : (r.lesson_type === 'group'
+                        ? `${r.attendance_marked_count ?? 0}/${r.student_count} · ${who}`
+                        : nameWithAttendance(who, r.attendance_status))
+                }</div>
                 ${studentId ? `<div style="color:var(--mid-grey);">${r.teacher_name ?? ''}</div>` : ''}
               </div>`;
             }).join('')}
@@ -1031,13 +1075,22 @@ async function loadDailyView() {
     : allStudios;
 
   // Load all occurrences for this date
-  const { data: occData, error } = await db
+  // Honour the status filter here too, so the control means the same
+  // thing in every view.
+  const dailyStatus = document.getElementById('filterStatus').value;
+
+  let dailyQuery = db
     .from('lesson_occurrences')
     .select(`
       id, date, status, is_online, occurrence_notes,
+      substitute_teacher_id, substitute_name,
       lessons(id, teacher_id, studio_id, instrument, start_time, duration_mins, lesson_type, max_students, series_notes, status)
     `)
     .eq('date', dateStr);
+
+  if (dailyStatus) dailyQuery = dailyQuery.eq('status', dailyStatus);
+
+  const { data: occData, error } = await dailyQuery;
 
   // Filter: hide cancelled occurrences where the whole series is also cancelled
   // Only show cancelled occurrences where the series (lesson) is still active
@@ -1049,6 +1102,18 @@ async function loadDailyView() {
   const { data: lsData } = lessonIds.length > 0
     ? await db.from('lesson_students').select('lesson_id,student_id').in('lesson_id', lessonIds)
     : { data: [] };
+
+  // Attendance too, so the grid can show it without opening each lesson
+  const occIds = (occData ?? []).map(o => o.id);
+  const { data: attData } = occIds.length > 0
+    ? await db.from('attendance')
+        .select('lesson_occurrence_id,student_id,status').in('lesson_occurrence_id', occIds)
+    : { data: [] };
+
+  attByOccurrence = {};
+  (attData ?? []).forEach(a => {
+    (attByOccurrence[a.lesson_occurrence_id] ??= {})[a.student_id] = a.status;
+  });
 
   // Build student name map
   const studentIds = [...new Set((lsData ?? []).map(ls => ls.student_id))];
@@ -1172,38 +1237,80 @@ async function loadDailyView() {
         <td class="time-label ${isHour ? 'full-hour' : 'half-hour'}">${isHour ? timeLabel : ''}</td>`;
 
       teachers.forEach(t => {
-        // Check if this slot is the START of a lesson
-        const startOcc = allOccurrences.find(o =>
+        // Every lesson starting in this slot, not just the first. A
+        // cancelled lesson frees its slot for rebooking, so the slot can
+        // legitimately hold both — the cancelled one and its
+        // replacement. Using find() showed whichever came back first and
+        // silently hid the other.
+        const startOccs = allOccurrences.filter(o =>
           o.lessons?.teacher_id === t.id &&
           o.lessons?.studio_id  === studio.id &&
           o.lessons?.start_time?.startsWith(slot)
-        );
+        ).sort((a, b) => (a.status === 'cancelled' ? 1 : 0) - (b.status === 'cancelled' ? 1 : 0));
 
-        if (startOcc) {
-          const dur      = startOcc.lessons?.duration_mins ?? 30;
-          const rowspan  = dur / 30;
-          const lType    = startOcc.lessons?.lesson_type ?? 'private';
-          const isCancelled = startOcc.status === 'cancelled';
-          const sIds     = startOcc.lessonStudents ?? [];
-          const sNames   = sIds.map(id => spMap[id]).filter(Boolean);
+        if (startOccs.length) {
+          // Tallest lesson decides the cell height
+          const liveOccs = startOccs.filter(o => o.status !== 'cancelled');
+          const maxDur   = Math.max(...(liveOccs.length ? liveOccs : startOccs)
+                                      .map(o => o.lessons?.duration_mins ?? 30));
+          const rowspan  = Math.max(1, maxDur / 30);
+          const share    = startOccs.length > 1;
 
-          let displayName, displayMeta;
-          if (lType === 'group') {
-            displayName = `${sIds.length} student${sIds.length !== 1 ? 's' : ''}`;
-            displayMeta = `Group · ${startOcc.lessons?.instrument}`;
-          } else {
-            displayName = sNames[0] ?? '—';
-            displayMeta = `Private · ${startOcc.lessons?.instrument}`;
-          }
+          // A slot can accumulate several cancellations before something
+          // sticks. Live lessons get the space; cancelled ones collapse
+          // to one line each so three of them don't wreck the row.
+          const live      = startOccs.filter(o => o.status !== 'cancelled');
+          const cancelled = startOccs.filter(o => o.status === 'cancelled');
 
-          html += `<td class="grid-cell" rowspan="${rowspan}" 
-            onclick="openOccurrenceModal('${startOcc.id}')"
-            style="vertical-align:top;height:${rowspan * 48}px;">
-            <div class="lesson-block ${isCancelled ? 'cancelled' : lType}" style="height:calc(100% - 4px);">
-              ${isCancelled ? '<span class="lesson-cancel-icon">✕</span>' : ''}
-              <div class="lesson-block-name">${displayName}</div>
-              <div class="lesson-block-meta">${displayMeta}</div>
-              ${startOcc.occurrence_notes ? `<div class="lesson-block-meta" style="font-style:italic;">📝 ${startOcc.occurrence_notes.slice(0,30)}…</div>` : ''}
+          // A private lesson shows that student's own state. A group of
+          // four with four different outcomes cannot reduce to one
+          // marker, so it summarises instead.
+          const nameOf = (o) => {
+            const sIds = o.lessonStudents ?? [];
+            const att  = attByOccurrence[o.id] ?? {};
+            if (o.lessons?.lesson_type === 'group') {
+              return `${groupAttendanceSummary(att, sIds.length)}${sIds.length} student${sIds.length !== 1 ? 's' : ''}`;
+            }
+            return nameWithAttendance(sIds.map(id => spMap[id]).filter(Boolean)[0] ?? '—', att[sIds[0]]);
+          };
+
+          const liveBlocks = live.map(o => {
+            const lType = o.lessons?.lesson_type ?? 'private';
+            return `<div class="lesson-block ${lType}"
+              onclick="event.stopPropagation();openOccurrenceModal('${o.id}')"
+              style="flex:1 1 auto;min-height:0;overflow:hidden;cursor:pointer;">
+              <div class="lesson-block-name">${nameOf(o)}</div>
+              <div class="lesson-block-meta">${lType === 'group' ? 'Group' : 'Private'} · ${o.lessons?.instrument}</div>
+              ${substituteLabel(o)}
+              ${o.occurrence_notes ? `<div class="lesson-block-meta" style="font-style:italic;">📝 ${o.occurrence_notes.slice(0,30)}…</div>` : ''}
+            </div>`;
+          }).join('');
+
+          // One compact line per cancellation — enough to see who it was
+          // and open it, without competing with the lesson that is on.
+          const soloCancelled = live.length === 0;
+          const cancelledLines = cancelled.map(o =>
+            `<div class="lesson-block cancelled"
+               onclick="event.stopPropagation();openOccurrenceModal('${o.id}')"
+               title="Cancelled — click to view"
+               style="cursor:pointer;padding:0 4px;flex:0 0 auto;
+                      display:flex;align-items:center;gap:3px;
+                      min-height:0;line-height:1.35;overflow:hidden;">
+               <span style="font-size:0.62rem;">✕</span>
+               <span class="lesson-block-name"
+                     style="font-size:${soloCancelled ? '0.72rem' : '0.64rem'};
+                            white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nameOf(o)}</span>
+             </div>`).join('');
+
+          const blocks = liveBlocks + cancelledLines;
+
+          // Everything must fit inside the cell. Sizing by the live
+          // lesson alone pushed the cancelled lines over the row below,
+          // which is what made them unreadable.
+          html += `<td class="grid-cell" rowspan="${rowspan}"
+            style="vertical-align:top;height:${rowspan * 48}px;padding:2px;">
+            <div style="height:100%;display:flex;flex-direction:column;gap:2px;overflow:hidden;">
+              ${blocks}
             </div>
           </td>`;
         } else if (!occupied[t.id]?.[slot]) {
@@ -1246,6 +1353,7 @@ async function loadWeeklyView() {
 
   let query = db.from('lesson_occurrences')
     .select(`id,date,status,is_online,occurrence_notes,
+      substitute_teacher_id,substitute_name,
       lessons(id,teacher_id,studio_id,instrument,start_time,duration_mins,lesson_type,max_students,series_notes,status)`)
     .gte('date', wStart).lte('date', wEnd).order('date').order('lessons(start_time)');
 
@@ -1314,14 +1422,31 @@ async function loadWeeklyView() {
   const studioMap = {};
   allStudios.forEach(s => { studioMap[s.id] = s.name; });
 
-  // Group by date — merge lessonStudents into each occurrence
+  // Attach the students to allOccurrences itself, not to copies. The
+  // occurrence modal reads allOccurrences, so a merge into a separate
+  // structure leaves it with nothing to mark attendance against.
+  allOccurrences = allOccurrences.map(o => ({
+    ...o,
+    lessonStudents: lsMap[o.lessons?.id ?? o.lesson_id] ?? [],
+  }));
+
+  // Attendance, so the week shows who turned up without opening each one
+  const wOccIds = allOccurrences.map(o => o.id);
+  const { data: wAtt } = wOccIds.length > 0
+    ? await db.from('attendance')
+        .select('lesson_occurrence_id,student_id,status').in('lesson_occurrence_id', wOccIds)
+    : { data: [] };
+
+  attByOccurrence = {};
+  (wAtt ?? []).forEach(a => {
+    (attByOccurrence[a.lesson_occurrence_id] ??= {})[a.student_id] = a.status;
+  });
+
   const byDate = {};
   days.forEach(d => { byDate[toISODate(d)] = []; });
   allOccurrences.forEach(o => {
-    const k      = o.date?.slice(0, 10);
-    const lId    = o.lessons?.id ?? o.lesson_id;
-    const merged = { ...o, lessonStudents: lsMap[lId] ?? [] };
-    if (byDate[k]) byDate[k].push(merged);
+    const k = o.date?.slice(0, 10);
+    if (byDate[k]) byDate[k].push(o);
   });
 
   const today = toISODate(new Date());
@@ -1353,9 +1478,17 @@ async function loadWeeklyView() {
           <div class="duration-label">${formatDuration(l.duration_mins)}</div>
         </div>
         <div>
-          <div class="lesson-name">${lType === 'group' ? `Group (${sIds.length} students)` : (sNames[0] ?? '—')}</div>
+          <div class="lesson-name">${
+            lType === 'group'
+              ? `Group · ${sIds.map((sid, i) => nameWithAttendance(sNames[i] ?? '—', (attByOccurrence[o.id] ?? {})[sid])).join(', ')}`
+              : nameWithAttendance(sNames[0] ?? '—', (attByOccurrence[o.id] ?? {})[sIds[0]])
+          }</div>
           <div class="lesson-instrument">${l.instrument}</div>
-          <div class="lesson-meta">${teacherMap[l.teacher_id] ?? '—'} · ${studioMap[l.studio_id] ?? '—'}</div>
+          <div class="lesson-meta">${
+            (o.substitute_teacher_id || o.substitute_name)
+              ? `<span style="color:var(--orange);font-weight:600;">${substituteName(o)}</span> covering ${teacherMap[l.teacher_id] ?? '—'}`
+              : (teacherMap[l.teacher_id] ?? '—')
+          } · ${studioMap[l.studio_id] ?? '—'}</div>
           ${o.occurrence_notes ? `<div class="text-sm text-muted mt-1">📝 ${o.occurrence_notes}</div>` : ''}
         </div>
         <div>
@@ -1747,6 +1880,17 @@ async function saveLesson() {
 
   // ---- SAVE ----
   try {
+    // Editing an existing series takes a different path: the lesson is
+    // updated and only its FUTURE occurrences are rebuilt.
+    const editId = document.getElementById('editLessonId').value;
+    if (editId) {
+      await saveSeriesEdit(editId, {
+        teacherId, studioId, instrument, lType, day, time, duration,
+        seriesNotes: seriesNotes || null,
+      });
+      return;
+    }
+
     const { data: lessonData, error: lErr } = await db.from('lessons').insert({
       teacher_id: teacherId, studio_id: studioId, instrument,
       lesson_type: lType, max_students: lType === 'group' ? 6 : 1,
@@ -1871,6 +2015,31 @@ async function generateOccurrences(lessonId, dayOfWeek, startDate, recurrenceTyp
 // ============================================================
 // OCCURRENCE MODAL — View/Edit single occurrence
 // ============================================================
+// The monthly view works from schedule_view, so its occurrences are not
+// in allOccurrences. Fetch what the modal needs, then open it normally.
+async function openOccurrence(occId) {
+  if (allOccurrences.some(o => o.id === occId)) return openOccurrenceModal(occId);
+
+  const { data: occ, error } = await db.from('lesson_occurrences')
+    .select(`id, date, status, is_online, occurrence_notes,
+             substitute_teacher_id, substitute_name,
+             lessons(id, teacher_id, studio_id, instrument, start_time,
+                     duration_mins, lesson_type, max_students, series_notes, status)`)
+    .eq('id', occId).maybeSingle();
+
+  if (error || !occ) { showToast('Could not open that lesson.', 'error'); return; }
+
+  const { data: ls } = await db.from('lesson_students')
+    .select('student_id').eq('lesson_id', occ.lessons?.id);
+
+  allOccurrences = [
+    ...allOccurrences.filter(o => o.id !== occId),
+    { ...occ, lessonStudents: (ls ?? []).map(r => r.student_id) },
+  ];
+
+  return openOccurrenceModal(occId);
+}
+
 async function openOccurrenceModal(occId) {
   const occ = allOccurrences.find(o => o.id === occId);
   if (!occ) return;
@@ -1901,7 +2070,7 @@ async function openOccurrenceModal(occId) {
       <div><span class="text-muted text-sm">Time</span><div class="font-bold">${formatTime(l.start_time)} · ${formatDuration(l.duration_mins)}</div></div>
       <div><span class="text-muted text-sm">Studio</span><div class="font-bold">${studio?.name ?? '—'}</div></div>
       <div><span class="text-muted text-sm">Type</span><div class="font-bold">${l.lesson_type === 'group' ? 'Group' : 'Private'}</div></div>
-      <div><span class="text-muted text-sm">Status</span><div>${attendancePill(null)}</div></div>
+      <div><span class="text-muted text-sm">Status</span><div id="occStatusPill">${attendancePill(null)}</div></div>
     </div>
     ${l.series_notes ? `<div style="margin-top:0.65rem;padding-top:0.65rem;border-top:1px solid var(--border);font-size:0.82rem;color:var(--dark-grey);">📋 Series note: ${l.series_notes}</div>` : ''}`;
 
@@ -1914,6 +2083,9 @@ async function openOccurrenceModal(occId) {
           ${isGroup ? `<button class="student-tag-remove" onclick="removeStudentFromOccurrence('${l.id}','${sid}')">✕</button>` : ''}
         </div>`).join('')
     : '<div class="text-sm text-muted">No students assigned.</div>';
+
+  renderSubstitutePicker(occ, l);
+  await renderOccurrenceAttendance(occId, sIds, sNames);
 
   // Show add student section for group lessons
   const addWrap  = document.getElementById('occAddStudentWrap');
@@ -1983,15 +2155,262 @@ async function saveOccurrence() {
   const isOnline = document.getElementById('occIsOnline').checked;
   const notes    = document.getElementById('occNotes').value.trim();
 
+  // A substitution belongs to this occurrence alone. Staff cover moves
+  // the lesson into that teacher's schedule; an external name is
+  // recorded so everyone knows who took it.
+  const subSel = document.getElementById('occSubTeacher').value;
+  const subName = document.getElementById('occSubName').value.trim();
+
+  if (subSel === '__external' && !subName) {
+    showToast('Enter the substitute\'s name, or choose the usual teacher.', 'warning');
+    return;
+  }
+
   const { error } = await db.from('lesson_occurrences').update({
-    is_online:        isOnline,
-    occurrence_notes: notes || null,
+    is_online:             isOnline,
+    occurrence_notes:      notes || null,
+    substitute_teacher_id: (subSel && subSel !== '__external') ? subSel : null,
+    substitute_name:       subSel === '__external' ? subName : null,
   }).eq('id', occId);
 
   if (error) { showToast('Error saving: ' + error.message, 'error'); return; }
-  showToast('Lesson updated.', 'success');
+
+  if (subSel && subSel !== '__external') {
+    const t = allTeachers.find(x => x.id === subSel);
+    const n = `${t?.profile?.first_name ?? ''} ${t?.profile?.last_name ?? ''}`.trim();
+    showToast(`${n} is covering this lesson — it now shows in their schedule.`, 'success');
+  } else if (subSel === '__external') {
+    showToast(`${subName} recorded as covering this lesson.`, 'success');
+  } else {
+    showToast('Lesson updated.', 'success');
+  }
   closeOccModal();
   loadView();
+}
+
+// Editing a series. Changing the day, time or teacher rewrites only
+// FUTURE occurrences — past ones are history and may carry attendance
+// and lesson notes. Previously there was no edit at all, so admins
+// cancelled the series and built a new one, losing that continuity.
+// One control per student, so a group lesson can have an individual
+// absence — the same shape the teacher's own dashboard uses.
+// Who is actually taking this one? Staff cover resolves to a name from
+// allTeachers; external cover is just the name that was typed in.
+// A marker per attendance state. Deliberately terse — these sit beside
+// a name in a small grid cell.
+const ATT_MARK = {
+  present:           { icon: '✓', colour: 'var(--present)', label: 'Present' },
+  absent_no_credit:  { icon: '✕', colour: '#dc2626',        label: 'Absent — no credit' },
+  absent_notice:     { icon: '✕', colour: '#dc2626',        label: 'Absent — notice given' },
+  teacher_cancelled: { icon: '',  colour: 'var(--mid-grey)', label: 'Teacher cancelled' },
+};
+
+// A name with its attendance shown: tick, cross, or struck through where
+// the teacher cancelled — that lesson did not happen for them.
+function nameWithAttendance(name, status) {
+  const safe = String(name ?? '—').replace(/</g, '&lt;');
+  const m = ATT_MARK[status];
+  if (!m) return safe;
+
+  if (status === 'teacher_cancelled') {
+    return `<span title="${m.label}" style="text-decoration:line-through;color:${m.colour};">${safe}</span>`;
+  }
+  return `<span title="${m.label}"><span style="color:${m.colour};font-weight:700;">${m.icon}</span> ${safe}</span>`;
+}
+
+// A group needs a state, not a fraction — a fraction has to be
+// interpreted, and the detail is one click away in the modal anyway.
+//
+//   everyone present   green tick
+//   everyone absent    red cross
+//   a mix              amber circle
+//   all cancelled      struck through, handled by the caller
+//   partly marked      amber circle, since it is not settled yet
+function groupAttendanceSummary(marks, total) {
+  const seen = Object.values(marks ?? {});
+  if (!seen.length) return '';
+
+  const isAbsent = s => s === 'absent_no_credit' || s === 'absent_notice';
+  const complete = seen.length === total;
+
+  const mark = (icon, colour, title) =>
+    `<span title="${title}" style="color:${colour};font-weight:700;">${icon}</span> `;
+
+  if (complete && seen.every(s => s === 'present')) {
+    return mark('✓', 'var(--present)', 'Everyone present');
+  }
+  if (complete && seen.every(isAbsent)) {
+    return mark('✕', '#dc2626', 'Everyone absent');
+  }
+  if (complete && seen.every(s => s === 'teacher_cancelled')) {
+    return mark('—', 'var(--mid-grey)', 'Cancelled for everyone');
+  }
+
+  const present = seen.filter(s => s === 'present').length;
+  const absent  = seen.filter(isAbsent).length;
+
+  return mark('●', '#d97706',
+    complete
+      ? `${present} present, ${absent} absent`
+      : `${seen.length} of ${total} marked`);
+}
+
+function substituteName(o) {
+  if (o.substitute_teacher_id) {
+    const t = allTeachers.find(x => x.id === o.substitute_teacher_id);
+    return `${t?.profile?.first_name ?? ''} ${t?.profile?.last_name ?? ''}`.trim() || 'Substitute';
+  }
+  return String(o.substitute_name ?? '').replace(/</g, '&lt;') || 'Substitute';
+}
+
+function substituteLabel(o) {
+  if (!o.substitute_teacher_id && !o.substitute_name) return '';
+  return `<div class="lesson-block-meta" style="color:var(--orange);font-weight:600;">${
+    substituteName(o)}</div>`;
+}
+
+function onSubTeacherChange() {
+  const v = document.getElementById('occSubTeacher').value;
+  document.getElementById('occSubNameWrap').classList.toggle('hidden', v !== '__external');
+  if (v !== '__external') document.getElementById('occSubName').value = '';
+}
+
+// Populate and preselect. The usual teacher is excluded — covering for
+// yourself is not a thing.
+function renderSubstitutePicker(occ, lesson) {
+  const sel = document.getElementById('occSubTeacher');
+  if (!sel) return;
+
+  sel.innerHTML =
+    `<option value="">Not covered — the usual teacher</option>` +
+    allTeachers
+      .filter(t => t.id !== lesson.teacher_id)
+      .map(t => {
+        const n = `${t.profile?.first_name ?? ''} ${t.profile?.last_name ?? ''}`.trim();
+        return `<option value="${t.id}">${n}</option>`;
+      }).join('') +
+    `<option value="__external">Someone not on staff…</option>`;
+
+  if (occ.substitute_teacher_id) {
+    sel.value = occ.substitute_teacher_id;
+  } else if (occ.substitute_name) {
+    sel.value = '__external';
+    document.getElementById('occSubName').value = occ.substitute_name;
+  } else {
+    sel.value = '';
+  }
+  onSubTeacherChange();
+}
+
+async function renderOccurrenceAttendance(occId, studentIds, studentNames) {
+  const wrap = document.getElementById('occAttendance');
+  if (!wrap) return;
+
+  if (!studentIds.length) {
+    wrap.innerHTML = '<div class="text-sm text-muted">No students to mark.</div>';
+    document.getElementById('occStatusPill').innerHTML = attendancePill(null);
+    return;
+  }
+
+  const { data: marks } = await db.from('attendance')
+    .select('student_id,status,marked_by,marked_at')
+    .eq('lesson_occurrence_id', occId);
+
+  const byStudent = {};
+  (marks ?? []).forEach(m => { byStudent[m.student_id] = m; });
+
+  const OPTIONS = [
+    ['',                  'Not marked'],
+    ['present',           'Present'],
+    ['absent_no_credit',  'Absent — No Credit'],
+    ['absent_notice',     'Absent — Notice Given'],
+    ['teacher_cancelled', 'Teacher Cancelled'],
+  ];
+
+  wrap.innerHTML = studentIds.map((sid, i) => {
+    const cur = byStudent[sid]?.status ?? '';
+    return `<div style="display:grid;grid-template-columns:1fr auto;gap:0.75rem;align-items:center;
+                        padding:0.45rem 0;border-bottom:1px solid var(--border);">
+      <div style="font-size:0.875rem;color:var(--charcoal);">${studentNames[i] ?? '—'}</div>
+      <select class="filter-select" data-student="${sid}"
+              onchange="markAttendanceAsAdmin('${occId}','${sid}',this.value)">
+        ${OPTIONS.map(([v, l]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${l}</option>`).join('')}
+      </select>
+    </div>`;
+  }).join('');
+
+  const marked = studentIds.filter(sid => byStudent[sid]).length;
+  document.getElementById('occStatusPill').innerHTML =
+    studentIds.length === 1
+      ? attendancePill(byStudent[studentIds[0]]?.status ?? null)
+      : `<span class="pill ${marked === studentIds.length ? 'pill-present' : 'pill-scheduled'}">${marked} of ${studentIds.length} marked</span>`;
+}
+
+async function markAttendanceAsAdmin(occId, studentId, status) {
+  if (!status) {
+    const { error } = await db.from('attendance').delete()
+      .eq('lesson_occurrence_id', occId).eq('student_id', studentId);
+    if (error) { showToast('Could not clear that: ' + error.message, 'error'); return; }
+    showToast('Attendance cleared.', 'success');
+  } else {
+    const { error } = await db.from('attendance').upsert({
+      lesson_occurrence_id: occId,
+      student_id:           studentId,
+      status,
+      marked_by:            currentProfile.id,   // the admin, not the teacher
+      marked_at:            new Date().toISOString(),
+    }, { onConflict: 'lesson_occurrence_id,student_id' });
+    if (error) { showToast('Could not save: ' + error.message, 'error'); return; }
+    showToast('Attendance recorded.', 'success');
+  }
+
+  // Redraw the summary, and refresh the grid so the unmarked count moves
+  const ids   = [...document.querySelectorAll('#occAttendance select')].map(s => s.dataset.student);
+  const names = [...document.querySelectorAll('#occAttendance > div > div:first-child')]
+                  .map(d => d.textContent.trim());
+  await renderOccurrenceAttendance(occId, ids, names);
+  loadView();   // redraws the grid so the tick or cross appears at once
+}
+
+async function editSeries() {
+  const lessonId = document.getElementById('occurrenceModal').dataset.lessonId;
+  if (!lessonId) return;
+
+  const { data: l, error } = await db.from('lessons')
+    .select('*').eq('id', lessonId).maybeSingle();
+  if (error || !l) { showToast('Could not load that series.', 'error'); return; }
+
+  const { data: ls } = await db.from('lesson_students')
+    .select('student_id').eq('lesson_id', lessonId);
+
+  closeOccModal();
+  openLessonModal();
+
+  document.getElementById('editLessonId').value = lessonId;
+  document.getElementById('lTeacher').value     = l.teacher_id;
+  await onTeacherChange();                       // fills instruments and studios
+  document.getElementById('lStudio').value      = l.studio_id;
+  document.getElementById('lInstrument').value  = l.instrument;
+  document.getElementById('lType').value        = l.lesson_type ?? 'private';
+  document.getElementById('lDay').value         = l.day_of_week;
+  document.getElementById('lDuration').value    = l.duration_mins;
+  document.getElementById('lSeriesNotes').value = l.series_notes ?? '';
+  await onDayOrTeacherChange?.();
+  document.getElementById('lTime').value        = l.start_time?.slice(0,5) ?? '';
+
+  lessonStudents = (ls ?? []).map(r => r.student_id);
+  renderLessonStudents();
+  updateRecurrenceForTrial();
+
+  // Recurrence is not editable here. Changing it would mean deciding
+  // what happens to occurrences already generated, and the common need
+  // is simply a different day, time or teacher.
+  ['lRecurrence','lCount','lEndDate','lStartDate'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.disabled = true;
+  });
+
+  document.getElementById('lessonModalTitle').textContent = 'Edit lesson series';
+  document.getElementById('editSeriesNote').classList.remove('hidden');
 }
 
 async function cancelOccurrence(scope) {

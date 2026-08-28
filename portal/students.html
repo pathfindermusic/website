@@ -309,6 +309,21 @@
         </div>
       </div>
 
+      <div class="form-group">
+        <label style="display:flex;align-items:flex-start;gap:0.55rem;cursor:pointer;">
+          <input type="checkbox" id="sReminders" style="accent-color:var(--orange);margin-top:0.15rem;">
+          <span>
+            <span style="font-size:0.875rem;font-weight:500;color:var(--charcoal);">
+              Send lesson reminders
+            </span>
+            <span class="form-hint" style="display:block;margin-top:0.15rem;">
+              A courtesy email on the morning of each lesson. Off unless the family asks
+              for it, and applied to every sibling at once.
+            </span>
+          </span>
+        </label>
+      </div>
+
       <!-- Instruments -->
       <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:0.5rem;">
         <div class="form-label" style="margin-bottom:0.75rem;">Instruments &amp; Skill Levels (up to 5)</div>
@@ -493,7 +508,7 @@ async function loadStudents() {
   const { data: studentData, error } = await db
     .from('students')
     .select('id, status, user_id, studio_id, email, parent_name, parent_phone, ' +
-            'parent_email, enquiry_notes, enquiry_date, enquiry_source')
+            'parent_email, enquiry_notes, enquiry_date, enquiry_source, lesson_reminders')
     .in('status', ['trial','active','inactive'])
     .order('id');
 
@@ -1215,6 +1230,27 @@ async function rollbackNewUser(userId, hadAuthAccount) {
   }
 }
 
+// Siblings are identified by a shared login or a shared parent email —
+// either identifies a household.
+async function applyRemindersToFamily(studentId, on) {
+  const me = allStudents.find(s => s.id === studentId);
+  if (!me) return;
+
+  const family = allStudents.filter(s =>
+    s.id === studentId ||
+    (me.user_id      && s.user_id      === me.user_id) ||
+    (me.parent_email && s.parent_email === me.parent_email));
+
+  const ids = [...new Set(family.map(s => s.id))];
+  const { error } = await db.from('students')
+    .update({ lesson_reminders: on }).in('id', ids);
+
+  if (error) { showToast('Could not update reminders: ' + error.message, 'error'); return; }
+  if (ids.length > 1) {
+    showToast(`Lesson reminders ${on ? 'on' : 'off'} for all ${ids.length} students in this family.`, 'success');
+  }
+}
+
 async function addLogin(studentId) {
   const s = allStudents.find(x => x.id === studentId);
   const first = s?.profiles?.first_name ?? '';
@@ -1337,6 +1373,7 @@ function openStudentModal(student = null) {
     }
     document.getElementById('sStudio').value       = student.studio_id ?? '';
     document.getElementById('sStatus').value       = student.status               ?? 'active';
+    document.getElementById('sReminders').checked = !!student.lesson_reminders;
     document.getElementById('sParentName').value   = student.parent_name          ?? '';
     document.getElementById('sParentPhone').value  = student.parent_phone         ?? '';
     document.getElementById('sParentEmail').value  = student.parent_email         ?? '';
@@ -1349,6 +1386,7 @@ function openStudentModal(student = null) {
       document.getElementById(id).value = '';
     });
     document.getElementById('sStatus').value = 'active';
+    document.getElementById('sReminders').checked = false;   // opt-in
     addInstrumentRow();
   }
   document.getElementById('studentModal').classList.remove('hidden');
@@ -1438,6 +1476,7 @@ async function saveStudent() {
       const { data: sData, error: sErr } = await db.from('students').insert({
         user_id: userId, status, studio_id: studioId || null, email: email || null,
         parent_name: parentName || null, parent_phone: parentPhone || null, parent_email: parentEmail || null,
+        lesson_reminders: document.getElementById('sReminders').checked,
       }).select('id').single();
 
       if (sErr) {
@@ -1457,6 +1496,10 @@ async function saveStudent() {
       // Update profile
       await db.from('profiles').update({ first_name: firstName, last_name: lastName, phone }).eq('id', editUserId);
       // Update student
+      // Reminders are a household decision — a parent with three children
+      // wants one answer, not three.
+      await applyRemindersToFamily(editId, document.getElementById('sReminders').checked);
+
       await db.from('students').update({
         status, studio_id: studioId || null, email,
         parent_name: parentName || null, parent_phone: parentPhone || null, parent_email: parentEmail || null,

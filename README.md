@@ -420,6 +420,83 @@ SELECT u.id, u.email, u.created_at
    AND NOT EXISTS (SELECT 1 FROM teachers t WHERE t.user_id = u.id);
 ```
 
+### Substitute teachers
+
+A substitution belongs to one **occurrence**, not the series — the following
+week reverts on its own. Two cases:
+
+- **Staff cover.** `lesson_occurrences.substitute_teacher_id` points at another
+  teacher. `schedule_view.teacher_id` is `COALESCE(substitute, usual)`, so the
+  lesson genuinely moves into the substitute's schedule and leaves the usual
+  teacher's. They see the students, the notes including earlier weeks, and can
+  mark attendance — `phase5-substitute-access.sql` grants that explicitly
+  rather than leaving it to chance.
+- **External cover.** `substitute_name` is just text. The person has no account,
+  so the lesson stays with the usual teacher and an admin marks the attendance
+  they report.
+
+Admins can mark attendance from the occurrence modal in either case;
+`marked_by` records who did it, which is the whole audit trail.
+
+**Rebuilding either view resets `security_invoker`.** Any migration that
+recreates them must set it again, or the Supabase lint silently reopens.
+
+### Three views, one modal, three different shapes
+
+`lessons.html` has daily, weekly and monthly views built at different times, and
+each populated `allOccurrences` differently while sharing one occurrence modal:
+
+- the **weekly** view merged student lists into copies held for rendering, so
+  the modal — reading `allOccurrences` — found no students and could not mark
+  attendance
+- the **monthly** view reads `schedule_view`, so its occurrences were never in
+  `allOccurrences` at all, and called an `openOccurrence()` that did not exist
+- neither grid query fetched the substitute columns, so a covered lesson looked
+  ordinary
+
+If a fourth view is ever added, it must attach `lessonStudents` to
+`allOccurrences` itself, not to a copy.
+
+**A slot can hold more than one lesson.** Cancelling frees a slot for
+rebooking, so the daily grid may need to show a cancelled lesson and its
+replacement together — `.find()` showed whichever came back first. Live lessons
+get the space; cancelled ones collapse to one line each.
+
+### A guard that returns quietly turns a bug into a non-event
+
+Three failures in one afternoon, all from a correct check failing silently:
+
+- `applyDefaultStudio` returned early when the dropdown had no matching
+  option — because it was called *before* the options were added. Both admins
+  saw every studio while the control said otherwise.
+- The same helper returned early when an admin appeared to cover several
+  studios, which happened because `tasks.html` queried `admins` without
+  selecting `studio_ids`.
+- `loadWeeklyView` threw part-way and left the spinner turning for ever, with
+  the error only in the console.
+
+The checks were right in each case; the silence is what cost the time. The
+helper now logs why it did nothing, and `loadView()` shows a failure with a
+retry button rather than spinning.
+
+### Filtering on a joined column gives a LEFT join
+
+`.eq('lessons.studio_id', x)` does not exclude non-matching rows — it returns
+them with `lessons: null`. The weekly view passed those through and the
+renderer threw on the first one. Anything filtering on a joined column must
+also drop rows where the join came back null.
+
+The daily and monthly views use `schedule_view` and were unaffected. The weekly
+view is the only one still joining directly, and moving it to the view would
+remove this class of problem.
+
+### Reloading a list must reapply its filter
+
+`loadStudents()` rendered the full list directly, so any reload discarded the
+active filter — a student moved to another studio reappeared until the page was
+refreshed by hand. Reload paths should go through the filter function, never
+render the raw array.
+
 ### Tightening scope can silently clear data
 
 Any `<select>` populated from a scoped query drops values the current user
@@ -725,6 +802,14 @@ Run in order. All are re-runnable.
 25. `phase5-view-rls.sql` — `my_lesson_ids()`, four student read policies,
     `security_invoker` on both views
 26. `phase5-scope-students.sql` — admins see only their own studios' students
+    *(superseded by 27)*
+27. `phase5-unscope-with-defaults.sql` — reverts 26; studio is a UI default,
+    not a database boundary
+28. `phase5-notification-images.sql` — public bucket for pasted screenshots
+29. `phase5-lesson-reminders.sql` — opt-in reminders, `reminder_log`
+30. `phase5-admin-attendance.sql` — admins may mark attendance
+31. `phase5-substitute-teachers.sql` — substitute columns, both views rebuilt
+32. `phase5-substitute-access.sql` — what a substitute may see
 
 ---
 
@@ -790,6 +875,17 @@ the cutover.
 Protections are an origin check, a honeypot field and duplicate suppression
 within the hour. reCAPTCHA is **not** verified: Zoho consumes the token and
 Google allows one verification per token. At cutover the portal takes it over.
+
+**Lesson reminders** run from a Netlify scheduled function at 20:00 UTC — 6 AM
+Melbourne in winter, 7 AM in summer. Netlify cron is UTC only, so an
+early-morning window avoids the daylight-saving drift rather than fighting it.
+Opt-in, per family, with a token-based unsubscribe link. Needs Resend's paid
+tier at scale: ~100 lessons a day is the free tier's entire daily allowance.
+
+**Pasted images in notifications** go to a public Supabase Storage bucket —
+email clients fetch images with no session, so it cannot be otherwise. The URLs
+are unguessable but permanent, and the composer warns about it. Nothing removes
+them; `phase5-notification-images.sql` has a housekeeping query.
 
 **Next up:** finish end-enrolment testing; Phase 4d (website form posts to the
 portal, Zoho retired); attendance report page; RLS on views before go-live.

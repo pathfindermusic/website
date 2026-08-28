@@ -517,6 +517,15 @@ async function loadSchedule() {
         <div>
           <div class="lesson-name">${displayName}</div>
           <div class="lesson-instrument">${l.instrument}</div>
+          ${l.substitute_teacher_id === teacherRecord?.id
+            ? `<div style="font-size:0.7rem;color:var(--orange);font-weight:600;">
+                 Covering for ${l.original_teacher_name ?? 'another teacher'}
+               </div>`
+            : l.substitute_name
+              ? `<div style="font-size:0.7rem;color:var(--orange);font-weight:600;">
+                   Covered by ${String(l.substitute_name).replace(/</g,'&lt;')}
+                 </div>`
+              : ''}
           ${isGroup && names.length ? `<div class="lesson-meta">${names.join(' · ')}</div>` : ''}
           <div class="lesson-meta">${l.studio_name}${l.is_online ? ' · <span class="pill pill-online" style="font-size:0.65rem;">Online</span>' : ''}</div>
           <div style="margin-top:4px;">${
@@ -608,9 +617,27 @@ async function openGroupAttendance(occurrenceId) {
     `Attendance — ${row.instrument} · ${formatTime(row.start_time)}`;
 
   const { data: marks } = await db.from('attendance')
-    .select('student_id,status').eq('lesson_occurrence_id', occurrenceId);
+    .select('student_id,status,marked_by').eq('lesson_occurrence_id', occurrenceId);
   const byStudent = {};
   (marks ?? []).forEach(m => { byStudent[m.student_id] = m.status; });
+
+  // Marked by someone else? An admin records attendance when a
+  // substitute has taken the lesson.
+  const others = [...new Set((marks ?? [])
+    .map(m => m.marked_by).filter(id => id && id !== currentProfile.id))];
+  let markedByNote = '';
+  if (others.length) {
+    const { data: who } = await db.from('profiles')
+      .select('first_name,last_name').in('id', others);
+    const names = (who ?? []).map(p => `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim()).filter(Boolean);
+    if (names.length) {
+      markedByNote = `<div style="background:var(--off-white);border:1px solid var(--border);
+        border-radius:var(--r-sm);padding:0.5rem 0.7rem;margin-bottom:0.75rem;
+        font-size:0.78rem;color:var(--dark-grey);">
+        Recorded by ${names.join(', ')} — the studio marks a lesson when a substitute takes it.
+      </div>`;
+    }
+  }
 
   const opts = [
     ['',                  'Not marked'],
@@ -620,7 +647,7 @@ async function openGroupAttendance(occurrenceId) {
     ['teacher_cancelled', 'Teacher Cancelled'],
   ];
 
-  document.getElementById('gaBody').innerHTML = (row.students ?? []).map(s => {
+  document.getElementById('gaBody').innerHTML = markedByNote + (row.students ?? []).map(s => {
     const cur = byStudent[s.id] ?? '';
     return `<div style="display:grid;grid-template-columns:1fr auto;gap:0.75rem;align-items:center;padding:0.55rem 0;border-bottom:1px solid var(--border);">
       <div style="font-size:0.9rem;font-weight:500;color:var(--charcoal);">${s.name}</div>

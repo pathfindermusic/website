@@ -10,3 +10,17 @@
   from = "/portal"
   to   = "/portal/login.html"
   status = 200
+
+# ------------------------------------------------------------
+# Lesson reminders — a courtesy email on the morning of a lesson
+#
+# 20:00 UTC is 6 AM in Melbourne through winter and 7 AM through
+# daylight saving. Netlify cron only understands UTC, so a fixed
+# local hour would drift by an hour twice a year; an early-morning
+# window avoids having to care.
+#
+# The function is opt-in and does nothing for students who have
+# not asked for reminders.
+# ------------------------------------------------------------
+[functions."send-lesson-reminders"]
+  schedule = "0 20 * * *"
