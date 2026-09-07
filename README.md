@@ -810,6 +810,7 @@ Run in order. All are re-runnable.
 30. `phase5-admin-attendance.sql` — admins may mark attendance
 31. `phase5-substitute-teachers.sql` — substitute columns, both views rebuilt
 32. `phase5-substitute-access.sql` — what a substitute may see
+33. `phase5-makeup-lessons.sql` — `is_makeup`, both views rebuilt
 
 ---
 
@@ -886,6 +887,21 @@ tier at scale: ~100 lessons a day is the free tier's entire daily allowance.
 email clients fetch images with no session, so it cannot be otherwise. The URLs
 are unguessable but permanent, and the composer warns about it. Nothing removes
 them; `phase5-notification-images.sql` has a housekeeping query.
+
+**Substitute teachers, makeup and one-off lessons** are in. A one-off is a
+first-class choice on the lesson form — trial, makeup, or ad-hoc request — which
+replaced booking a "series of one" and editing it afterwards. Makeup lessons show
+amber; the daily and monthly views now share one colour scheme.
+
+**Attendance shows on the schedule.** Green tick, red cross, or struck through
+for a teacher cancellation. A group shows one state: all present, all absent, or
+amber for a mix.
+
+**Lifecycle emails were not BCCing the studio.** `send-email.js` only BCCs when
+told where to, and the lifecycle sends passed `from` but not `bcc`. Affected the
+trial and enrolment confirmations, the enquiry acknowledgement, check-in,
+payment follow-up and farewell — silently, for weeks. Fixed in `processes.js`;
+`email_log` has the record of everything that went out regardless.
 
 **Next up:** finish end-enrolment testing; Phase 4d (website form posts to the
 portal, Zoho retired); attendance report page; RLS on views before go-live.

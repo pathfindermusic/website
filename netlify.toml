@@ -24,3 +24,16 @@
 # ------------------------------------------------------------
 [functions."send-lesson-reminders"]
   schedule = "0 20 * * *"
+
+# ------------------------------------------------------------
+# Weekly attendance marking report
+#
+# 07:00 UTC on Sundays — 5 PM Melbourne through winter, 6 PM
+# through daylight saving. Late enough that the weekend's lessons
+# are done, early enough to be read before the week starts.
+#
+# Teachers who are up to date get nothing, so an email always
+# means there is something to do.
+# ------------------------------------------------------------
+[functions."attendance-marking-report"]
+  schedule = "0 7 * * 0"
