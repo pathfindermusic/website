@@ -119,8 +119,8 @@
 
     /* Lesson block inside cell */
     .lesson-block {
-      position: absolute;
-      left: 2px; right: 2px;
+      position: relative;
+      margin: 0 2px;
       border-radius: 4px;
       padding: 3px 6px;
       font-size: 0.72rem;
@@ -141,6 +141,13 @@
       background: rgba(16,163,74,0.12);
       border-left: 3px solid #10a37f;
       color: #065f46;
+    }
+    /* A makeup sits outside the usual pattern, so it reads differently
+       from a regular lesson at a glance. */
+    .lesson-block.makeup {
+      background: rgba(217,119,6,0.12);
+      border-left: 3px solid #d97706;
+      color: #92400e;
     }
     .lesson-block.cancelled {
       background: rgba(220,38,38,0.08);
@@ -365,6 +372,14 @@
     </div>
     <div class="modal-body">
       <input type="hidden" id="editLessonId">
+
+      <div class="hidden" id="editSeriesNote"
+           style="background:var(--off-white);border-left:3px solid var(--orange);
+                  border-radius:0 var(--r-sm) var(--r-sm) 0;padding:0.65rem 0.85rem;
+                  margin-bottom:0.85rem;font-size:0.82rem;color:var(--dark-grey);line-height:1.55;">
+        Changes apply to lessons <strong>from today onwards</strong>. Past lessons stay
+        exactly as they were, with their attendance and notes intact.
+      </div>
       <input type="hidden" id="editOccurrenceId">
 
       <!-- Clash error -->
@@ -455,7 +470,30 @@
       <!-- Recurrence -->
       <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:1rem;">
         <div class="form-label" style="margin-bottom:0.65rem;">Recurrence</div>
+
         <div class="form-group">
+          <select class="form-select" id="lPattern" onchange="onPatternChange()">
+            <option value="series">Repeating lesson</option>
+            <option value="oneoff">One-off lesson</option>
+          </select>
+        </div>
+
+        <!-- What kind of one-off? Only affects how it appears on the
+             schedule; a makeup shows amber so it reads as outside the
+             usual pattern. -->
+        <div class="form-group hidden" id="oneOffKindWrap">
+          <label class="form-label">What is it for?</label>
+          <select class="form-select" id="lOneOffKind" onchange="autoPopulateSeriesNotes()">
+            <option value="makeup">Makeup lesson</option>
+            <option value="trial">Trial lesson</option>
+            <option value="adhoc">One-off request</option>
+          </select>
+          <div class="form-hint">
+            A single lesson on the date above. Nothing repeats, and no series is created.
+          </div>
+        </div>
+
+        <div class="form-group" id="recurrenceWrap">
           <select class="form-select" id="lRecurrence" onchange="toggleRecurrenceFields()">
             <option value="indefinite">Indefinitely (until cancelled)</option>
             <option value="occurrences">Fixed number of lessons</option>
@@ -513,6 +551,12 @@
       <div class="form-group">
         <label class="form-label">Students in this lesson</label>
         <div id="occStudentsList" style="font-size:0.875rem;color:var(--dark-grey);"></div>
+
+        <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;
+                      margin-top:0.5rem;font-size:0.875rem;color:var(--charcoal);">
+          <input type="checkbox" id="occIsMakeup" style="accent-color:#d97706;">
+          This is a makeup lesson
+        </label>
 
         <!-- A substitution is one lesson, not a change of teacher, so it
              lives on the occurrence. Two cases: another member of staff,
@@ -956,7 +1000,7 @@ async function loadMonthlyView() {
   const statusF   = document.getElementById('filterStatus').value;
   const studentId = document.getElementById('filterStudent').value;
 
-  let q = db.from('schedule_view').select('*')
+  let q = db.from('schedule_view').select('*')   // includes is_makeup via the view
     .gte('date', toISODate(first)).lte('date', toISODate(last))
     .order('date').order('start_time');
   if (studioId) q = q.eq('studio_id', studioId);
@@ -1030,11 +1074,20 @@ async function loadMonthlyView() {
               const who = r.lesson_type === 'group'
                 ? `${r.student_count} students`
                 : (r.student_name ?? '—');
+              // Same colours as the daily grid. This view was written
+              // later and used the brand orange for everything, so the
+              // same lesson looked different depending on the view.
+              const tone = cancelled ? { bg:'transparent',            bar:'var(--light-grey)' }
+                         : r.is_makeup ? { bg:'rgba(217,119,6,0.12)',  bar:'#d97706' }
+                         : r.lesson_type === 'group'
+                                       ? { bg:'rgba(16,163,74,0.12)',  bar:'#10a37f' }
+                                       : { bg:'rgba(37,99,235,0.12)',  bar:'#2563eb' };
+
               return `<div onclick="openOccurrence('${r.occurrence_id}')"
                 style="cursor:pointer;font-size:0.7rem;line-height:1.3;padding:0.2rem 0.3rem;
                        margin-bottom:0.15rem;border-radius:3px;
-                       background:${cancelled ? 'transparent' : 'rgba(232,73,30,0.08)'};
-                       border-left:2px solid ${cancelled ? 'var(--light-grey)' : 'var(--orange)'};
+                       background:${tone.bg};
+                       border-left:2px solid ${tone.bar};
                        ${cancelled ? 'opacity:0.55;text-decoration:line-through;' : ''}">
                 <div style="font-weight:600;color:var(--charcoal);">${formatTime(r.start_time)}</div>
                 <div style="color:var(--dark-grey);">${
@@ -1082,7 +1135,7 @@ async function loadDailyView() {
   let dailyQuery = db
     .from('lesson_occurrences')
     .select(`
-      id, date, status, is_online, occurrence_notes,
+      id, date, status, is_online, occurrence_notes, is_makeup,
       substitute_teacher_id, substitute_name,
       lessons(id, teacher_id, studio_id, instrument, start_time, duration_mins, lesson_type, max_students, series_notes, status)
     `)
@@ -1276,11 +1329,14 @@ async function loadDailyView() {
 
           const liveBlocks = live.map(o => {
             const lType = o.lessons?.lesson_type ?? 'private';
-            return `<div class="lesson-block ${lType}"
+            // A makeup overrides the private/group colour — that it is a
+            // makeup matters more than which kind of lesson it is.
+            const cls   = o.is_makeup ? 'makeup' : lType;
+            return `<div class="lesson-block ${cls}"
               onclick="event.stopPropagation();openOccurrenceModal('${o.id}')"
-              style="flex:1 1 auto;min-height:0;overflow:hidden;cursor:pointer;">
+              style="flex:1 1 auto;min-height:24px;overflow:hidden;cursor:pointer;">
               <div class="lesson-block-name">${nameOf(o)}</div>
-              <div class="lesson-block-meta">${lType === 'group' ? 'Group' : 'Private'} · ${o.lessons?.instrument}</div>
+              <div class="lesson-block-meta">${o.is_makeup ? 'Makeup · ' : ''}${lType === 'group' ? 'Group' : 'Private'} · ${o.lessons?.instrument}</div>
               ${substituteLabel(o)}
               ${o.occurrence_notes ? `<div class="lesson-block-meta" style="font-style:italic;">📝 ${o.occurrence_notes.slice(0,30)}…</div>` : ''}
             </div>`;
@@ -1308,8 +1364,9 @@ async function loadDailyView() {
           // lesson alone pushed the cancelled lines over the row below,
           // which is what made them unreadable.
           html += `<td class="grid-cell" rowspan="${rowspan}"
-            style="vertical-align:top;height:${rowspan * 48}px;padding:2px;">
-            <div style="height:100%;display:flex;flex-direction:column;gap:2px;overflow:hidden;">
+            style="vertical-align:top;height:${rowspan * 48}px;padding:0;">
+            <div style="height:100%;display:flex;flex-direction:column;gap:2px;
+                        padding:2px 0;overflow:hidden;box-sizing:border-box;">
               ${blocks}
             </div>
           </td>`;
@@ -1352,7 +1409,7 @@ async function loadWeeklyView() {
   const statusFilter  = document.getElementById('filterStatus').value;
 
   let query = db.from('lesson_occurrences')
-    .select(`id,date,status,is_online,occurrence_notes,
+    .select(`id,date,status,is_online,occurrence_notes,is_makeup,
       substitute_teacher_id,substitute_name,
       lessons(id,teacher_id,studio_id,instrument,start_time,duration_mins,lesson_type,max_students,series_notes,status)`)
     .gte('date', wStart).lte('date', wEnd).order('date').order('lessons(start_time)');
@@ -1537,6 +1594,12 @@ function openLessonModal(lesson = null) {
   if (!lesson) {
     document.getElementById('lessonModalTitle').textContent = 'Add Lesson';
     document.getElementById('editLessonId').value = '';
+    document.getElementById('lPattern').value    = 'series';
+    document.getElementById('lPattern').disabled = false;
+    ['lRecurrence','lCount','lEndDate','lStartDate'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.disabled = false;
+    });
+    onPatternChange();
     // Default start date to the current date shown on the grid
     document.getElementById('lStartDate').value = toISODate(currentDate);
   }
@@ -1635,13 +1698,22 @@ function updateRecurrenceForTrial() {
   const note     = document.getElementById('trialRecurrenceNote');
 
   if (hasTrial) {
-    recSel.value    = 'occurrences';
-    countIn.value   = 1;
-    recSel.disabled = true;
+    // A trial is one lesson by definition — the same shape as any other
+    // one-off, so it uses the same control rather than a separate lock.
+    const pattern = document.getElementById('lPattern');
+    pattern.value    = 'oneoff';
+    pattern.disabled = true;
+    document.getElementById('lOneOffKind').value = 'trial';
+    onPatternChange();
+
+    recSel.value     = 'occurrences';
+    countIn.value    = 1;
+    recSel.disabled  = true;
     countIn.disabled = true;
     endIn.disabled   = true;
     note.classList.remove('hidden');
   } else {
+    document.getElementById('lPattern').disabled = false;
     recSel.disabled  = false;
     countIn.disabled = false;
     endIn.disabled   = false;
@@ -1670,6 +1742,28 @@ function renderLessonStudents() {
 function checkAvailability() {
   // No-op — availability is enforced as a hard block in saveLesson()
   // The avail-warning div is kept in HTML but no longer used
+}
+
+// A one-off needs no recurrence at all — it is one lesson on one date.
+function onPatternChange() {
+  const oneOff = document.getElementById('lPattern').value === 'oneoff';
+
+  document.getElementById('oneOffKindWrap').classList.toggle('hidden', !oneOff);
+  document.getElementById('recurrenceWrap').classList.toggle('hidden', oneOff);
+
+  if (oneOff) {
+    // Stored as a single occurrence, which is what it is
+    document.getElementById('lRecurrence').value = 'occurrences';
+    document.getElementById('lCount').value = 1;
+  }
+  toggleRecurrenceFields();
+  autoPopulateSeriesNotes();
+
+  // The label reads oddly for something that happens once
+  const dateLabel = document.querySelector('label[for="lStartDate"]')
+    ?? [...document.querySelectorAll('.form-label')]
+         .find(l => l.textContent.trim().startsWith('First lesson date'));
+  if (dateLabel) dateLabel.textContent = oneOff ? 'Lesson date *' : 'First lesson date *';
 }
 
 function toggleRecurrenceFields() {
@@ -1702,8 +1796,19 @@ function autoPopulateSeriesNotes() {
     return new Date(y, m - 1, d).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
   };
 
+  // A one-off is not a "1-lesson series" — it is a trial, a makeup or a
+  // one-off request, and the note should say which.
+  const isOneOff = document.getElementById('lPattern')?.value === 'oneoff';
+
   let note = '';
-  if (recurrence === 'occurrences' && count && startDate) {
+  if (isOneOff && startDate) {
+    const kind = document.getElementById('lOneOffKind')?.value;
+    note = {
+      trial:  `Trial lesson on ${formatDate(startDate)}`,
+      makeup: `Makeup lesson on ${formatDate(startDate)}`,
+      adhoc:  `One-off lesson on ${formatDate(startDate)}`,
+    }[kind] ?? `One-off lesson on ${formatDate(startDate)}`;
+  } else if (recurrence === 'occurrences' && count && startDate) {
     note = `${count}-lesson series, starting ${formatDate(startDate)}`;
   } else if (recurrence === 'date_range' && startDate && endDate) {
     note = `Recurring lessons from ${formatDate(startDate)} to ${formatDate(endDate)}`;
@@ -1795,12 +1900,21 @@ async function saveLesson() {
   }
 
   // ---- CLASH DETECTION ----
-  // Get all active lessons on this day of week
-  const { data: existingLessons } = await db
+  // Every active lesson on this weekday, EXCEPT the one being edited.
+  // Without that exclusion a series clashes with itself: changing the
+  // notes, or anything else, reports the teacher as already teaching
+  // at that time — which they are, because it is the same lesson.
+  const editingId = document.getElementById('editLessonId').value;
+
+  let clashQuery = db
     .from('lessons')
     .select('id,teacher_id,start_time,duration_mins,lesson_type,max_students')
     .eq('day_of_week', day)
     .eq('status','active');
+
+  if (editingId) clashQuery = clashQuery.neq('id', editingId);
+
+  const { data: existingLessons } = await clashQuery;
 
   // Also get lesson_students for those lessons
   const existingIds = (existingLessons ?? []).map(l => l.id);
@@ -1882,9 +1996,8 @@ async function saveLesson() {
   try {
     // Editing an existing series takes a different path: the lesson is
     // updated and only its FUTURE occurrences are rebuilt.
-    const editId = document.getElementById('editLessonId').value;
-    if (editId) {
-      await saveSeriesEdit(editId, {
+    if (editingId) {
+      await saveSeriesEdit(editingId, {
         teacherId, studioId, instrument, lType, day, time, duration,
         seriesNotes: seriesNotes || null,
       });
@@ -1912,6 +2025,14 @@ async function saveLesson() {
 
     // Generate occurrences
     await generateOccurrences(lessonId, day, startDate, recurrence, count, endDate);
+
+    // A one-off marked as a makeup shows amber on the schedule. Set it
+    // now rather than making the admin edit the lesson afterwards.
+    if (document.getElementById('lPattern').value === 'oneoff'
+        && document.getElementById('lOneOffKind').value === 'makeup') {
+      await db.from('lesson_occurrences')
+        .update({ is_makeup: true }).eq('lesson_id', lessonId);
+    }
 
     showToast('Lesson created successfully.', 'success');
     closeLessonModal();
@@ -2084,6 +2205,7 @@ async function openOccurrenceModal(occId) {
         </div>`).join('')
     : '<div class="text-sm text-muted">No students assigned.</div>';
 
+  document.getElementById('occIsMakeup').checked = !!occ.is_makeup;
   renderSubstitutePicker(occ, l);
   await renderOccurrenceAttendance(occId, sIds, sNames);
 
@@ -2168,6 +2290,7 @@ async function saveOccurrence() {
 
   const { error } = await db.from('lesson_occurrences').update({
     is_online:             isOnline,
+    is_makeup:             document.getElementById('occIsMakeup').checked,
     occurrence_notes:      notes || null,
     substitute_teacher_id: (subSel && subSel !== '__external') ? subSel : null,
     substitute_name:       subSel === '__external' ? subName : null,
@@ -2372,9 +2495,98 @@ async function markAttendanceAsAdmin(occId, studentId, status) {
   loadView();   // redraws the grid so the tick or cross appears at once
 }
 
+// Apply an edit: update the series, then rebuild its FUTURE occurrences
+// on the new day. Anything already past, or already marked, is left
+// alone — that is the history admins were losing by cancelling and
+// recreating a series just to move it.
+async function saveSeriesEdit(lessonId, f) {
+  const today = toISODate(new Date());
+
+  const { error: uErr } = await db.from('lessons').update({
+    teacher_id: f.teacherId, studio_id: f.studioId, instrument: f.instrument,
+    lesson_type: f.lType, day_of_week: f.day, start_time: f.time,
+    duration_mins: f.duration, series_notes: f.seriesNotes,
+  }).eq('id', lessonId);
+  if (uErr) { showToast('Could not save: ' + uErr.message, 'error'); return; }
+
+  // Students may have changed too
+  const { data: existing } = await db.from('lesson_students')
+    .select('student_id').eq('lesson_id', lessonId);
+  const before = new Set((existing ?? []).map(r => r.student_id));
+  const after  = new Set(lessonStudents);
+
+  for (const sid of after) if (!before.has(sid)) {
+    await db.from('lesson_students').insert({ lesson_id: lessonId, student_id: sid });
+  }
+  for (const sid of before) if (!after.has(sid)) {
+    await db.from('lesson_students').delete()
+      .eq('lesson_id', lessonId).eq('student_id', sid);
+  }
+
+  // How far did the old series run? The rebuilt one should reach the
+  // same date rather than quietly shortening or extending it.
+  const { data: lastOcc } = await db.from('lesson_occurrences')
+    .select('date').eq('lesson_id', lessonId)
+    .order('date', { ascending: false }).limit(1);
+  const runsUntil = lastOcc?.[0]?.date ?? null;
+
+  // Remove only future, untouched occurrences. Anything marked is kept:
+  // a lesson that happened is a fact, whatever the series says now.
+  const { data: future } = await db.from('lesson_occurrences')
+    .select('id,date').eq('lesson_id', lessonId).gte('date', today);
+
+  const futureIds = (future ?? []).map(o => o.id);
+  const { data: marked } = futureIds.length
+    ? await db.from('attendance').select('lesson_occurrence_id').in('lesson_occurrence_id', futureIds)
+    : { data: [] };
+  const markedIds = new Set((marked ?? []).map(a => a.lesson_occurrence_id));
+
+  const removable = futureIds.filter(id => !markedIds.has(id));
+  if (removable.length) {
+    await db.from('lesson_occurrences').delete().in('id', removable);
+  }
+
+  // Rebuild from today on the new day
+  const dates = plannedDates(
+    f.day, today,
+    runsUntil ? 'date_range' : 'indefinite',
+    null, runsUntil);
+
+  const { data: kept } = await db.from('lesson_occurrences')
+    .select('date').eq('lesson_id', lessonId);
+  const keptDates = new Set((kept ?? []).map(o => o.date?.slice(0, 10)));
+
+  const rows = dates
+    .filter(d => !keptDates.has(d))
+    .map(date => ({ lesson_id: lessonId, date, status: 'scheduled' }));
+
+  if (rows.length) {
+    const { error: oErr } = await db.from('lesson_occurrences').insert(rows);
+    if (oErr) { showToast('Series saved, but the dates failed: ' + oErr.message, 'error'); return; }
+  }
+
+  showToast(
+    `Series updated. ${rows.length} future lesson${rows.length !== 1 ? 's' : ''} rescheduled; ` +
+    `past lessons unchanged.`, 'success');
+  closeLessonModal();
+  loadView();
+}
+
 async function editSeries() {
+  try {
+    await editSeriesInner();
+  } catch (err) {
+    // A throw part-way leaves the form half-populated and looking like
+    // Add Lesson, which is exactly how this failed the first time.
+    console.error('[lessons] could not open the series for editing', err);
+    showToast('Could not open that series: ' + (err?.message ?? err), 'error');
+    closeLessonModal();
+  }
+}
+
+async function editSeriesInner() {
   const lessonId = document.getElementById('occurrenceModal').dataset.lessonId;
-  if (!lessonId) return;
+  if (!lessonId) throw new Error('no series selected');
 
   const { data: l, error } = await db.from('lessons')
     .select('*').eq('id', lessonId).maybeSingle();
@@ -2395,8 +2607,8 @@ async function editSeries() {
   document.getElementById('lDay').value         = l.day_of_week;
   document.getElementById('lDuration').value    = l.duration_mins;
   document.getElementById('lSeriesNotes').value = l.series_notes ?? '';
-  await onDayOrTeacherChange?.();
   document.getElementById('lTime').value        = l.start_time?.slice(0,5) ?? '';
+  checkAvailability();   // warn straight away if the slot no longer suits
 
   lessonStudents = (ls ?? []).map(r => r.student_id);
   renderLessonStudents();
@@ -2405,7 +2617,9 @@ async function editSeries() {
   // Recurrence is not editable here. Changing it would mean deciding
   // what happens to occurrences already generated, and the common need
   // is simply a different day, time or teacher.
-  ['lRecurrence','lCount','lEndDate','lStartDate'].forEach(id => {
+  // Editing an existing series: the pattern is fixed, only its details
+  // can change.
+  ['lRecurrence','lCount','lEndDate','lStartDate','lPattern'].forEach(id => {
     const el = document.getElementById(id); if (el) el.disabled = true;
   });
 

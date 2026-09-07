@@ -373,6 +373,7 @@ async function maybeSendConfirmation(studentId, sentBy) {
           action: 'send', mode: 'students', studentIds: [studentId],
           from: lesson.studioEmail,
           fromName: `Pathfinder Music Lessons (${lesson.studio})`,
+          bcc: lesson.studioEmail,      // the studio keeps a copy
           subject: isTrial
             ? 'Your trial is booked, {{first_name}}!'
             : "You're enrolled, {{first_name}}!",
@@ -427,6 +428,9 @@ async function sendStudentEmail(studentId, subject, bodyText, sentBy) {
         action: 'send', mode: 'students', studentIds: [studentId],
         from: studio.email,
         fromName: `Pathfinder Music Lessons (${studio.name})`,
+        // Without this the studio gets no copy: send-email.js only
+        // BCCs when it is told where to.
+        bcc: studio.email,
         subject, bodyText, sentBy: sentBy ?? null,
       }),
     });
