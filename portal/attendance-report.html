@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attendance Report — Pathfinder Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/portal.css">
+  <style>
+    .report-toolbar {
+      display: flex; align-items: flex-end; gap: 0.75rem; flex-wrap: wrap;
+      margin-bottom: 1.25rem;
+    }
+    .toolbar-field { display: flex; flex-direction: column; gap: 0.3rem; }
+    .toolbar-field label {
+      font-size: 0.72rem; font-weight: 600; color: var(--mid-grey);
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .toolbar-field input[type="date"] {
+      font-size: 0.82rem; font-family: 'Inter', sans-serif;
+      padding: 0.46rem 0.7rem; border: 1px solid var(--border);
+      border-radius: var(--r-sm); background: var(--white); color: var(--charcoal);
+    }
+    .toolbar-search {
+      display: flex; align-items: center; gap: 0.4rem;
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      background: var(--white); padding: 0.46rem 0.75rem; min-width: 200px;
+    }
+    .toolbar-search input {
+      border: none; outline: none; font-size: 0.82rem; font-family: 'Inter', sans-serif;
+      width: 100%; background: transparent; color: var(--charcoal);
+    }
+    .toolbar-checkbox {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 0.8rem; color: var(--dark-grey); padding-bottom: 0.5rem;
+    }
+    .toolbar-checkbox input { accent-color: var(--orange); }
+
+    th.sortable { cursor: pointer; user-select: none; }
+    th.sortable:hover { color: rgba(255,255,255,0.95); }
+    th.sortable .arrow { opacity: 0.55; margin-left: 3px; font-size: 0.7rem; }
+
+    .rate-cell { display: flex; align-items: center; gap: 0.55rem; }
+    .rate-track {
+      width: 56px; height: 6px; border-radius: 4px; background: var(--light-grey);
+      overflow: hidden; flex-shrink: 0;
+    }
+    .rate-fill { height: 100%; border-radius: 4px; }
+    .rate-fill.good { background: var(--present); }
+    .rate-fill.warn { background: var(--absent-notice); }
+    .rate-fill.bad  { background: var(--absent-nc); }
+
+    .student-row { cursor: pointer; }
+    .student-name-cell { font-weight: 600; color: var(--charcoal); }
+    .no-lessons { color: var(--mid-grey); font-style: italic; font-size: 0.82rem; }
+
+    .detail-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .detail-table th {
+      text-align: left; font-size: 0.72rem; text-transform: uppercase;
+      letter-spacing: 0.04em; color: var(--mid-grey); padding: 0.4rem 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .detail-table td { padding: 0.5rem; border-bottom: 1px solid var(--border); }
+    .detail-table tr:last-child td { border-bottom: none; }
+  </style>
+</head>
+<body>
+<div class="portal-shell">
+
+  <nav class="topnav">
+    <a href="#" class="topnav-logo"><img src="../Logo_-_long.png" alt="Pathfinder Music Lessons"></a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">–</span>
+        </div>
+      </div>
+      <a href="change-password.html" class="btn-logout" style="text-decoration:none;">🔑 Password</a>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Teaching</div>
+    <a class="nav-item" href="dashboard-admin.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Schedule
+    </a>
+    <a class="nav-item" href="lessons.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Lessons
+    </a>
+    <a class="nav-item" href="students.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      Students
+    </a>
+    <a class="nav-item" href="teachers.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+      Teachers
+    </a>
+    <div class="sidebar-section">Front desk</div>
+    <a class="nav-item" href="enquiries.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+      Enquiries
+    </a>
+    <a class="nav-item" href="tasks.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Tasks
+    </a>
+    <a class="nav-item" href="notifications.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/></svg>
+      Notifications
+    </a>
+    <div class="sidebar-section">Reports</div>
+    <a class="nav-item active" href="attendance-report.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Attendance
+    </a>
+    <div class="sidebar-section hidden" id="superuserSection">Super User</div>
+    <a class="nav-item hidden" href="studios.html" id="studiosLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Studios
+    </a>
+    <a class="nav-item hidden" href="admins.html" id="adminsLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Admins
+    </a>
+  </aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Attendance Report</div>
+        <div class="page-sub" id="pageSub">Loading…</div>
+      </div>
+      <div class="flex gap-1" style="flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm" onclick="exportCSV()">⬇ Export CSV</button>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="report-toolbar">
+      <div class="toolbar-field">
+        <label for="filterStudio">Studio</label>
+        <select class="filter-select" id="filterStudio" onchange="loadReport()">
+          <option value="">All Studios</option>
+        </select>
+      </div>
+      <div class="toolbar-field">
+        <label for="filterTeacher">Teacher</label>
+        <select class="filter-select" id="filterTeacher" onchange="loadReport()">
+          <option value="">All Teachers</option>
+        </select>
+      </div>
+      <div class="toolbar-field">
+        <label for="filterInstrument">Instrument</label>
+        <select class="filter-select" id="filterInstrument" onchange="loadReport()">
+          <option value="">All Instruments</option>
+        </select>
+      </div>
+      <div class="toolbar-field">
+        <label for="fromDate">From</label>
+        <input type="date" id="fromDate" onchange="loadReport()">
+      </div>
+      <div class="toolbar-field">
+        <label for="toDate">To</label>
+        <input type="date" id="toDate" onchange="loadReport()">
+      </div>
+      <div class="toolbar-search">
+        <span>🔍</span>
+        <input type="text" id="searchInput" placeholder="Search student…" oninput="renderTable()">
+      </div>
+      <label class="toolbar-checkbox">
+        <input type="checkbox" id="onlyBelow" onchange="renderTable()">
+        Only below 80%
+      </label>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row" id="statsRow">
+      <div class="stat-card">
+        <div class="stat-card-top">
+          <span class="stat-label">Overall rate</span>
+          <div class="stat-icon">📊</div>
+        </div>
+        <div class="stat-value" id="statOverallRate">–</div>
+        <div class="stat-sub">present ÷ lessons ended, this filter</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-top">
+          <span class="stat-label">Lessons counted</span>
+          <div class="stat-icon">🎵</div>
+        </div>
+        <div class="stat-value" id="statTotal">–</div>
+        <div class="stat-sub">ended, not cancelled</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-top">
+          <span class="stat-label">Unmarked</span>
+          <div class="stat-icon">⚠️</div>
+        </div>
+        <div class="stat-value" id="statUnmarked">–</div>
+        <div class="stat-sub">counts against the student</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-top">
+          <span class="stat-label">Below 80%</span>
+          <div class="stat-icon">🚩</div>
+        </div>
+        <div class="stat-value" id="statBelow">–</div>
+        <div class="stat-sub">students in range, this filter</div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="schedule-wrap">
+      <table class="schedule-table" id="reportTable">
+        <thead>
+          <tr>
+            <th>Student</th>
+            <th>Studio</th>
+            <th>Teacher(s)</th>
+            <th class="sortable" onclick="setSort('total')">Lessons<span class="arrow" id="arrow-total"></span></th>
+            <th class="sortable" onclick="setSort('present')">Present<span class="arrow" id="arrow-present"></span></th>
+            <th>Absent — No Credit</th>
+            <th>Absent — Notice</th>
+            <th class="sortable" onclick="setSort('unmarked')">Unmarked<span class="arrow" id="arrow-unmarked"></span></th>
+            <th class="sortable" onclick="setSort('rate')">Rate<span class="arrow" id="arrow-rate"></span></th>
+          </tr>
+        </thead>
+        <tbody id="reportBody">
+          <tr><td colspan="9"><div class="loading"><div class="spinner"></div> Loading…</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<!-- Detail modal -->
+<div class="modal-overlay hidden" id="detailModal">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header">
+      <span class="modal-title" id="detailTitle">Student attendance</span>
+      <button class="modal-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div class="modal-body" id="detailBody">
+      <!-- Populated by JS -->
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeDetail()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script>
+
+// Canonical instrument list — must stay identical to lessons.html / students.html / teachers.html
+const INSTRUMENTS = ['Guitar','Bass','Drums','Piano / Keyboard','Voice / Singing','Violin','Ukulele','Music Theory','Saxophone','Band','Other'];
+
+let currentProfile = null;
+let myStudioIds     = [];
+let studentsMap     = {};   // student_id -> { name, studioId }
+let aggregated      = [];   // per-student rollups for the current filter
+let sortKey         = 'rate';
+let sortDir         = 'asc';
+
+// ---- Init ----
+(async () => {
+  currentProfile = await requireAuth(['superuser','admin']);
+  if (!currentProfile) return;
+
+  renderTopNavUser(currentProfile);
+
+  if (currentProfile.role === 'superuser') {
+    document.getElementById('superuserSection').classList.remove('hidden');
+    document.getElementById('studiosLink').classList.remove('hidden');
+    document.getElementById('adminsLink').classList.remove('hidden');
+  }
+
+  if (window.innerWidth < 900) {
+    document.getElementById('menuToggle').style.display = '';
+  }
+
+  // Default range: last 90 days up to today
+  const today = new Date();
+  const from  = new Date(today.getTime() - 90 * 86400000);
+  document.getElementById('toDate').value   = toISODate(today);
+  document.getElementById('fromDate').value = toISODate(from);
+
+  const instSel = document.getElementById('filterInstrument');
+  INSTRUMENTS.forEach(i => { instSel.innerHTML += `<option value="${i}">${i}</option>`; });
+
+  await loadFilters();
+  await loadReport();
+})();
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+// ---- Filters: studios + teachers ----
+async function loadFilters() {
+  const { data: studios } = await db.from('studios').select('id, name').eq('status','active').order('name');
+
+  if (currentProfile.role === 'superuser') {
+    myStudioIds = (studios ?? []).map(s => s.id);
+  } else {
+    const { data: me } = await db.from('admins')
+      .select('studio_ids').eq('user_id', currentProfile.id).maybeSingle();
+    myStudioIds = me?.studio_ids?.length ? me.studio_ids : (studios ?? []).map(s => s.id);
+  }
+
+  const studioSel = document.getElementById('filterStudio');
+  (studios ?? []).forEach(s => { studioSel.innerHTML += `<option value="${s.id}">${s.name}</option>`; });
+
+  const { data: teachers } = await db
+    .from('teachers')
+    .select('id, profiles(first_name, last_name)')
+    .order('profiles(last_name)');
+  const teacherSel = document.getElementById('filterTeacher');
+  (teachers ?? []).forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = `${t.profiles?.first_name ?? ''} ${t.profiles?.last_name ?? ''}`.trim();
+    teacherSel.appendChild(opt);
+  });
+
+  // Default the studio filter to this admin's own studio — after the
+  // options exist, or applyDefaultStudio finds no match and gives up.
+  // No onChange here: the caller loads the report right after this
+  // returns, so triggering it again here would just double the fetch.
+  applyDefaultStudio('filterStudio', myStudioIds);
+}
+
+// "Has the lesson ended" — same test as the three dashboards, so this
+// report agrees with what students/teachers/admins already see marked
+// as unmarked. Not yet in supabase-client.js, so kept local here.
+function lessonHasEnded(row, todayStr, nowHM) {
+  const d = row.date?.slice(0, 10);
+  if (!d) return false;
+  if (d < todayStr) return true;
+  if (d > todayStr) return false;
+  const [sh, sm] = (row.start_time ?? '00:00:00').split(':').map(Number);
+  const endMins  = sh * 60 + sm + (row.duration_mins ?? 0);
+  const [nh, nm] = nowHM.split(':').map(Number);
+  return endMins <= (nh * 60 + nm);
+}
+
+// ---- Load + aggregate ----
+async function loadReport() {
+  const studio     = document.getElementById('filterStudio').value;
+  const teacher    = document.getElementById('filterTeacher').value;
+  const instrument = document.getElementById('filterInstrument').value;
+  const from       = document.getElementById('fromDate').value;
+  const to         = document.getElementById('toDate').value;
+
+  document.getElementById('reportBody').innerHTML =
+    `<tr><td colspan="9"><div class="loading"><div class="spinner"></div> Loading…</div></td></tr>`;
+
+  // Active students in scope for this filter — students with zero
+  // lessons in range still show up, which is itself worth seeing.
+  let studentQuery = db.from('students')
+    .select('id, studio_id, status, profiles(first_name, last_name)')
+    .eq('status', 'active');
+  if (studio) studentQuery = studentQuery.eq('studio_id', studio);
+  const { data: students, error: studentErr } = await studentQuery;
+
+  if (studentErr) {
+    console.error('[attendance report] students query failed:', studentErr);
+    document.getElementById('reportBody').innerHTML =
+      `<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">⚠️</div><h3>Couldn't load students</h3><p>${studentErr.message}</p></div></td></tr>`;
+    return;
+  }
+
+  studentsMap = {};
+  (students ?? []).forEach(s => {
+    studentsMap[s.id] = {
+      name: `${s.profiles?.first_name ?? ''} ${s.profiles?.last_name ?? ''}`.trim() || '(no name)',
+      studioId: s.studio_id,
+    };
+  });
+
+  let rowQuery = db.from('student_schedule_view')
+    .select('student_id,date,start_time,duration_mins,occurrence_status,attendance_status,instrument,teacher_id,studio_id,teacher_name,studio_name')
+    .gte('date', from)
+    .lte('date', to)
+    .neq('occurrence_status', 'cancelled');
+  if (studio)     rowQuery = rowQuery.eq('studio_id', studio);
+  if (teacher)    rowQuery = rowQuery.eq('teacher_id', teacher);
+  if (instrument) rowQuery = rowQuery.eq('instrument', instrument);
+
+  const { data: rows, error: rowErr } = await rowQuery;
+  if (rowErr) {
+    console.error('[attendance report] schedule query failed:', rowErr);
+    document.getElementById('reportBody').innerHTML =
+      `<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">⚠️</div><h3>Couldn't load lessons</h3><p>${rowErr.message}</p></div></td></tr>`;
+    return;
+  }
+
+  const now     = new Date();
+  const todayStr = toISODate(now);
+  const nowHM    = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:00`;
+
+  // Only lessons that have actually ended, and only for a student
+  // currently in scope (active, and in the chosen studio if any).
+  const ended = (rows ?? []).filter(r => studentsMap[r.student_id] && lessonHasEnded(r, todayStr, nowHM));
+
+  const byStudent = {};
+  Object.keys(studentsMap).forEach(id => {
+    byStudent[id] = { total: 0, present: 0, absent_nc: 0, absent_notice: 0, teacher_cancelled: 0, unmarked: 0, teachers: new Set(), rows: [] };
+  });
+
+  // NOTE — a deliberate assumption, not yet a documented decision:
+  // a teacher-cancelled occurrence is excluded from the rate's total,
+  // the same way an occurrence-level cancellation already is. The
+  // lesson didn't happen through no fault of the student, so it
+  // shouldn't move their percentage either way. It's still counted
+  // and shown separately (and in the CSV), for visibility. If the
+  // studios want it counted differently, this is the one place to
+  // change.
+  ended.forEach(r => {
+    const b = byStudent[r.student_id];
+    if (!b) return;
+    b.rows.push(r);
+    if (r.teacher_name) b.teachers.add(r.teacher_name);
+    switch (r.attendance_status) {
+      case 'present':            b.total++; b.present++; break;
+      case 'absent_no_credit':   b.total++; b.absent_nc++; break;
+      case 'absent_notice':      b.total++; b.absent_notice++; break;
+      case 'teacher_cancelled':  b.teacher_cancelled++; break;
+      default:                   b.total++; b.unmarked++; break;
+    }
+  });
+
+  aggregated = Object.entries(studentsMap).map(([id, s]) => {
+    const b = byStudent[id];
+    const rate = b.total > 0 ? b.present / b.total : null;
+    return {
+      id, name: s.name, studioId: s.studioId,
+      teachers: [...b.teachers].sort().join(', '),
+      total: b.total, present: b.present, absent_nc: b.absent_nc,
+      absent_notice: b.absent_notice, teacher_cancelled: b.teacher_cancelled,
+      unmarked: b.unmarked, rate, rows: b.rows,
+    };
+  });
+
+  document.getElementById('pageSub').textContent =
+    `${toDisplayDate(from)} – ${toDisplayDate(to)} · present ÷ lessons that have ended · unmarked counts against the student`;
+
+  renderTable();
+}
+
+function toDisplayDate(iso) {
+  return iso ? formatShortDate(parseLocalDate(iso)) : '';
+}
+
+// ---- Sorting ----
+function setSort(key) {
+  if (sortKey === key) { sortDir = sortDir === 'asc' ? 'desc' : 'asc'; }
+  else { sortKey = key; sortDir = key === 'rate' ? 'asc' : 'desc'; }
+  renderTable();
+}
+
+// ---- Render ----
+function renderTable() {
+  const q         = document.getElementById('searchInput').value.trim().toLowerCase();
+  const onlyBelow = document.getElementById('onlyBelow').checked;
+
+  let list = aggregated.filter(s => !q || s.name.toLowerCase().includes(q));
+  if (onlyBelow) list = list.filter(s => s.rate !== null && s.rate < 0.8);
+
+  list.sort((a, b) => {
+    // Students with no lessons in range aren't part of the rate ranking —
+    // always last, regardless of sort direction, rather than landing at
+    // whichever end -1 happens to sort to.
+    if (sortKey === 'rate' && (a.rate === null) !== (b.rate === null)) {
+      return a.rate === null ? 1 : -1;
+    }
+    let av = a[sortKey], bv = b[sortKey];
+    if (sortKey === 'rate') { av = av ?? 0; bv = bv ?? 0; }
+    if (av === bv) return a.name.localeCompare(b.name);
+    return sortDir === 'asc' ? av - bv : bv - av;
+  });
+
+  // Stats — computed over the same filtered/sorted set shown in the table
+  const withLessons = list.filter(s => s.total > 0);
+  const sumTotal   = withLessons.reduce((n, s) => n + s.total, 0);
+  const sumPresent = withLessons.reduce((n, s) => n + s.present, 0);
+  const sumUnmarked = withLessons.reduce((n, s) => n + s.unmarked, 0);
+  const below80    = withLessons.filter(s => s.rate < 0.8).length;
+
+  document.getElementById('statOverallRate').textContent = sumTotal > 0 ? `${Math.round(sumPresent / sumTotal * 100)}%` : '–';
+  document.getElementById('statTotal').textContent    = sumTotal;
+  document.getElementById('statUnmarked').textContent = sumUnmarked;
+  document.getElementById('statBelow').textContent    = below80;
+
+  ['total','present','unmarked','rate'].forEach(k => {
+    document.getElementById(`arrow-${k}`).textContent = sortKey === k ? (sortDir === 'asc' ? '▲' : '▼') : '';
+  });
+
+  const tbody = document.getElementById('reportBody');
+  if (list.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">📭</div><h3>No students match</h3><p>Try widening the date range or clearing a filter.</p></div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = list.map(s => {
+    if (s.total === 0) {
+      return `
+        <tr class="student-row" onclick="openDetail('${s.id}')">
+          <td class="student-name-cell">${escapeHTML(s.name)}</td>
+          <td>${studioName(s.studioId)}</td>
+          <td>–</td>
+          <td colspan="6"><span class="no-lessons">No lessons in this range</span></td>
+        </tr>`;
+    }
+    const pct = Math.round(s.rate * 100);
+    const cls = s.rate >= 0.85 ? 'good' : (s.rate >= 0.7 ? 'warn' : 'bad');
+    return `
+      <tr class="student-row" onclick="openDetail('${s.id}')">
+        <td class="student-name-cell">${escapeHTML(s.name)}</td>
+        <td>${studioName(s.studioId)}</td>
+        <td>${escapeHTML(s.teachers) || '–'}</td>
+        <td>${s.total}</td>
+        <td>${s.present}</td>
+        <td>${s.absent_nc}</td>
+        <td>${s.absent_notice}</td>
+        <td>${s.unmarked}</td>
+        <td>
+          <div class="rate-cell">
+            <div class="rate-track"><div class="rate-fill ${cls}" style="width:${pct}%;"></div></div>
+            <span class="pill ${cls === 'good' ? 'pill-present' : cls === 'warn' ? 'pill-absent-notice' : 'pill-absent-nc'}">${pct}%</span>
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+let studiosCache = null;
+function studioName(id) {
+  // populated lazily from the filter select, which already has every active studio
+  if (!studiosCache) {
+    studiosCache = {};
+    [...document.getElementById('filterStudio').options].forEach(o => { if (o.value) studiosCache[o.value] = o.textContent; });
+  }
+  return studiosCache[id] ?? '–';
+}
+
+function escapeHTML(str) {
+  const div = document.createElement('div');
+  div.textContent = str ?? '';
+  return div.innerHTML;
+}
+
+// ---- Detail modal ----
+function openDetail(studentId) {
+  const s = aggregated.find(x => x.id === studentId);
+  if (!s) return;
+  document.getElementById('detailTitle').textContent = s.name;
+
+  if (s.rows.length === 0) {
+    document.getElementById('detailBody').innerHTML = `<p class="text-sm text-muted">No lessons ended in the selected range.</p>`;
+  } else {
+    const sorted = [...s.rows].sort((a, b) => b.date.localeCompare(a.date) || (b.start_time ?? '').localeCompare(a.start_time ?? ''));
+    document.getElementById('detailBody').innerHTML = `
+      <table class="detail-table">
+        <thead><tr><th>Date</th><th>Teacher</th><th>Instrument</th><th>Status</th></tr></thead>
+        <tbody>
+          ${sorted.map(r => `
+            <tr>
+              <td>${formatShortDate(parseLocalDate(r.date))}</td>
+              <td>${escapeHTML(r.teacher_name)}</td>
+              <td>${escapeHTML(r.instrument)}</td>
+              <td>${attendancePill(r.attendance_status)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  document.getElementById('detailModal').classList.remove('hidden');
+}
+
+function closeDetail() {
+  document.getElementById('detailModal').classList.add('hidden');
+}
+
+document.getElementById('detailModal').addEventListener('click', (e) => {
+  if (e.target.id === 'detailModal') closeDetail();
+});
+
+// ---- CSV export ----
+function exportCSV() {
+  const header = ['Student','Studio','Teacher(s)','Lessons','Present','Absent - No Credit','Absent - Notice','Teacher Cancelled','Unmarked','Rate %'];
+  const rows = aggregated.map(s => [
+    s.name, studioName(s.studioId), s.teachers,
+    s.total, s.present, s.absent_nc, s.absent_notice, s.teacher_cancelled, s.unmarked,
+    s.rate === null ? '' : Math.round(s.rate * 100),
+  ]);
+  const csv = [header, ...rows]
+    .map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))
+    .join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const from = document.getElementById('fromDate').value;
+  const to   = document.getElementById('toDate').value;
+  a.href = url;
+  a.download = `attendance-report_${from}_to_${to}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+</script>
+</body>
+</html>

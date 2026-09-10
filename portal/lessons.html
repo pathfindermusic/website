@@ -161,6 +161,10 @@
     .lesson-block-meta { font-size: 0.65rem; opacity: 0.8; }
     .lesson-cancel-icon { position: absolute; top: 3px; right: 4px; font-size: 0.7rem; color: #dc2626; }
 
+    /* A fortnightly series is still just a private/group lesson — this
+       only ever adds information, never replaces the type colour. */
+    .pill-fortnightly { background: #e0e7ff; color: #4338ca; }
+
     /* ---- WEEKLY VIEW ---- */
     .schedule-wrap { overflow-x: auto; border-radius: var(--r); border: 1px solid var(--border); background: var(--white); box-shadow: var(--shadow); }
     .schedule-table { width: 100%; border-collapse: collapse; min-width: 640px; }
@@ -491,6 +495,14 @@
           <div class="form-hint">
             A single lesson on the date above. Nothing repeats, and no series is created.
           </div>
+        </div>
+
+        <div class="form-group" id="frequencyWrap">
+          <label class="form-label">How often</label>
+          <select class="form-select" id="lFrequency" onchange="autoPopulateSeriesNotes()">
+            <option value="weekly">Weekly</option>
+            <option value="fortnightly">Fortnightly</option>
+          </select>
         </div>
 
         <div class="form-group" id="recurrenceWrap">
@@ -1137,7 +1149,7 @@ async function loadDailyView() {
     .select(`
       id, date, status, is_online, occurrence_notes, is_makeup,
       substitute_teacher_id, substitute_name,
-      lessons(id, teacher_id, studio_id, instrument, start_time, duration_mins, lesson_type, max_students, series_notes, status)
+      lessons(id, teacher_id, studio_id, instrument, start_time, duration_mins, lesson_type, max_students, series_notes, status, frequency)
     `)
     .eq('date', dateStr);
 
@@ -1336,7 +1348,7 @@ async function loadDailyView() {
               onclick="event.stopPropagation();openOccurrenceModal('${o.id}')"
               style="flex:1 1 auto;min-height:24px;overflow:hidden;cursor:pointer;">
               <div class="lesson-block-name">${nameOf(o)}</div>
-              <div class="lesson-block-meta">${o.is_makeup ? 'Makeup · ' : ''}${lType === 'group' ? 'Group' : 'Private'} · ${o.lessons?.instrument}</div>
+              <div class="lesson-block-meta">${o.is_makeup ? 'Makeup · ' : ''}${o.lessons?.frequency === 'fortnightly' ? 'Fortnightly · ' : ''}${lType === 'group' ? 'Group' : 'Private'} · ${o.lessons?.instrument}</div>
               ${substituteLabel(o)}
               ${o.occurrence_notes ? `<div class="lesson-block-meta" style="font-style:italic;">📝 ${o.occurrence_notes.slice(0,30)}…</div>` : ''}
             </div>`;
@@ -1411,7 +1423,7 @@ async function loadWeeklyView() {
   let query = db.from('lesson_occurrences')
     .select(`id,date,status,is_online,occurrence_notes,is_makeup,
       substitute_teacher_id,substitute_name,
-      lessons(id,teacher_id,studio_id,instrument,start_time,duration_mins,lesson_type,max_students,series_notes,status)`)
+      lessons(id,teacher_id,studio_id,instrument,start_time,duration_mins,lesson_type,max_students,series_notes,status,frequency)`)
     .gte('date', wStart).lte('date', wEnd).order('date').order('lessons(start_time)');
 
   if (studioFilter) query = query.eq('lessons.studio_id', studioFilter);
@@ -1553,6 +1565,7 @@ async function loadWeeklyView() {
             ? `<span class="pill pill-cancelled" style="display:flex;align-items:center;gap:0.3rem;">✕ Cancelled</span>`
             : `<span class="pill pill-${lType === 'group' ? 'active' : 'scheduled'}">${lType === 'private' ? 'Private' : 'Group'}</span>`}
           ${o.is_online ? `<div class="mt-1"><span class="pill pill-online">Online</span></div>` : ''}
+          ${l.frequency === 'fortnightly' ? `<div class="mt-1"><span class="pill pill-fortnightly">Fortnightly</span></div>` : ''}
         </div>
       </div>`;
     });
@@ -1586,6 +1599,7 @@ function openLessonModal(lesson = null) {
   document.getElementById('clashError').classList.remove('show');
   document.getElementById('availWarning').classList.remove('show');
   document.getElementById('lRecurrence').value  = 'indefinite';
+  document.getElementById('lFrequency').value   = 'weekly';
   document.getElementById('lSeriesNotes').value = '';
   toggleRecurrenceFields();
   onTypeChange();
@@ -1750,6 +1764,7 @@ function onPatternChange() {
 
   document.getElementById('oneOffKindWrap').classList.toggle('hidden', !oneOff);
   document.getElementById('recurrenceWrap').classList.toggle('hidden', oneOff);
+  document.getElementById('frequencyWrap').classList.toggle('hidden', oneOff);
 
   if (oneOff) {
     // Stored as a single occurrence, which is what it is
@@ -1799,6 +1814,7 @@ function autoPopulateSeriesNotes() {
   // A one-off is not a "1-lesson series" — it is a trial, a makeup or a
   // one-off request, and the note should say which.
   const isOneOff = document.getElementById('lPattern')?.value === 'oneoff';
+  const isFortnightly = document.getElementById('lFrequency')?.value === 'fortnightly';
 
   let note = '';
   if (isOneOff && startDate) {
@@ -1809,9 +1825,9 @@ function autoPopulateSeriesNotes() {
       adhoc:  `One-off lesson on ${formatDate(startDate)}`,
     }[kind] ?? `One-off lesson on ${formatDate(startDate)}`;
   } else if (recurrence === 'occurrences' && count && startDate) {
-    note = `${count}-lesson series, starting ${formatDate(startDate)}`;
+    note = `${isFortnightly ? 'Fortnightly, ' : ''}${count}-lesson series, starting ${formatDate(startDate)}`;
   } else if (recurrence === 'date_range' && startDate && endDate) {
-    note = `Recurring lessons from ${formatDate(startDate)} to ${formatDate(endDate)}`;
+    note = `${isFortnightly ? 'Fortnightly recurring' : 'Recurring'} lessons from ${formatDate(startDate)} to ${formatDate(endDate)}`;
   }
 
   if (note) {
@@ -1835,6 +1851,7 @@ async function saveLesson() {
   const recurrence  = document.getElementById('lRecurrence').value;
   const count       = parseInt(document.getElementById('lCount').value);
   const endDate     = document.getElementById('lEndDate').value;
+  const frequency   = document.getElementById('lFrequency').value;
   const seriesNotes = document.getElementById('lSeriesNotes').value.trim();
 
   const clashEl = document.getElementById('clashError');
@@ -1929,7 +1946,7 @@ async function saveLesson() {
   // Comparing day-of-week alone meant a trial lesson blocked that slot
   // for ever, even once its single occurrence had passed — which is
   // exactly the slot the ongoing series usually wants.
-  const newDates = new Set(plannedDates(day, startDate, recurrence, count, endDate));
+  const newDates = new Set(plannedDates(day, startDate, recurrence, count, endDate, frequency));
 
   const overlappingIds = (existingLessons ?? [])
     .filter(el => {
@@ -1966,8 +1983,9 @@ async function saveLesson() {
       ? formatShortDate(parseLocalDate(sharedDates[0])) : DAY_NAMES[day];
 
     if (el.teacher_id === teacherId) {
+      const tName = teacher ? `${teacher.profile?.first_name ?? ''} ${teacher.profile?.last_name ?? ''}`.trim() : '';
       showClashError(
-        `Teacher is already teaching another lesson at this time on ${firstShared}` +
+        `${tName || 'Teacher'} is already teaching another lesson at this time on ${firstShared}` +
         (sharedDates.length > 1 ? ` (and ${sharedDates.length - 1} other date${sharedDates.length > 2 ? 's' : ''})` : '') +
         '.'); return;
     }
@@ -1998,7 +2016,7 @@ async function saveLesson() {
     // updated and only its FUTURE occurrences are rebuilt.
     if (editingId) {
       await saveSeriesEdit(editingId, {
-        teacherId, studioId, instrument, lType, day, time, duration,
+        teacherId, studioId, instrument, lType, day, time, duration, frequency,
         seriesNotes: seriesNotes || null,
       });
       return;
@@ -2011,6 +2029,7 @@ async function saveLesson() {
       recurrence_type: recurrence, recurrence_start: startDate,
       recurrence_count: recurrence === 'occurrences' ? count : null,
       recurrence_end:   recurrence === 'date_range'  ? endDate : null,
+      frequency,
       series_notes: seriesNotes || null,
       status: 'active',
     }).select('id').single();
@@ -2024,7 +2043,7 @@ async function saveLesson() {
     );
 
     // Generate occurrences
-    await generateOccurrences(lessonId, day, startDate, recurrence, count, endDate);
+    await generateOccurrences(lessonId, day, startDate, recurrence, count, endDate, frequency);
 
     // A one-off marked as a makeup shows amber on the schedule. Set it
     // now rather than making the admin edit the lesson afterwards.
@@ -2078,7 +2097,8 @@ function timeToMins(timeStr) {
 // How far ahead an "indefinite" series is generated.
 const INDEFINITE_YEARS = 3;
 
-function plannedDates(dayOfWeek, startDate, recurrenceType, count, endDate) {
+function plannedDates(dayOfWeek, startDate, recurrenceType, count, endDate, frequency = 'weekly') {
+  const stepDays = frequency === 'fortnightly' ? 14 : 7;
   const dates = [];
   let current = parseLocalDate(startDate);
   while (current.getDay() !== dayOfWeek) current.setDate(current.getDate() + 1);
@@ -2112,20 +2132,20 @@ function plannedDates(dayOfWeek, startDate, recurrenceType, count, endDate) {
     if (limit !== null && generated >= limit) break;
     if (end && current > end) break;
     if (horizon && current > horizon) break;
-    if (generated > 1040) break;                   // twenty years, a safety stop
+    if (generated > 1040) break;                   // twenty years weekly, forty fortnightly — a safety stop
 
     dates.push(toISODate(current));
     generated++;
-    current.setDate(current.getDate() + 7);
+    current.setDate(current.getDate() + stepDays);
   }
   return dates;
 }
 
-async function generateOccurrences(lessonId, dayOfWeek, startDate, recurrenceType, count, endDate) {
+async function generateOccurrences(lessonId, dayOfWeek, startDate, recurrenceType, count, endDate, frequency = 'weekly') {
   await db.from('lesson_occurrences').delete()
     .eq('lesson_id', lessonId).eq('status','scheduled').gte('date', startDate);
 
-  const occurrences = plannedDates(dayOfWeek, startDate, recurrenceType, count, endDate)
+  const occurrences = plannedDates(dayOfWeek, startDate, recurrenceType, count, endDate, frequency)
     .map(date => ({ lesson_id: lessonId, date, status: 'scheduled' }));
 
   if (occurrences.length > 0) {
@@ -2145,7 +2165,7 @@ async function openOccurrence(occId) {
     .select(`id, date, status, is_online, occurrence_notes,
              substitute_teacher_id, substitute_name,
              lessons(id, teacher_id, studio_id, instrument, start_time,
-                     duration_mins, lesson_type, max_students, series_notes, status)`)
+                     duration_mins, lesson_type, max_students, series_notes, status, frequency)`)
     .eq('id', occId).maybeSingle();
 
   if (error || !occ) { showToast('Could not open that lesson.', 'error'); return; }
@@ -2192,6 +2212,7 @@ async function openOccurrenceModal(occId) {
       <div><span class="text-muted text-sm">Studio</span><div class="font-bold">${studio?.name ?? '—'}</div></div>
       <div><span class="text-muted text-sm">Type</span><div class="font-bold">${l.lesson_type === 'group' ? 'Group' : 'Private'}</div></div>
       <div><span class="text-muted text-sm">Status</span><div id="occStatusPill">${attendancePill(null)}</div></div>
+      ${l.frequency === 'fortnightly' ? `<div><span class="text-muted text-sm">Frequency</span><div class="font-bold">Fortnightly</div></div>` : ''}
     </div>
     ${l.series_notes ? `<div style="margin-top:0.65rem;padding-top:0.65rem;border-top:1px solid var(--border);font-size:0.82rem;color:var(--dark-grey);">📋 Series note: ${l.series_notes}</div>` : ''}`;
 
@@ -2506,6 +2527,7 @@ async function saveSeriesEdit(lessonId, f) {
     teacher_id: f.teacherId, studio_id: f.studioId, instrument: f.instrument,
     lesson_type: f.lType, day_of_week: f.day, start_time: f.time,
     duration_mins: f.duration, series_notes: f.seriesNotes,
+    frequency: f.frequency,
   }).eq('id', lessonId);
   if (uErr) { showToast('Could not save: ' + uErr.message, 'error'); return; }
 
@@ -2546,11 +2568,14 @@ async function saveSeriesEdit(lessonId, f) {
     await db.from('lesson_occurrences').delete().in('id', removable);
   }
 
-  // Rebuild from today on the new day
+  // Rebuild from today on the new day — and the new frequency, if it
+  // changed. A weekly series switched to fortnightly mid-run keeps its
+  // past occurrences (weekly, as they happened) and generates the rest
+  // fortnightly from today.
   const dates = plannedDates(
     f.day, today,
     runsUntil ? 'date_range' : 'indefinite',
-    null, runsUntil);
+    null, runsUntil, f.frequency);
 
   const { data: kept } = await db.from('lesson_occurrences')
     .select('date').eq('lesson_id', lessonId);
@@ -2606,6 +2631,7 @@ async function editSeriesInner() {
   document.getElementById('lType').value        = l.lesson_type ?? 'private';
   document.getElementById('lDay').value         = l.day_of_week;
   document.getElementById('lDuration').value    = l.duration_mins;
+  document.getElementById('lFrequency').value   = l.frequency ?? 'weekly';
   document.getElementById('lSeriesNotes').value = l.series_notes ?? '';
   document.getElementById('lTime').value        = l.start_time?.slice(0,5) ?? '';
   checkAvailability();   // warn straight away if the slot no longer suits
@@ -2616,7 +2642,10 @@ async function editSeriesInner() {
 
   // Recurrence is not editable here. Changing it would mean deciding
   // what happens to occurrences already generated, and the common need
-  // is simply a different day, time or teacher.
+  // is simply a different day, time, teacher — or frequency. Frequency
+  // is left enabled deliberately: it behaves like day/time, not like
+  // count/end-date — saveSeriesEdit() only rebuilds occurrences from
+  // today forward, so a change here can't touch the past.
   // Editing an existing series: the pattern is fixed, only its details
   // can change.
   ['lRecurrence','lCount','lEndDate','lStartDate','lPattern'].forEach(id => {

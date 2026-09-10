@@ -811,6 +811,7 @@ Run in order. All are re-runnable.
 31. `phase5-substitute-teachers.sql` — substitute columns, both views rebuilt
 32. `phase5-substitute-access.sql` — what a substitute may see
 33. `phase5-makeup-lessons.sql` — `is_makeup`, both views rebuilt
+34. `phase5-fortnightly-lessons.sql` — `lessons.frequency` (weekly/fortnightly)
 
 ---
 
