@@ -812,6 +812,7 @@ Run in order. All are re-runnable.
 32. `phase5-substitute-access.sql` — what a substitute may see
 33. `phase5-makeup-lessons.sql` — `is_makeup`, both views rebuilt
 34. `phase5-fortnightly-lessons.sql` — `lessons.frequency` (weekly/fortnightly)
+35. `phase5-require-contact-email.sql` — `students` must have email or parent_email (NOT VALID check)
 
 ---
 

@@ -219,7 +219,7 @@
     <div class="toolbar">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
-        <input type="text" id="searchInput" placeholder="Search by name, email or instrument…" oninput="filterStudents()">
+        <input type="text" id="searchInput" placeholder="Search by name, email, phone or instrument…" oninput="filterStudents()">
       </div>
       <div class="flex gap-1">
         <select class="filter-select" id="filterStudio" onchange="filterStudents()">
@@ -287,6 +287,8 @@
           <div class="form-hint">
             Gives this student their own portal login. Leave blank for a
             sibling who will share one — you can link them afterwards.
+            Either this or a parent email below is required, so the
+            student stays reachable.
           </div>
         </div>
         <div class="form-group">
@@ -347,6 +349,10 @@
         <div class="form-group">
           <label class="form-label">Parent Email</label>
           <input class="form-input" type="email" id="sParentEmail" placeholder="parent@email.com">
+          <div class="form-hint">
+            Required if the student doesn't have their own email above —
+            we need at least one address to reach the family.
+          </div>
         </div>
       </div>
     </div>
@@ -586,9 +592,6 @@ async function loadStudents() {
       teachers: { profiles: teacherProfileMap[st.teacher_id] ?? null }
     }))
   }));
-
-  document.getElementById('studentCount').textContent =
-    `${allStudents.filter(s => s.status === 'active').length} active · ${allStudents.length} total`;
 
   await loadProcesses();
   filterStudents();   // keep the active filter — never render the raw list
@@ -1143,21 +1146,51 @@ async function syncProcessStatus(studentId) {
 function closeProcess() { document.getElementById('procModal').classList.add('hidden'); }
 
 // ---- Filter ----
+// Phone numbers get typed and stored in whatever shape someone used —
+// spaces, dashes, a +61 prefix. Compare digits only so "0412 345 678"
+// finds "0412345678".
+function digitsOnly(str) {
+  return (str ?? '').replace(/\D/g, '');
+}
+
 function filterStudents() {
-  const q       = document.getElementById('searchInput').value.toLowerCase();
+  const q       = document.getElementById('searchInput').value.toLowerCase().trim();
+  const qDigits = digitsOnly(q);
   const studio  = document.getElementById('filterStudio').value;
   const status  = document.getElementById('filterStatus').value;
 
   const filtered = allStudents.filter(s => {
     const p    = s.profiles ?? {};
-    const name = `${p.first_name ?? ''} ${p.last_name ?? ''} ${p.email ?? ''}`.toLowerCase();
+    const name  = `${p.first_name ?? ''} ${p.last_name ?? ''}`.toLowerCase();
+    // Own email/phone or a parent's — the student is reachable either
+    // way, so a search for either should find them. Bug fix in passing:
+    // this used to check p.email, which is profiles.email — a column
+    // that doesn't exist (email lives on students, not profiles), so
+    // email search silently matched nothing.
+    const email = `${s.email ?? ''} ${s.parent_email ?? ''}`.toLowerCase();
+    const phone = digitsOnly(`${p.phone ?? ''} ${s.parent_phone ?? ''}`);
     const insts = (s.student_instruments ?? []).map(i => i.instrument.toLowerCase()).join(' ');
-    const matchQ      = !q      || name.includes(q) || insts.includes(q);
+
+    const matchQ = !q
+      || name.includes(q)
+      || email.includes(q)
+      || insts.includes(q)
+      || (qDigits.length >= 4 && phone.includes(qDigits));   // avoid 1-2 digit false positives
     const matchStudio = !studio || s.studio_id === studio;
     const matchStatus = !status || s.status === status;
     return matchQ && matchStudio && matchStatus;
   });
   renderStudents(filtered);
+  updateStudentCount(studio);
+}
+
+// "X active · Y total" in the header — scoped to the selected studio
+// (but not to the search text or status dropdown, so the two numbers
+// keep their meaning instead of collapsing to the same value).
+function updateStudentCount(studio) {
+  const scoped = allStudents.filter(s => !studio || s.studio_id === studio);
+  document.getElementById('studentCount').textContent =
+    `${scoped.filter(s => s.status === 'active').length} active · ${scoped.length} total`;
 }
 
 // ---- Instrument rows ----
@@ -1410,6 +1443,11 @@ async function saveStudent() {
 
   if (!firstName || !lastName || !studioId) {
     showToast('Please fill in all required fields.', 'error'); return;
+  }
+
+  if (!email && !parentEmail) {
+    showToast('Please provide either a student email or a parent email — at least one is required.', 'error');
+    return;
   }
 
   // Duplicate email check is handled inside the Netlify Function

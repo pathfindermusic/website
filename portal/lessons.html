@@ -117,6 +117,16 @@
     .grid-cell:hover { background: rgba(232,73,30,0.04); }
     .grid-cell.blocked { cursor: not-allowed; background: var(--off-white); }
 
+    /* Outside the teacher's stated availability for this day/studio —
+       still clickable (admins can override), just visually muted */
+    .grid-cell.cell-unavailable {
+      background: repeating-linear-gradient(
+        45deg, var(--off-white), var(--off-white) 6px,
+        rgba(0,0,0,0.035) 6px, rgba(0,0,0,0.035) 12px
+      );
+    }
+    .grid-cell.cell-unavailable:hover { background: rgba(232,73,30,0.06); }
+
     /* Lesson block inside cell */
     .lesson-block {
       position: relative;
@@ -709,11 +719,17 @@ for (let h = 8; h <= 20; h++) {
 }
 
 function computeTimeSlots(occurrences) {
-  if (!occurrences || occurrences.length === 0) return ALL_TIME_SLOTS;
+  // A cancelled one-off (shown on the grid with a red ✕, per the note
+  // above) still happened at some scheduled time, but it shouldn't be
+  // allowed to stretch the visible range for the whole day — that's
+  // what was pulling the grid open to 5am on 10 Sep 2026 for a studio
+  // whose only lesson that day was at 4:30pm.
+  const activeOccs = (occurrences ?? []).filter(o => o.status !== 'cancelled');
+  if (activeOccs.length === 0) return ALL_TIME_SLOTS;
 
   // Find earliest start and latest end across all lessons
   let minMins = 999, maxMins = 0;
-  occurrences.forEach(o => {
+  activeOccs.forEach(o => {
     const start = o.lessons?.start_time;
     const dur   = o.lessons?.duration_mins ?? 30;
     if (!start) return;
@@ -1225,12 +1241,34 @@ async function loadDailyView() {
   let html = `<div class="studios-wrap">`;
 
   studios.forEach(studio => {
-    // Teachers at this studio
-    const teachers = allTeachers.filter(t => (t.studio_ids ?? []).includes(studio.id));
-    if (teachers.length === 0) {
+    // All lessons at this studio today — needed both to decide which
+    // teachers to show and to size the grid.
+    const studioOccs = allOccurrences.filter(o => o.lessons?.studio_id === studio.id);
+
+    // Teachers assigned to this studio at all…
+    const studioTeachersAll = allTeachers.filter(t => (t.studio_ids ?? []).includes(studio.id));
+    // …but only show the ones available today, or who have an actual
+    // lesson booked today even without a matching availability record
+    // (so a real booked lesson never silently disappears because of
+    // missing/stale availability data).
+    const teachers = studioTeachersAll.filter(t => {
+      const hasAvailToday = (t.teacher_availability ?? [])
+        .some(a => a.studio_id === studio.id && a.day_of_week === dayOfWeek);
+      const hasLessonToday = studioOccs.some(o => o.lessons?.teacher_id === t.id);
+      return hasAvailToday || hasLessonToday;
+    });
+
+    if (studioTeachersAll.length === 0) {
       html += `<div class="studio-grid-section">
         <div class="studio-grid-title">${studio.name}</div>
         <div class="empty-state" style="padding:1.5rem;"><p>No teachers assigned to this studio.</p></div>
+      </div>`;
+      return;
+    }
+    if (teachers.length === 0) {
+      html += `<div class="studio-grid-section">
+        <div class="studio-grid-title">${studio.name}</div>
+        <div class="empty-state" style="padding:1.5rem;"><p>No teachers available at this studio today.</p></div>
       </div>`;
       return;
     }
@@ -1248,29 +1286,47 @@ async function loadDailyView() {
           <tbody>`;
 
     // Compute time slots dynamically based on lessons at this studio
-    const studioOccs = allOccurrences.filter(o => o.lessons?.studio_id === studio.id);
     const TIME_SLOTS  = computeTimeSlots(studioOccs);
 
-    // Extend time range to cover teacher availability on this day
-    // so empty grids still show the working hours
-    const availSlots = [];
+    // Each shown teacher's availability windows today, as a set of
+    // "HH:MM" slot keys — used below both to extend the grid (for an
+    // otherwise-empty day) and to grey out each teacher's own
+    // unavailable slots once the grid is drawn.
+    const teacherAvailSlots = {}; // teacherId -> Set<"HH:MM">
     teachers.forEach(t => {
+      const set = new Set();
       (t.teacher_availability ?? [])
         .filter(a => a.studio_id === studio.id && a.day_of_week === dayOfWeek)
         .forEach(a => {
           const [sh, sm] = a.start_time.split(':').map(Number);
           const [eh, em] = a.end_time.split(':').map(Number);
-          const startMins = sh * 60 + sm;
-          const endMins   = eh * 60 + em;
-          for (let m = startMins; m < endMins; m += 30) {
-            const slot = `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
-            if (!availSlots.includes(slot)) availSlots.push(slot);
+          for (let m = sh * 60 + sm; m < eh * 60 + em; m += 30) {
+            set.add(`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`);
           }
         });
+      teacherAvailSlots[t.id] = set;
     });
-    // Merge availability slots into TIME_SLOTS
-    availSlots.forEach(s => { if (!TIME_SLOTS.includes(s)) TIME_SLOTS.push(s); });
-    TIME_SLOTS.sort();
+
+    // Extend time range to cover teacher availability on this day, but
+    // only when the studio has no real lessons booked at all that day —
+    // so an empty grid still shows the working hours. TIME_SLOTS is one
+    // shared row-range for every teacher column in this grid, so once
+    // any lesson exists, merging in every teacher's availability
+    // unconditionally let a single early/mis-set availability window
+    // (e.g. one teacher's Friday slot starting 05:00) blow the whole
+    // grid open with a large empty gap before the day's actual lessons
+    // — reported 10 Sep 2026, first lesson 4:30pm but grid opened 5am.
+    if (studioOccs.filter(o => o.status !== 'cancelled').length === 0) {
+      const availSlots = [];
+      teachers.forEach(t => {
+        teacherAvailSlots[t.id].forEach(slot => {
+          if (!availSlots.includes(slot)) availSlots.push(slot);
+        });
+      });
+      // Merge availability slots into TIME_SLOTS
+      availSlots.forEach(s => { if (!TIME_SLOTS.includes(s)) TIME_SLOTS.push(s); });
+      TIME_SLOTS.sort();
+    }
 
     // Build occupied slots map: teacherId → Set of slot strings
     const occupied = {}; // teacherId → { slotKey: occurrenceId }
@@ -1383,10 +1439,16 @@ async function loadDailyView() {
             </div>
           </td>`;
         } else if (!occupied[t.id]?.[slot]) {
-          // Empty cell — clickable to add lesson
-          html += `<td class="grid-cell" 
+          // Empty cell — clickable to add lesson. Grey it out if it
+          // falls outside this teacher's stated availability today —
+          // but only when we actually have availability data for
+          // them today; with none at all, we don't know their hours,
+          // so leave the cell neutral rather than greying everything.
+          const availSet    = teacherAvailSlots[t.id];
+          const isUnavail   = availSet.size > 0 && !availSet.has(slot);
+          html += `<td class="grid-cell${isUnavail ? ' cell-unavailable' : ''}"
             onclick="openLessonModalFromCell('${t.id}','${studio.id}','${slot}','${dayOfWeek}')"
-            title="Click to add lesson at ${formatTime(slot + ':00')}">
+            title="${isUnavail ? 'Outside availability — click to add anyway at ' : 'Click to add lesson at '}${formatTime(slot + ':00')}">
           </td>`;
         }
         // else: cell is mid-lesson, covered by rowspan — skip

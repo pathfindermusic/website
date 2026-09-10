@@ -353,6 +353,167 @@ so no cycle can form. `get_my_role()`, `get_my_teacher_id()`,
 `get_my_studio_ids()` and `my_lesson_ids()` all exist for this reason. Any new
 policy needing a relationship lookup should use one, not an inline subquery.
 
+### Studio access is a default, not a boundary
+
+Admins see and work on every studio. Their pages simply *default* the studio
+filter to their own, so the day starts with their own work and the other studio
+is one dropdown away.
+
+This replaced database-level scoping, which was the wrong tool. Being a `FOR
+ALL` policy it restricted writing as well as reading, and the failures surfaced
+as opaque `42501` errors rather than clear refusals. Three bugs came from it in
+two days — an invisible task that made an enquiry report "Needs a task", a task
+silently losing its subject when edited by an admin who couldn't see that
+student, and a student creation that inserted fine and then failed on the
+read-back.
+
+The lesson worth keeping: **scoping in the database enforces a boundary;
+scoping in the interface expresses a preference.** The admins wanted a
+preference, and said so once asked directly.
+
+`applyDefaultStudio()` in `supabase-client.js` does it, and only where an admin
+covers exactly one studio.
+
+### Historical note: studio scoping restricted writing, not just reading
+
+`admins_manage_students_in_their_studios` is a `FOR ALL` policy, so its
+`USING` clause governs reads *and* the read-back after a write. A request with
+`Prefer: return=representation` — which supabase-js sends whenever `.select()`
+follows an insert — therefore fails with `42501` when an admin creates a
+student at another studio: the insert succeeds, the read-back is denied, and
+the error names row-level security rather than the actual problem.
+
+`students.html` blocks this case with a plain message. The workaround is to
+create the student at your own studio and move them across, which carries
+their tasks over.
+
+**Decided:** creating for another studio stays forbidden. It is rare, and
+admins can hand it over between themselves.
+
+### A student may have no login of their own
+
+Around 5% of students are siblings sharing one family email address, and
+`auth.users.email` must be unique — so a login each is impossible.
+
+Email is therefore optional. A student without one gets no auth account and
+exists as a record only, exactly like the bulk-imported students; notifications
+reach them through `parent_email`. `students.user_id` is not unique, so several
+students can share one profile — that is how a family login works.
+
+The student dashboard shows a child switcher when the login owns more than one
+student, and one child at a time: practice notes and attendance are per child,
+and combining them invites reading the wrong child's feedback. A single child
+sees no switcher.
+
+**Creating a student is not atomic.** The auth account is made first, then the
+profile, then the student row. A failure partway used to leave an auth account
+holding the email address with no student attached — invisible in the portal,
+and the next attempt failed with "already used" for a student nobody could
+find. Both later steps now roll the account back. If this recurs, look for
+orphans:
+
+```sql
+SELECT u.id, u.email, u.created_at
+  FROM auth.users u
+ WHERE NOT EXISTS (SELECT 1 FROM students s WHERE s.user_id = u.id)
+   AND NOT EXISTS (SELECT 1 FROM admins  a WHERE a.user_id = u.id)
+   AND NOT EXISTS (SELECT 1 FROM teachers t WHERE t.user_id = u.id);
+```
+
+### Substitute teachers
+
+A substitution belongs to one **occurrence**, not the series — the following
+week reverts on its own. Two cases:
+
+- **Staff cover.** `lesson_occurrences.substitute_teacher_id` points at another
+  teacher. `schedule_view.teacher_id` is `COALESCE(substitute, usual)`, so the
+  lesson genuinely moves into the substitute's schedule and leaves the usual
+  teacher's. They see the students, the notes including earlier weeks, and can
+  mark attendance — `phase5-substitute-access.sql` grants that explicitly
+  rather than leaving it to chance.
+- **External cover.** `substitute_name` is just text. The person has no account,
+  so the lesson stays with the usual teacher and an admin marks the attendance
+  they report.
+
+Admins can mark attendance from the occurrence modal in either case;
+`marked_by` records who did it, which is the whole audit trail.
+
+**Rebuilding either view resets `security_invoker`.** Any migration that
+recreates them must set it again, or the Supabase lint silently reopens.
+
+### Three views, one modal, three different shapes
+
+`lessons.html` has daily, weekly and monthly views built at different times, and
+each populated `allOccurrences` differently while sharing one occurrence modal:
+
+- the **weekly** view merged student lists into copies held for rendering, so
+  the modal — reading `allOccurrences` — found no students and could not mark
+  attendance
+- the **monthly** view reads `schedule_view`, so its occurrences were never in
+  `allOccurrences` at all, and called an `openOccurrence()` that did not exist
+- neither grid query fetched the substitute columns, so a covered lesson looked
+  ordinary
+
+If a fourth view is ever added, it must attach `lessonStudents` to
+`allOccurrences` itself, not to a copy.
+
+**A slot can hold more than one lesson.** Cancelling frees a slot for
+rebooking, so the daily grid may need to show a cancelled lesson and its
+replacement together — `.find()` showed whichever came back first. Live lessons
+get the space; cancelled ones collapse to one line each.
+
+### A guard that returns quietly turns a bug into a non-event
+
+Three failures in one afternoon, all from a correct check failing silently:
+
+- `applyDefaultStudio` returned early when the dropdown had no matching
+  option — because it was called *before* the options were added. Both admins
+  saw every studio while the control said otherwise.
+- The same helper returned early when an admin appeared to cover several
+  studios, which happened because `tasks.html` queried `admins` without
+  selecting `studio_ids`.
+- `loadWeeklyView` threw part-way and left the spinner turning for ever, with
+  the error only in the console.
+
+The checks were right in each case; the silence is what cost the time. The
+helper now logs why it did nothing, and `loadView()` shows a failure with a
+retry button rather than spinning.
+
+### Filtering on a joined column gives a LEFT join
+
+`.eq('lessons.studio_id', x)` does not exclude non-matching rows — it returns
+them with `lessons: null`. The weekly view passed those through and the
+renderer threw on the first one. Anything filtering on a joined column must
+also drop rows where the join came back null.
+
+The daily and monthly views use `schedule_view` and were unaffected. The weekly
+view is the only one still joining directly, and moving it to the view would
+remove this class of problem.
+
+### Reloading a list must reapply its filter
+
+`loadStudents()` rendered the full list directly, so any reload discarded the
+active filter — a student moved to another studio reappeared until the page was
+refreshed by hand. Reload paths should go through the filter function, never
+render the raw array.
+
+### Tightening scope can silently clear data
+
+Any `<select>` populated from a scoped query drops values the current user
+cannot see. The control then reads empty, and saving writes that absence as a
+deliberate change.
+
+Studio-scoping students did exactly this: a Kilsyth admin opened a task about a
+Ringwood prospective student, the subject dropdown had no matching option, and
+saving set `subject_type` and `subject_id` to null. The task survived; its link
+to the student did not, and the Enquiries page then correctly reported "Needs a
+task" for an enquiry whose task existed but pointed at nobody.
+
+`tasks.html` now keeps the original subject when it wasn't among the options,
+and shows it as "Student at another studio". **Check every dropdown with the
+same shape before tightening scope anywhere else** — the assignee and studio
+pickers have it too.
+
 ### Testing a policy as another user
 
 The SQL editor bypasses RLS, so policies look fine from there. Impersonate
@@ -489,13 +650,34 @@ Deactivate is the answer in both cases: the record survives, past lessons stay
 attributed, and they can come back. Delete remains only on Studios and Admins,
 where it is Super User only and genuinely rare.
 
-**Known gap: admins are not studio-scoped in the database.** A Kilsyth admin
-can read Ringwood's lessons and students — the policies on those tables test the
-role, not the studio. Page queries filter by studio so the dashboards look
-correct, but the restriction isn't enforced where it matters.
-`get_my_studio_ids()` exists and the task policies use it; applying the same to
-students and lessons is a behavioural change worth deciding rather than
-assuming.
+**Students and enquiries are studio-scoped**, matching tasks. An admin sees only
+their own studios' students; a student with no studio stays visible to everyone.
+The `WITH CHECK` is role-only, so a student can be handed *out* to another studio
+but not pulled in — the same asymmetry as tasks.
+
+Changing a student's studio hands them over: a trigger moves their open tasks to
+the receiving studio's queue, unassigned, with a handover record explaining why.
+Enquiries have a **Move studio** button for this; moving an enquiry's follow-up
+task offers to move the enquiry too, since they are the same piece of work.
+
+**Known gap: lessons are not studio-scoped.** Only students and tasks are.
+
+**An indefinite lesson series runs three years ahead of today**, not from
+whenever it began. Generating 52 weeks from the start date meant a migrated
+student whose lessons began in early 2025 got occurrences that had all already
+happened — their lesson appeared in no view at all, and could not be fixed
+through the portal. `INDEFINITE_YEARS` in `lessons.html` controls the horizon.
+Nothing tops series up as time passes, so that horizon is a real deadline.
+
+After any bulk import, check for series that are already exhausted:
+
+```sql
+SELECT l.id, l.instrument, MAX(o.date) AS last_occurrence
+  FROM lessons l JOIN lesson_occurrences o ON o.lesson_id = l.id
+ WHERE l.status = 'active'
+ GROUP BY l.id, l.instrument
+HAVING MAX(o.date) < CURRENT_DATE;
+```
 
 **Known gap:** deleting a studio does not check for live lessons. It cleans up
 teacher references and availability, but a studio with a running schedule would
@@ -619,6 +801,18 @@ Run in order. All are re-runnable.
 24. `phase5-security-lints.sql` — drops the `zoho_leads_import` staging table
 25. `phase5-view-rls.sql` — `my_lesson_ids()`, four student read policies,
     `security_invoker` on both views
+26. `phase5-scope-students.sql` — admins see only their own studios' students
+    *(superseded by 27)*
+27. `phase5-unscope-with-defaults.sql` — reverts 26; studio is a UI default,
+    not a database boundary
+28. `phase5-notification-images.sql` — public bucket for pasted screenshots
+29. `phase5-lesson-reminders.sql` — opt-in reminders, `reminder_log`
+30. `phase5-admin-attendance.sql` — admins may mark attendance
+31. `phase5-substitute-teachers.sql` — substitute columns, both views rebuilt
+32. `phase5-substitute-access.sql` — what a substitute may see
+33. `phase5-makeup-lessons.sql` — `is_makeup`, both views rebuilt
+34. `phase5-fortnightly-lessons.sql` — `lessons.frequency` (weekly/fortnightly)
+35. `phase5-require-contact-email.sql` — `students` must have email or parent_email (NOT VALID check)
 
 ---
 
@@ -673,6 +867,43 @@ inactive and leaves the profile alone — so login checks both. Note this is
 checked at login only: an existing session survives until it expires.
 `isAccountBlocked()` in `supabase-client.js` is there for wiring into
 `requireAuth` if per-page enforcement is ever wanted.
+
+**Website enquiries reach the portal (parallel run).** The contact form still
+posts to Zoho, which stays authoritative and still sends both the
+acknowledgement and the studio notification. A `keepalive` fetch also creates
+the enquiry and its follow-up task in the portal, so admins can work it in both
+systems. `receive-enquiry.js` sends nothing — see `SEND_ACKNOWLEDGEMENT` for
+the cutover.
+
+Protections are an origin check, a honeypot field and duplicate suppression
+within the hour. reCAPTCHA is **not** verified: Zoho consumes the token and
+Google allows one verification per token. At cutover the portal takes it over.
+
+**Lesson reminders** run from a Netlify scheduled function at 20:00 UTC — 6 AM
+Melbourne in winter, 7 AM in summer. Netlify cron is UTC only, so an
+early-morning window avoids the daylight-saving drift rather than fighting it.
+Opt-in, per family, with a token-based unsubscribe link. Needs Resend's paid
+tier at scale: ~100 lessons a day is the free tier's entire daily allowance.
+
+**Pasted images in notifications** go to a public Supabase Storage bucket —
+email clients fetch images with no session, so it cannot be otherwise. The URLs
+are unguessable but permanent, and the composer warns about it. Nothing removes
+them; `phase5-notification-images.sql` has a housekeeping query.
+
+**Substitute teachers, makeup and one-off lessons** are in. A one-off is a
+first-class choice on the lesson form — trial, makeup, or ad-hoc request — which
+replaced booking a "series of one" and editing it afterwards. Makeup lessons show
+amber; the daily and monthly views now share one colour scheme.
+
+**Attendance shows on the schedule.** Green tick, red cross, or struck through
+for a teacher cancellation. A group shows one state: all present, all absent, or
+amber for a mix.
+
+**Lifecycle emails were not BCCing the studio.** `send-email.js` only BCCs when
+told where to, and the lifecycle sends passed `from` but not `bcc`. Affected the
+trial and enrolment confirmations, the enquiry acknowledgement, check-in,
+payment follow-up and farewell — silently, for weeks. Fixed in `processes.js`;
+`email_log` has the record of everything that went out regardless.
 
 **Next up:** finish end-enrolment testing; Phase 4d (website form posts to the
 portal, Zoho retired); attendance report page; RLS on views before go-live.

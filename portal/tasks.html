@@ -72,6 +72,9 @@
     }
 
     .task-title { font-size: 0.9rem; font-weight: 500; color: var(--charcoal); line-height: 1.4; }
+    /* Overdue and still open — the name itself carries the urgency, not
+       just the due-date text below it. */
+    .task-title.overdue { color: #dc2626; }
     .task-meta {
       font-size: 0.75rem; color: var(--mid-grey); margin-top: 0.2rem;
       display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;
@@ -140,6 +143,17 @@
       <div>
         <div class="page-title">Tasks</div>
         <div class="page-sub" id="pageSub">Loading…</div>
+      </div>
+      <div class="flex items-center gap-2" style="flex-wrap:wrap;">
+        <div class="week-nav">
+          <button class="week-nav-btn" onclick="taskNavBack()">‹</button>
+          <button class="btn btn-ghost btn-sm" onclick="taskGoToday()">Today</button>
+          <button class="week-nav-btn" onclick="taskNavForward()">›</button>
+        </div>
+        <input type="date" class="filter-select" id="taskDatePicker"
+               onchange="taskJumpToDate(this.value)"
+               title="Jump to a date — shows tasks due that day, plus anything overdue"
+               style="padding:0.42rem 0.6rem;cursor:pointer;">
       </div>
     </div>
 
@@ -330,7 +344,12 @@ let admins      = [];
 let studentOpts = [];
 let teacherOpts = [];
 let myStudios   = [];         // studios this admin covers
-let bucket      = 'open';     // overdue | today | unassigned | upcoming | open
+// null is the landing view: overdue (always, regardless of selectedDate)
+// plus whatever is due on selectedDate. Clicking a bucket card moves to
+// a single-purpose filter instead; deselecting it comes back to null,
+// not to 'open' — 'open' stays its own card ("All open"), not a fallback.
+let bucket       = null;      // null | overdue | today | unassigned | upcoming | waiting | replied | open
+let selectedDate = new Date(); // drives the null-bucket "due on this date" half
 let openTask    = null;
 
 // ============================================================
@@ -350,6 +369,7 @@ let openTask    = null;
   } else {
     document.getElementById('filterBar').classList.add('hidden');
   }
+  syncTaskDatePicker();
   await loadTasks();
 
   // Arrived from Enquiries with a specific task in mind
@@ -610,13 +630,56 @@ function onStatusFilterChange() {
 }
 
 function setBucket(k) {
-  bucket = (bucket === k) ? 'open' : k;
+  bucket = (bucket === k) ? null : k;
   // These buckets are open-work views; reset the status filter to match
   // rather than showing an empty list.
   if (bucket !== 'open') {
     const sel = document.getElementById('filterStatus');
     if (sel && sel.value !== 'open') sel.value = 'open';
   }
+  renderBuckets();
+  render();
+}
+
+// ============================================================
+// DATE NAVIGATION — same pattern as the Lessons dashboard. Only
+// meaningful for the default (null-bucket) view, so using it also
+// switches back to that view — a single-purpose bucket like
+// "Unassigned" doesn't care what date is selected.
+// ============================================================
+function syncTaskDatePicker() {
+  const el = document.getElementById('taskDatePicker');
+  if (el) el.value = toISODate(selectedDate);
+}
+
+function taskNavBack() {
+  selectedDate.setDate(selectedDate.getDate() - 1);
+  bucket = null;
+  syncTaskDatePicker();
+  renderBuckets();
+  render();
+}
+
+function taskNavForward() {
+  selectedDate.setDate(selectedDate.getDate() + 1);
+  bucket = null;
+  syncTaskDatePicker();
+  renderBuckets();
+  render();
+}
+
+function taskGoToday() {
+  selectedDate = new Date();
+  bucket = null;
+  syncTaskDatePicker();
+  renderBuckets();
+  render();
+}
+
+function taskJumpToDate(value) {
+  if (!value) return;
+  selectedDate = parseLocalDate(value);
+  bucket = null;
   renderBuckets();
   render();
 }
@@ -639,7 +702,15 @@ function render() {
   // Bucket. Every view except "Waiting list" excludes waitlist
   // entries, so open-ended items don't clutter the day's work.
   const notWait = t => t.kind !== 'waitlist';
-  if (bucket === 'overdue')    list = list.filter(t => t.status==='open' && notWait(t) && t.due_date && t.due_date < today);
+  const selectedStr = toISODate(selectedDate);
+  if (bucket === null) {
+    // The landing view: overdue is always against the real today, not
+    // wherever the date-nav is pointed — an overdue task doesn't stop
+    // being overdue because you're browsing next Friday.
+    list = list.filter(t => t.status==='open' && notWait(t) && t.due_date &&
+      (t.due_date < today || t.due_date === selectedStr));
+  }
+  else if (bucket === 'overdue')    list = list.filter(t => t.status==='open' && notWait(t) && t.due_date && t.due_date < today);
   else if (bucket === 'today') list = list.filter(t => t.status==='open' && notWait(t) && t.due_date === today);
   else if (bucket === 'unassigned') list = list.filter(t => t.status==='open' && notWait(t) && !t.assigned_to);
   else if (bucket === 'upcoming')   list = list.filter(t => t.status==='open' && notWait(t) && t.due_date > today && t.due_date <= wk);
@@ -660,15 +731,21 @@ function render() {
   else if (fAssignee === '__none') list = list.filter(t => !t.assigned_to);
   else if (fAssignee)              list = list.filter(t => t.assigned_to === fAssignee);
 
+  const dateNote = bucket === null
+    ? ` · showing overdue + ${selectedStr === today ? 'today' : formatShortDate(selectedDate)}`
+    : '';
   document.getElementById('pageSub').textContent =
-    `${tasks.filter(t=>t.status==='open').length} open · ${list.length} shown`;
+    `${tasks.filter(t=>t.status==='open').length} open · ${list.length} shown${dateNote}`;
 
   const el = document.getElementById('taskList');
   if (!list.length) {
+    const emptyMsg = isTeacher ? 'No tasks for you right now.'
+      : bucket === null ? `Nothing overdue, and nothing due ${selectedStr === today ? 'today' : `on ${formatShortDate(selectedDate)}`}.`
+      : 'Nothing matches this view.';
     el.innerHTML = `<div class="empty-state">
       <div class="empty-state-icon">✓</div>
       <h3>Nothing here</h3>
-      <p>${isTeacher ? 'No tasks for you right now.' : 'Nothing matches this view.'}</p>
+      <p>${emptyMsg}</p>
     </div>`;
     return;
   }
@@ -719,7 +796,7 @@ function render() {
               onclick="event.stopPropagation();quickToggle('${t.id}')"
               title="${tip}">${mark}</button>
       <div>
-        <div class="task-title">${escapeHtml(t.title)}</div>
+        <div class="task-title ${dueCls === 'due-overdue' ? 'overdue' : ''}">${escapeHtml(t.title)}</div>
         <div class="task-meta">${bits.join('')}</div>
       </div>
     </div>`;
