@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Artefact Library — Pathfinder Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/portal.css">
+  <style>
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+      flex-wrap: wrap;
+    }
+    .search-wrap { position: relative; flex: 1; max-width: 320px; }
+    .search-wrap input {
+      width: 100%;
+      padding: 0.52rem 0.85rem 0.52rem 2.1rem;
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      font-size: 0.845rem;
+      font-family: 'Inter', sans-serif;
+      background: var(--white);
+      color: var(--charcoal);
+    }
+    .search-wrap input:focus { outline: none; border-color: var(--orange); }
+    .search-icon {
+      position: absolute; left: 0.65rem; top: 50%;
+      transform: translateY(-50%); color: var(--mid-grey);
+      font-size: 0.9rem; pointer-events: none;
+    }
+    .art-table { width: 100%; border-collapse: collapse; font-size: 0.845rem; }
+    .art-table th {
+      text-align: left; font-size: 0.72rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.07em;
+      color: var(--mid-grey); padding: 0 1rem 0.65rem;
+      border-bottom: 1px solid var(--border); white-space: nowrap;
+    }
+    .art-table td {
+      padding: 0.85rem 1rem; border-bottom: 1px solid var(--border);
+      color: var(--dark-grey); vertical-align: middle;
+    }
+    .art-table tr:last-child td { border-bottom: none; }
+    .art-table tr:hover td { background: var(--off-white); }
+    .art-title { font-weight: 600; color: var(--charcoal); }
+    .art-desc  { font-size: 0.78rem; color: var(--mid-grey); }
+    .art-title-row.retired .art-title,
+    .art-title-row.retired .art-desc { opacity: 0.55; }
+    .action-btns { display: flex; gap: 0.4rem; }
+
+    .component-pill {
+      display: inline-block; font-size: 0.68rem; font-weight: 600;
+      padding: 0.15rem 0.55rem; border-radius: 3px; white-space: nowrap;
+      border: 1px solid transparent;
+    }
+    .component-repertoire { background: rgba(232,73,30,0.08); border-color: rgba(232,73,30,0.25); color: var(--orange); }
+    .component-technique  { background: rgba(37,99,235,0.08); border-color: rgba(37,99,235,0.25); color: #1e40af; }
+    .component-knowledge  { background: rgba(22,163,74,0.08); border-color: rgba(22,163,74,0.25); color: #15803d; }
+
+    .tier-pill {
+      display: inline-block; font-size: 0.68rem; font-weight: 600;
+      padding: 0.15rem 0.55rem; border-radius: 3px; white-space: nowrap;
+      background: var(--off-white); border: 1px solid var(--border); color: var(--dark-grey);
+    }
+    .retired-pill {
+      display: inline-block; font-size: 0.68rem; font-weight: 600;
+      padding: 0.15rem 0.55rem; border-radius: 3px; white-space: nowrap;
+      background: #fef3c7; border: 1px solid #fcd34d; color: #92400e;
+    }
+    .pending-pill {
+      display: inline-block; font-size: 0.68rem; font-weight: 600;
+      padding: 0.15rem 0.55rem; border-radius: 3px; white-space: nowrap;
+      background: rgba(37,99,235,0.08); border: 1px solid rgba(37,99,235,0.25); color: #1e40af;
+    }
+    .custom-tag {
+      display: inline-block; font-size: 0.68rem; font-weight: 500;
+      padding: 0.1rem 0.45rem; border-radius: 3px; white-space: nowrap;
+      background: var(--off-white); border: 1px solid var(--orange); color: var(--orange);
+      margin-left: 0.4rem;
+    }
+    .pending-count-pill {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      font-size: 0.8rem; font-weight: 600; color: #1e40af;
+      background: rgba(37,99,235,0.08); border: 1px solid rgba(37,99,235,0.25);
+      border-radius: var(--r-sm); padding: 0.4rem 0.75rem;
+    }
+    .tag-chip {
+      display: inline-block; font-size: 0.68rem; padding: 0.1rem 0.45rem;
+      border-radius: 3px; background: var(--off-white); border: 1px solid var(--border);
+      color: var(--mid-grey); margin: 0 0.25rem 0.25rem 0;
+    }
+    .drive-link { font-size: 0.8rem; color: var(--orange); text-decoration: none; }
+    .drive-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+<div class="portal-shell">
+  <!-- TOP NAV -->
+  <nav class="topnav">
+    <a href="#" class="topnav-logo"><img src="../Logo_-_long.png" alt="Pathfinder Music Lessons"></a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">–</span>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Teaching</div>
+    <a class="nav-item" href="dashboard-admin.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Schedule
+    </a>
+    <a class="nav-item" href="lessons.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Lessons
+    </a>
+    <a class="nav-item" href="students.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      Students
+    </a>
+    <a class="nav-item" href="teachers.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+      Teachers
+    </a>
+    <div class="sidebar-section">Curriculum</div>
+    <a class="nav-item active" href="bok-artefacts.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Artefact Library
+    </a>
+    <div class="sidebar-section">Front desk</div>
+    <a class="nav-item" href="enquiries.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+      Enquiries
+    </a>
+    <a class="nav-item" href="tasks.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Tasks
+    </a>
+    <a class="nav-item" href="notifications.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/></svg>
+      Notifications
+    </a>
+    <div class="sidebar-section">Reports</div>
+    <a class="nav-item" href="attendance-report.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Attendance
+    </a>
+    <div class="sidebar-section hidden" id="superuserSection">Super User</div>
+    <a class="nav-item hidden" href="studios.html" id="studiosLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Studios
+    </a>
+    <a class="nav-item hidden" href="admins.html" id="adminsLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Admins
+    </a>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Artefact Library</div>
+        <div class="page-sub" id="artefactCount">Loading…</div>
+      </div>
+      <div class="flex gap-1" style="flex-wrap:wrap;align-items:center;">
+        <span class="pending-count-pill hidden" id="pendingCountPill">⏳ 0 pending review</span>
+        <button class="btn btn-primary btn-sm" onclick="openArtefactModal()">+ Add Artefact</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:1.25rem;padding:0.9rem 1.1rem;">
+      Chord charts, songs, backing tracks and everything else in the Body of
+      Knowledge live on Google Drive — this library just classifies each one
+      by instrument, grade and component, and links to it. Teachers pick from
+      here when planning a lesson; picks are captured automatically in the
+      shared lesson notes.
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" placeholder="Search by title, description or tag…" oninput="filterArtefacts()">
+      </div>
+      <div class="flex gap-1" style="flex-wrap:wrap;">
+        <select class="filter-select" id="filterInstrument" onchange="filterArtefacts()">
+          <option value="">All instruments</option>
+        </select>
+        <select class="filter-select" id="filterGrade" onchange="filterArtefacts()">
+          <option value="">All grades</option>
+        </select>
+        <select class="filter-select" id="filterComponent" onchange="filterArtefacts()">
+          <option value="">All components</option>
+          <option value="repertoire">Repertoire</option>
+          <option value="technique">Technique</option>
+          <option value="knowledge">Knowledge</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;color:var(--dark-grey);white-space:nowrap;">
+          <input type="checkbox" id="filterShowRetired" onchange="filterArtefacts()">
+          Show retired
+        </label>
+        <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;color:var(--dark-grey);white-space:nowrap;">
+          <input type="checkbox" id="filterOnlyCustom" onchange="filterArtefacts()">
+          Teacher-added only
+        </label>
+      </div>
+    </div>
+
+    <!-- Artefacts table -->
+    <div class="card">
+      <div style="overflow-x:auto;">
+        <table class="art-table">
+          <thead>
+            <tr>
+              <th>Artefact</th>
+              <th>Instrument</th>
+              <th>Grade</th>
+              <th>Component</th>
+              <th>Tags</th>
+              <th>Link</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="artefactsBody">
+            <tr><td colspan="7"><div class="loading"><div class="spinner"></div> Loading artefact library…</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ADD/EDIT ARTEFACT MODAL -->
+<div class="modal-overlay hidden" id="artefactModal">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <span class="modal-title" id="artefactModalTitle">Add Artefact</span>
+      <button class="modal-close" onclick="closeArtefactModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editArtefactId">
+
+      <div class="form-group">
+        <label class="form-label">Title *</label>
+        <input class="form-input" type="text" id="aTitle" placeholder="e.g. Horse With No Name — chord chart">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Instrument *</label>
+          <select class="form-select" id="aInstrument"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Grade *</label>
+          <select class="form-select" id="aGrade"></select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Component *</label>
+        <select class="form-select" id="aComponent">
+          <option value="repertoire">Repertoire / Songs</option>
+          <option value="technique">Technique</option>
+          <option value="knowledge">Musical knowledge (theory and aural)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea class="form-textarea" id="aDescription" placeholder="What this is / how it's used in a lesson" style="min-height:60px;"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Google Drive link</label>
+        <input class="form-input" type="url" id="aDriveUrl" placeholder="https://drive.google.com/…">
+        <div class="form-hint">The file itself stays on the studio's Drive — this is just the share link.</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Tags</label>
+        <input class="form-input" type="text" id="aTags" placeholder="comma, separated, tags">
+      </div>
+
+      <div class="form-group" id="aActiveGroup" style="display:none;">
+        <label style="display:flex;align-items:center;gap:0.55rem;cursor:pointer;">
+          <input type="checkbox" id="aActive" style="accent-color:var(--orange);">
+          <span style="font-size:0.875rem;color:var(--charcoal);">Active — offered to teachers when planning a lesson</span>
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeArtefactModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveArtefact()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script>
+
+const INSTRUMENTS = ['Guitar','Bass','Drums','Piano / Keyboard','Voice / Singing','Violin','Ukulele','Music Theory','Saxophone','Band','Other'];
+const COMPONENT_LABELS = { repertoire: 'Repertoire', technique: 'Technique', knowledge: 'Knowledge' };
+
+let currentProfile  = null;
+let allArtefacts     = [];
+let gradeLevels       = [];   // [{id, code, tier, label, sort_order}]
+let gradeLevelById    = {};
+let editingArtefactId = null;
+let profileNameById   = {};   // created_by -> "First Last", for teacher-added items
+
+// ---- Init ----
+(async () => {
+  currentProfile = await requireAuth(['superuser','admin']);
+  if (!currentProfile) return;
+  renderTopNavUser(currentProfile);
+  if (currentProfile.role === 'superuser') {
+    document.getElementById('superuserSection').classList.remove('hidden');
+    document.getElementById('studiosLink').classList.remove('hidden');
+    document.getElementById('adminsLink').classList.remove('hidden');
+  }
+  if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
+
+  INSTRUMENTS.forEach(i => {
+    document.getElementById('filterInstrument').innerHTML += `<option value="${i}">${i}</option>`;
+    document.getElementById('aInstrument').innerHTML       += `<option value="${i}">${i}</option>`;
+  });
+
+  await loadGradeLevels();
+  await loadArtefacts();
+})();
+
+// ---- Grade levels (reference data, seeded by phase6-bok-grading.sql) ----
+async function loadGradeLevels() {
+  const { data, error } = await db.from('bok_grade_levels').select('*').order('sort_order');
+  if (error) { showToast('Error loading grade levels: ' + error.message, 'error'); return; }
+  gradeLevels = data ?? [];
+  gradeLevels.forEach(g => { gradeLevelById[g.id] = g; });
+
+  const gradeOptions = gradeLevels.map(g => `<option value="${g.id}">${g.tier} — ${g.label}</option>`).join('');
+  document.getElementById('filterGrade').innerHTML += gradeOptions;
+  document.getElementById('aGrade').innerHTML        = gradeOptions;
+}
+
+// ---- Load artefacts ----
+async function loadArtefacts() {
+  const { data, error } = await db
+    .from('bok_artefacts')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) { showToast('Error loading artefact library: ' + error.message, 'error'); return; }
+  allArtefacts = data ?? [];
+
+  // Resolve "added by" names for teacher-added items only — no need to
+  // look up every admin who's ever added something.
+  const creatorIds = [...new Set(allArtefacts.filter(a => a.is_custom && a.created_by).map(a => a.created_by))];
+  if (creatorIds.length > 0) {
+    const { data: profs } = await db.from('profiles').select('id, first_name, last_name').in('id', creatorIds);
+    profileNameById = {};
+    (profs ?? []).forEach(p => { profileNameById[p.id] = `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim(); });
+  }
+
+  filterArtefacts();
+}
+
+// A pending item is a teacher's custom submission an admin hasn't
+// activated yet — kept distinct from "retired" (an admin-added item
+// taken out of rotation) even though both are is_active=false, so it
+// isn't accidentally hidden by the "Show retired" toggle.
+function isPending(a) { return a.is_custom && !a.is_active; }
+
+// ---- Filter + render ----
+function filterArtefacts() {
+  const q         = document.getElementById('searchInput').value.trim().toLowerCase();
+  const instr     = document.getElementById('filterInstrument').value;
+  const gradeId   = document.getElementById('filterGrade').value;
+  const component = document.getElementById('filterComponent').value;
+  const showRetired = document.getElementById('filterShowRetired').checked;
+  const onlyCustom  = document.getElementById('filterOnlyCustom').checked;
+
+  const filtered = allArtefacts.filter(a => {
+    if (!a.is_active && !isPending(a) && !showRetired) return false;   // truly retired, hidden by default
+    if (onlyCustom && !a.is_custom) return false;
+    if (instr && a.instrument !== instr) return false;
+    if (gradeId && a.grade_level_id !== gradeId) return false;
+    if (component && a.component !== component) return false;
+    if (q) {
+      const hay = [a.title, a.description, ...(a.tags ?? [])].filter(Boolean).join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  renderArtefacts(filtered);
+  document.getElementById('artefactCount').textContent =
+    `${filtered.length} artefact${filtered.length === 1 ? '' : 's'}` +
+    (filtered.length !== allArtefacts.length ? ` (of ${allArtefacts.length})` : '');
+
+  const pendingCount = allArtefacts.filter(isPending).length;
+  const pill = document.getElementById('pendingCountPill');
+  if (pendingCount > 0) {
+    pill.textContent = `⏳ ${pendingCount} pending review`;
+    pill.classList.remove('hidden');
+  } else {
+    pill.classList.add('hidden');
+  }
+}
+
+function renderArtefacts(list) {
+  const body = document.getElementById('artefactsBody');
+  if (list.length === 0) {
+    body.innerHTML = `<tr><td colspan="7"><div class="empty-state">No artefacts match these filters yet.</div></td></tr>`;
+    return;
+  }
+
+  body.innerHTML = list.map(a => {
+    const grade = gradeLevelById[a.grade_level_id];
+    const pending = isPending(a);
+    const addedByName = a.is_custom ? (profileNameById[a.created_by] || 'a teacher') : null;
+    let statusPill = '';
+    if (pending)            statusPill = `<span class="pending-pill" style="margin-top:0.3rem;display:inline-block;">Pending review</span>`;
+    else if (!a.is_active)  statusPill = `<span class="retired-pill" style="margin-top:0.3rem;display:inline-block;">Retired</span>`;
+    return `
+    <tr class="art-title-row ${a.is_active ? '' : 'retired'}">
+      <td>
+        <div class="art-title">${escapeHtml(a.title)}${a.is_custom ? `<span class="custom-tag">Teacher-added</span>` : ''}</div>
+        ${a.description ? `<div class="art-desc">${escapeHtml(a.description)}</div>` : ''}
+        ${a.is_custom ? `<div class="art-desc">Added by ${escapeHtml(addedByName)}</div>` : ''}
+        ${statusPill}
+      </td>
+      <td>${escapeHtml(a.instrument)}</td>
+      <td>${grade ? `<span class="tier-pill">${grade.tier} — ${grade.label}</span>` : '—'}</td>
+      <td><span class="component-pill component-${a.component}">${COMPONENT_LABELS[a.component] ?? a.component}</span></td>
+      <td>${(a.tags ?? []).map(t => `<span class="tag-chip">${escapeHtml(t)}</span>`).join('') || '—'}</td>
+      <td>${a.drive_url ? `<a class="drive-link" href="${escapeAttr(a.drive_url)}" target="_blank" rel="noopener">📁 Open</a>` : '—'}</td>
+      <td>
+        <div class="action-btns">
+          <button class="btn btn-secondary btn-sm" onclick="openArtefactModal('${a.id}')">Edit</button>
+          <button class="btn btn-secondary btn-sm" onclick="toggleArtefactActive('${a.id}', ${!a.is_active})">
+            ${a.is_active ? 'Retire' : (pending ? 'Approve' : 'Reactivate')}
+          </button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeAttr(s) { return escapeHtml(s); }
+
+// ---- Add/Edit modal ----
+function openArtefactModal(id = null) {
+  editingArtefactId = id;
+  document.getElementById('editArtefactId').value = id ?? '';
+
+  if (id) {
+    const a = allArtefacts.find(x => x.id === id);
+    if (!a) { showToast('Could not load that artefact. Please refresh.', 'error'); return; }
+    document.getElementById('artefactModalTitle').textContent = 'Edit Artefact';
+    document.getElementById('aTitle').value       = a.title ?? '';
+    document.getElementById('aInstrument').value  = a.instrument ?? '';
+    document.getElementById('aGrade').value       = a.grade_level_id ?? '';
+    document.getElementById('aComponent').value   = a.component ?? 'repertoire';
+    document.getElementById('aDescription').value = a.description ?? '';
+    document.getElementById('aDriveUrl').value    = a.drive_url ?? '';
+    document.getElementById('aTags').value        = (a.tags ?? []).join(', ');
+    document.getElementById('aActive').checked    = !!a.is_active;
+    document.getElementById('aActiveGroup').style.display = '';
+  } else {
+    document.getElementById('artefactModalTitle').textContent = 'Add Artefact';
+    document.getElementById('aTitle').value       = '';
+    document.getElementById('aInstrument').value  = 'Guitar';
+    document.getElementById('aGrade').value       = gradeLevels[0]?.id ?? '';
+    document.getElementById('aComponent').value   = 'repertoire';
+    document.getElementById('aDescription').value = '';
+    document.getElementById('aDriveUrl').value    = '';
+    document.getElementById('aTags').value        = '';
+    document.getElementById('aActive').checked    = true;
+    document.getElementById('aActiveGroup').style.display = 'none';
+  }
+
+  document.getElementById('artefactModal').classList.remove('hidden');
+}
+
+function closeArtefactModal() {
+  document.getElementById('artefactModal').classList.add('hidden');
+  editingArtefactId = null;
+}
+
+async function saveArtefact() {
+  const title       = document.getElementById('aTitle').value.trim();
+  const instrument  = document.getElementById('aInstrument').value;
+  const gradeId     = document.getElementById('aGrade').value;
+  const component   = document.getElementById('aComponent').value;
+  const description = document.getElementById('aDescription').value.trim();
+  const driveUrl    = document.getElementById('aDriveUrl').value.trim();
+  const tags        = document.getElementById('aTags').value.split(',').map(t => t.trim()).filter(Boolean);
+
+  if (!title)      { showToast('Title is required.', 'error'); return; }
+  if (!instrument)  { showToast('Instrument is required.', 'error'); return; }
+  if (!gradeId)     { showToast('Grade is required.', 'error'); return; }
+
+  const payload = {
+    title, instrument, component, tags,
+    grade_level_id: gradeId,
+    description: description || null,
+    drive_url:   driveUrl || null,
+    updated_at:  new Date().toISOString(),
+  };
+
+  let error;
+  if (editingArtefactId) {
+    payload.is_active = document.getElementById('aActive').checked;
+    ({ error } = await db.from('bok_artefacts').update(payload).eq('id', editingArtefactId));
+  } else {
+    payload.created_by = currentProfile.id;
+    ({ error } = await db.from('bok_artefacts').insert(payload));
+  }
+
+  if (error) { showToast('Error saving artefact: ' + error.message, 'error'); return; }
+
+  showToast(editingArtefactId ? 'Artefact updated.' : 'Artefact added.', 'success');
+  closeArtefactModal();
+  await loadArtefacts();
+}
+
+async function toggleArtefactActive(id, makeActive) {
+  const { error } = await db.from('bok_artefacts')
+    .update({ is_active: makeActive, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) { showToast('Error updating artefact: ' + error.message, 'error'); return; }
+  showToast(makeActive ? 'Artefact reactivated.' : 'Artefact retired.', 'success');
+  await loadArtefacts();
+}
+
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+</script>
+</body>
+</html>

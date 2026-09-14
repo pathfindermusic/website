@@ -766,6 +766,198 @@ a date bucket resets the status filter, and vice versa.
 
 ---
 
+## Planned: Guitar grading / Body of Knowledge framework
+
+Requested Sep 2026, source document `Pathfinder_Guitar_Grading_Framework.pdf`
+(Guitar Studio, four tiers/nine grades: Foundation → Pre-Grade 1, Beginner →
+Grades 1–3, Intermediate → Grades 4–6, Advanced → Grades 7–8). This section
+is the agreed design so implementation can proceed without re-litigating it.
+Scope for this phase was confirmed with the studio:
+
+- **Build now:** an artefact library (chord charts, songs, backing tracks,
+  etc.) filed by instrument/grade/component, a per-student grade history, and
+  a teacher-facing "pick artefacts for this lesson" flow that feeds the
+  existing shared lesson notes.
+- **Deliberately deferred:** the framework's weighted Repertoire 50% /
+  Technique 30% / Knowledge 20% scoring engine, the ≥60% overall & ≥50%
+  per-strand progression rule, Pass/Merit/Distinction banding, and
+  certificate/recital tracking. Grades are recorded as a milestone a
+  teacher/admin sets directly (same trust level as today's skill_level edit),
+  not calculated from sub-scores. Revisit once the simpler version is in use.
+- Guitar only, to start. The schema is instrument-generic (see below) so the
+  same tables can carry a second instrument's BoK later without a redesign —
+  but only Guitar gets grade levels and artefacts populated in this phase.
+
+### Relationship to `student_instruments.skill_level`
+
+The portal already has `student_instruments.skill_level` — a plain
+`integer 0–8`, hand-set by a teacher/admin, no history, no grade concept.
+It's read/written in five places: `dashboard-student.html` (student's own
+read-only bar), `my-students.html` (teacher edits it per student), `teacher-detail.html`
+and `students.html` (admin views/edits, including CSV bulk-import columns
+`instrument_N`/`skill_level_N`), and defaulted to `0` on enrolment in
+`enquiries.html`. It's banded client-side into Beginner (≤3) / Intermediate
+(≤6) / Advanced (>6) — a coarse, informal echo of the same four-tier idea the
+new framework formalises.
+
+Decision: **for Guitar students, the new Foundation–Grade 8 badge replaces
+the skill-level bar** on all four display screens above. The `skill_level`
+column, table and every non-Guitar instrument's editing flow are untouched —
+other instruments have nothing else to show yet. A Guitar student's
+`student_instruments` row still exists (instrument list, CSV import, teacher
+assignment all key off it) but its `skill_level` value stops being displayed
+once a grade-milestone row exists for that student/instrument; nothing
+deletes or migrates the old integer.
+
+### Google Drive vs. querying Drive live
+
+Recommendation: **keep the files on Drive, store structured metadata + a
+Drive share link per artefact in Supabase.** Reasons:
+
+- The library is curated, not dynamic — admins decide what's "in" the BoK and
+  what grade/component it belongs to. That classification has to be typed in
+  somewhere regardless; it may as well be the row that also holds the link.
+- Querying Drive live means a service account or OAuth flow, Drive API scopes,
+  keeping folder structure and naming in sync with grade/component tags, and
+  a new failure mode (Drive API down/rate-limited) on every lesson-planning
+  screen. None of that is needed to answer "which artefacts exist for Grade 3
+  Repertoire" — a Supabase table answers that instantly and is already how
+  the rest of the portal works.
+- Existing precedent: `dashboard-teacher.html`'s lesson-note modal already has
+  a free-text `drive_link` field a teacher pastes in by hand today. This
+  design formalises that same pattern (a link stored in Postgres, opened in a
+  new tab) rather than replacing it with something architecturally new.
+
+### Data model (Phase 1)
+
+New tables, additive only — no changes to existing tables beyond one new link
+table referencing `lesson_occurrences`:
+
+- **`bok_grade_levels`** — generic, instrument-agnostic reference list: 9 rows,
+  `sort_order` 0–8, `code` (`pre_grade_1`, `grade_1`…`grade_8`), `tier`
+  (`Foundation`/`Beginner`/`Intermediate`/`Advanced`), `label`. Shared across
+  every instrument's BoK, today and in future.
+- **`bok_artefacts`** — the library: `instrument`, `grade_level_id` (FK),
+  `component` (`repertoire`/`technique`/`knowledge`, CHECK-constrained —
+  matches the document's three strands), `title`, `description`, `drive_url`,
+  `tags`, `is_active`, `created_by`, `created_at`. The document's "living,
+  approved repertoire list" per grade is just this table filtered to
+  `component = 'repertoire'` for that grade — no separate table needed.
+- **`student_grade_milestones`** — the per-student timeline: `student_id`,
+  `instrument`, `grade_level_id` (FK), `achieved_on` (date), `notes`,
+  `recorded_by`. A student's *current* grade for an instrument is simply the
+  row with the latest `achieved_on`; every prior row stays as history, which
+  is what answers "when did they reach each grade."
+- **`lesson_occurrence_artefacts`** — link table: `occurrence_id` (FK to
+  `lesson_occurrences`), `artefact_id` (FK to `bok_artefacts`), `added_by`,
+  `created_at`. One row per artefact picked for a lesson occurrence (whole
+  occurrence, not per student — matches how `lesson_notes` already works for
+  group lessons: one shared note per occurrence). This table alone answers
+  "what artefacts has this student gone through": join it through the
+  occurrence's existing roster (`lesson_students`, same `rosterFor` logic
+  `lessons.html` already uses for ad-hoc vs. permanent students).
+
+### UI changes (Phase 1)
+
+- **New admin page — Artefact Library.** CRUD for `bok_artefacts`: filter by
+  instrument/grade/component, paste a Drive link, tag, activate/retire.
+  Same pattern as the existing admin list+modal pages (`students.html` etc.).
+- **Teacher lesson planning — `dashboard-teacher.html`'s existing note modal
+  (`openNoteModal()` / `saveNote()`).** Add an artefact picker above the
+  current free-text fields, pre-filtered to the occurrence's instrument (and
+  ideally the primary student's current grade level once that's known). Picks
+  are saved to `lesson_occurrence_artefacts`. The existing hand-typed
+  `drive_link` field stays as-is, for a one-off file that isn't in the
+  library yet — the two aren't mutually exclusive.
+- **Notes shared with students stay automatic, not manual.** Today
+  `notifyStudentOfNote()` emails `note_text` + `drive_link`, and
+  `dashboard-student.html`'s note-box renders the same two fields. Both gain
+  a generated "Materials covered" list sourced live from
+  `lesson_occurrence_artefacts` for that occurrence — the teacher never types
+  artefact names into the note by hand, it's assembled from what they picked.
+- **Grade badge.** Guitar students' entries in `dashboard-student.html`,
+  `my-students.html`, `teacher-detail.html`, `students.html` show the current
+  `student_grade_milestones` grade (Foundation…Grade 8) instead of the
+  skill-level bar, editable by teacher/admin the same way skill_level is
+  today — except saving writes a new milestone row rather than overwriting a
+  single field, so the history builds itself.
+- **Student grade & materials history.** A read-only panel (student profile,
+  and the student's own dashboard) listing every grade milestone and every
+  artefact they've been given by date — the explicit "report historically
+  what they've gone through" requirement.
+
+### Status
+
+**Built:**
+
+- Schema (migration #38, `phase6-bok-grading.sql`) plus a correction
+  (migration #39, `phase6b-bok-retired-artefact-visibility.sql` — the
+  original `bok_artefacts` read policy hid a retired artefact from
+  *everyone* but an admin, which silently broke a student's own history the
+  moment anything they'd covered was retired; fixed to also allow reading an
+  artefact already linked to an occurrence the caller can see).
+- Admin **Artefact Library** page (`bok-artefacts.html`, linked from every
+  admin page's sidebar under a new "Curriculum" section): add/edit/retire an
+  artefact, filter by instrument/grade/component/tag, paste its Drive link.
+  Nine grade levels are seeded by the migration; no artefacts are seeded —
+  the library starts empty and admins populate it against real Drive content.
+- Teacher picker in `dashboard-teacher.html`'s lesson-note modal
+  (`openNoteModal()`/`saveNote()`): three multi-select dropdowns grouped by
+  component (Repertoire/Songs, Technique, Musical knowledge — chosen over a
+  single flat checklist since a grade can have ~15 items per component),
+  filterable by grade (defaulted to the student's current grade for a
+  private lesson, where one is on record), writing to
+  `lesson_occurrence_artefacts`. Shown whenever the occurrence has an
+  instrument on record, library-populated or not.
+- **"Add your own" (migration #40, `phase6c-bok-teacher-custom-artefacts.sql`).**
+  When a student wants to work on a song/technique that isn't in the library
+  yet, the teacher adds it themselves from that same picker
+  (`openCustomArtefactModal()`/`saveCustomArtefact()`) — title, grade and
+  component, same as an admin would. It's saved as a real `bok_artefacts`
+  row (`is_custom=true`) so it's correctly attached to that lesson and shows
+  in "Materials covered"/history right away, but lands `is_active=false` so
+  it isn't offered to other teachers until an admin reviews it. The
+  Artefact Library page flags these as "Pending review" (kept visible by
+  default — not lumped in with "Show retired") with a pending-count pill by
+  the page title, a "Teacher-added only" filter, and "Added by <name>";
+  approving one is the same Retire/Reactivate button, relabelled "Approve".
+  Teachers can edit their own pending item (fix a typo) but can't activate
+  it themselves.
+- **Read-only lesson view also shows "Last lesson".** Clicking a lesson
+  card opens `openLessonView()`, a separate read-only modal from the note
+  editor — it now shows the same "Last lesson" recap (previous occurrence's
+  note, shared file, materials) via a shared `fetchPreviousLessonData()` /
+  `previousLessonBoxHtml()` pair, plus this occurrence's own picked
+  materials, which it never showed before. Everything is fetched before the
+  modal body renders (one paint, not a fetch-then-reflow) so opening it
+  doesn't flash a bare version first.
+- "Materials covered" generated wherever a note reaches a student: the
+  emailed note (`notifyStudentOfNote()`), the upcoming-lessons note-box and
+  the notes-history tab in `dashboard-student.html` — all three read live
+  from `lesson_occurrence_artefacts`, so nothing is typed twice.
+
+- **Grade badge**, replacing the skill-level bar for Guitar students
+  everywhere it showed: `dashboard-student.html` (read-only, own progress),
+  `teacher-detail.html` (read-only, admin's view of a teacher's roster),
+  `my-students.html` (teacher records a new milestone via a small modal —
+  always an insert, never overwriting the last one), `students.html` (the
+  admin Add/Edit Student modal's instrument row swaps its skill slider for a
+  grade select when the row's instrument is Guitar; saving inserts a
+  milestone only if the grade actually changed). All four read
+  `student_current_grades`. **Not wired:** the CSV bulk-import path in
+  `students.html` still only writes `skill_level` — a Guitar student
+  imported by CSV needs their grade set afterwards in the edit modal.
+- **Student grade & materials history**, on the student's own Progress tab
+  (`dashboard-student.html`): every grade milestone by date, and every
+  artefact linked to one of their lessons, newest first — both read
+  straight from the tables above (`lesson_occurrence_artefacts` needs no
+  explicit "my lessons" filter; RLS already scopes it to the caller's own
+  occurrences).
+
+Everything above assumes migrations #38, #39 and #40 are run.
+
+---
+
 ## Applied SQL migrations
 
 Run in order. All are re-runnable.
@@ -813,6 +1005,11 @@ Run in order. All are re-runnable.
 33. `phase5-makeup-lessons.sql` — `is_makeup`, both views rebuilt
 34. `phase5-fortnightly-lessons.sql` — `lessons.frequency` (weekly/fortnightly)
 35. `phase5-require-contact-email.sql` — `students` must have email or parent_email (NOT VALID check)
+36. `phase5-schedule-performance-indexes.sql` — indexes on lesson_occurrences/lessons/lesson_students/attendance fixing a "statement timeout" on the teacher schedule view
+37. `phase5-occurrence-only-students.sql` — `lesson_students.added_for_occurrence_id`, both views rebuilt; lets an admin add a student to a single occurrence only, without enrolling them in the whole series
+38. `phase6-bok-grading.sql` — `bok_grade_levels` (seeded, 9 rows), `bok_artefacts`, `student_grade_milestones`, `lesson_occurrence_artefacts`, `student_current_grades` view, RLS on all four tables — Body of Knowledge / grading framework, milestone 1 (see "Planned" section above)
+39. `phase6b-bok-retired-artefact-visibility.sql` — fixes the `bok_artefacts` read policy so a retired artefact stays visible to a teacher/student already looking at a past lesson that used it, instead of vanishing from their history
+40. `phase6c-bok-teacher-custom-artefacts.sql` — adds `bok_artefacts.is_custom`, plus RLS letting a teacher insert/update their own pending (`is_active=false`) custom artefact and read it back — lets a teacher add a song/technique that isn't in the library yet, straight from the lesson-note picker
 
 ---
 

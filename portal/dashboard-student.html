@@ -85,6 +85,22 @@
       min-width: 110px;
       text-align: right;
     }
+    .grade-pill {
+      display: inline-block; font-size: 0.78rem; font-weight: 600;
+      padding: 0.15rem 0.55rem; border-radius: 3px;
+      background: rgba(232,73,30,0.08); border: 1px solid rgba(232,73,30,0.25); color: var(--orange);
+    }
+    .grade-pill.ungraded {
+      background: var(--off-white); border-color: var(--border); color: var(--mid-grey); font-weight: 500; font-style: italic;
+    }
+    .component-pill {
+      display: inline-block; font-size: 0.65rem; font-weight: 600;
+      padding: 0.1rem 0.45rem; border-radius: 3px; white-space: nowrap;
+      border: 1px solid transparent;
+    }
+    .component-repertoire { background: rgba(232,73,30,0.08); border-color: rgba(232,73,30,0.25); color: var(--orange); }
+    .component-technique  { background: rgba(37,99,235,0.08); border-color: rgba(37,99,235,0.25); color: #1e40af; }
+    .component-knowledge  { background: rgba(22,163,74,0.08); border-color: rgba(22,163,74,0.25); color: #15803d; }
 
     /* Tab navigation */
     .tab-nav {
@@ -290,6 +306,45 @@ let studentRecord   = null;
 let myStudents      = [];   // a family login may own several
 let weekStart       = getWeekStart(new Date());
 let tabsLoaded      = { schedule: false, notes: false, attendance: false, progress: false };
+
+// ---- Body of Knowledge: what a teacher picked for a lesson, keyed by
+// occurrence. Fetched in two steps (link rows, then the artefacts
+// themselves) rather than a nested select, matching how the rest of
+// this portal joins across RLS-protected tables.
+async function fetchOccurrenceMaterials(occurrenceIds) {
+  const ids = [...new Set(occurrenceIds)].filter(Boolean);
+  if (ids.length === 0) return {};
+
+  const { data: links } = await db.from('lesson_occurrence_artefacts')
+    .select('occurrence_id, artefact_id').in('occurrence_id', ids);
+  const artefactIds = [...new Set((links ?? []).map(l => l.artefact_id))];
+  if (artefactIds.length === 0) return {};
+
+  const { data: artefacts } = await db.from('bok_artefacts')
+    .select('id, title, drive_url').in('id', artefactIds);
+  const artefactById = {};
+  (artefacts ?? []).forEach(a => { artefactById[a.id] = a; });
+
+  const map = {};
+  (links ?? []).forEach(l => {
+    const a = artefactById[l.artefact_id];
+    if (!a) return;   // shouldn't happen — RLS lets a student read anything linked to their own lesson
+    (map[l.occurrence_id] ??= []).push(a);
+  });
+  return map;
+}
+
+function materialsHtml(list) {
+  if (!list || list.length === 0) return '';
+  return `<div style="margin-top:0.5rem;">
+    <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--mid-grey);margin-bottom:0.2rem;">Materials covered</div>
+    ${list.map(a => `<div style="font-size:0.82rem;">
+      ${a.drive_url
+        ? `<a href="${a.drive_url}" target="_blank" class="text-orange" style="text-decoration:none;">📁 ${a.title}</a>`
+        : a.title}
+    </div>`).join('')}
+  </div>`;
+}
 
 // ---- Init ----
 (async () => {
@@ -530,6 +585,8 @@ async function loadSchedule() {
     return;
   }
 
+  const materialsMap = await fetchOccurrenceMaterials(data.map(r => r.occurrence_id));
+
   // Group by date
   const byDate = {};
   days.forEach(d => byDate[toISODate(d)] = []);
@@ -565,11 +622,12 @@ async function loadSchedule() {
           <div class="lesson-meta">with ${l.teacher_name} · ${l.studio_name}</div>
           ${l.is_online ? `<div class="mt-1"><span class="pill pill-online">Online lesson</span></div>` : ''}
           ${isCancelled ? `<div class="mt-1"><span class="pill pill-cancelled">Cancelled</span></div>` : ''}
-          ${l.note_text ? `
+          ${(l.note_text || materialsMap[l.occurrence_id]?.length) ? `
             <div class="note-box">
               <div class="note-date">Practice note from ${l.teacher_name}</div>
-              ${l.note_text}
+              ${l.note_text ?? ''}
               ${l.drive_link ? `<div style="margin-top:0.5rem;"><a href="${l.drive_link}" target="_blank" class="text-orange" style="font-size:0.82rem;text-decoration:none;">📁 View shared file</a></div>` : ''}
+              ${materialsHtml(materialsMap[l.occurrence_id])}
             </div>` : ''}
         </div>
         <div>
@@ -610,6 +668,8 @@ async function loadNotes() {
     return;
   }
 
+  const materialsMap = await fetchOccurrenceMaterials(data.map(r => r.occurrence_id));
+
   let html = `<div class="card">`;
   data.forEach((l, i) => {
     html += `
@@ -624,6 +684,7 @@ async function loadNotes() {
         <div class="note-box" style="margin-top:0;">
           ${l.note_text}
           ${l.drive_link ? `<div style="margin-top:0.5rem;"><a href="${l.drive_link}" target="_blank" class="text-orange" style="font-size:0.82rem;text-decoration:none;">📁 View shared file</a></div>` : ''}
+          ${materialsHtml(materialsMap[l.occurrence_id])}
         </div>
       </div>`;
   });
@@ -693,18 +754,26 @@ async function loadAttendance() {
 }
 
 // ---- Progress tab ----
+// Instruments with a formal Body of Knowledge grading framework show a
+// grade badge + history instead of the 0-8 skill bar. Guitar only, for now.
+const GRADED_INSTRUMENTS = ['Guitar'];
+
 async function loadProgress() {
   if (!studentRecord) return;
   const wrap = document.getElementById('progressWrap');
   wrap.innerHTML = `<div class="loading"><div class="spinner"></div> Loading…</div>`;
 
-  const { data, error } = await db
-    .from('student_instruments')
-    .select('instrument, skill_level')
-    .eq('student_id', studentRecord.id)
-    .order('instrument');
+  const [instRes, gradeRes, milestoneRes] = await Promise.all([
+    db.from('student_instruments').select('instrument, skill_level')
+      .eq('student_id', studentRecord.id).order('instrument'),
+    db.from('student_current_grades').select('instrument, tier, label')
+      .eq('student_id', studentRecord.id),
+    db.from('student_grade_milestones').select('instrument, grade_level_id, achieved_on, notes')
+      .eq('student_id', studentRecord.id).order('achieved_on', { ascending: false }),
+  ]);
+  const data = instRes.data;
 
-  if (error || !data || data.length === 0) {
+  if (instRes.error || !data || data.length === 0) {
     wrap.innerHTML = `<div class="card"><div class="empty-state">
       <div class="empty-state-icon">🎸</div>
       <h3>No instruments on file yet</h3>
@@ -713,9 +782,23 @@ async function loadProgress() {
     return;
   }
 
+  const currentGradeByInst = {};
+  (gradeRes.data ?? []).forEach(g => { currentGradeByInst[g.instrument] = g; });
+
   let html = `<div class="card"><div class="card-header"><span class="card-title">Instrument skill levels</span></div><div class="card-body">`;
 
   data.forEach(item => {
+    if (GRADED_INSTRUMENTS.includes(item.instrument)) {
+      const g = currentGradeByInst[item.instrument];
+      html += `
+        <div class="skill-row">
+          <div class="skill-instrument">${item.instrument}</div>
+          <div style="flex:1;">${g
+            ? `<span class="grade-pill">${g.tier} — ${g.label}</span>`
+            : `<span class="grade-pill ungraded">Not yet graded</span>`}</div>
+        </div>`;
+      return;
+    }
     const pct = Math.round((item.skill_level / 8) * 100);
     const band = item.skill_level <= 3 ? 'Beginner' : item.skill_level <= 6 ? 'Intermediate' : 'Advanced';
     const bandColour = item.skill_level <= 3 ? '#2563eb' : item.skill_level <= 6 ? '#d97706' : '#16a34a';
@@ -741,6 +824,74 @@ async function loadProgress() {
       </div>
     </div>
   </div></div>`;
+
+  // ---- Grade & materials history (only shows if there's a graded
+  // instrument with at least one milestone — nothing to show otherwise) ----
+  const milestones = milestoneRes.data ?? [];
+  if (milestones.length > 0) {
+    const glIds = [...new Set(milestones.map(m => m.grade_level_id))];
+    const { data: glRows } = await db.from('bok_grade_levels').select('*').in('id', glIds);
+    const glById = {};
+    (glRows ?? []).forEach(g => { glById[g.id] = g; });
+
+    html += `<div class="card" style="margin-top:1.25rem;">
+      <div class="card-header"><span class="card-title">Grade history</span></div>
+      <div class="card-body">
+        ${milestones.map(m => {
+          const g = glById[m.grade_level_id];
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0;border-bottom:1px solid var(--border);">
+            <div>
+              <span style="font-weight:600;color:var(--charcoal);">${m.instrument}</span>
+              <span class="text-muted"> — ${g ? `${g.tier} — ${g.label}` : 'Grade'}</span>
+              ${m.notes ? `<div class="text-sm text-muted" style="margin-top:0.15rem;">${m.notes}</div>` : ''}
+            </div>
+            <div class="text-sm text-muted">${formatLongDate(new Date(m.achieved_on))}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
+  // Materials covered historically. RLS on lesson_occurrence_artefacts
+  // already restricts this to the student's own lessons, so no explicit
+  // occurrence filter is needed here.
+  const { data: matRows } = await db.from('lesson_occurrence_artefacts')
+    .select('occurrence_id, artefact_id, created_at')
+    .order('created_at', { ascending: false }).limit(50);
+
+  if (matRows?.length > 0) {
+    const occIds = [...new Set(matRows.map(r => r.occurrence_id))];
+    const artefactIds = [...new Set(matRows.map(r => r.artefact_id))];
+    const [occRes, artRes] = await Promise.all([
+      db.from('lesson_occurrences').select('id, date').in('id', occIds),
+      db.from('bok_artefacts').select('id, title, drive_url, component').in('id', artefactIds),
+    ]);
+    const dateByOcc = {};
+    (occRes.data ?? []).forEach(o => { dateByOcc[o.id] = o.date; });
+    const artById = {};
+    (artRes.data ?? []).forEach(a => { artById[a.id] = a; });
+    const compLabel = { repertoire: 'Repertoire', technique: 'Technique', knowledge: 'Knowledge' };
+
+    html += `<div class="card" style="margin-top:1.25rem;">
+      <div class="card-header"><span class="card-title">Materials you've covered</span></div>
+      <div class="card-body">
+        ${matRows.map(r => {
+          const a = artById[r.artefact_id];
+          if (!a) return '';
+          const d = dateByOcc[r.occurrence_id];
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0;border-bottom:1px solid var(--border);">
+            <div style="font-size:0.85rem;">
+              ${a.drive_url
+                ? `<a href="${a.drive_url}" target="_blank" class="text-orange" style="text-decoration:none;">📁 ${a.title}</a>`
+                : a.title}
+              <span class="component-pill component-${a.component}" style="margin-left:0.4rem;">${compLabel[a.component] ?? a.component}</span>
+            </div>
+            <div class="text-sm text-muted">${d ? formatLongDate(new Date(d)) : ''}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
 
   wrap.innerHTML = html;
 }

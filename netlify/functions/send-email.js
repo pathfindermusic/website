@@ -443,9 +443,20 @@ function escapeHtml(s) {
 
 // Plain text → branded HTML email.
 // A paragraph wrapped entirely in **double asterisks** becomes a
-// highlighted callout block; **bold** works inline elsewhere.
+// highlighted callout block; **bold** works inline elsewhere; a
+// [label](url) works inline anywhere, same syntax as markdown links; a
+// paragraph where every line starts with "- " becomes a real bullet list
+// (each line may itself contain a [label](url)).
 function emailTemplate(bodyText, studioEmail) {
   const inlineBold = (s) => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  const inlineLink = (s) => s.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
+    '<a href="$2" style="color:#E8491E;text-decoration:none;">$1</a>');
+  const formatInline = (s) => inlineBold(inlineLink(s));
+
+  const isBulletBlock = (t) => {
+    const lines = t.split('\n').map(l => l.trim()).filter(Boolean);
+    return lines.length > 0 && lines.every(l => l.startsWith('- '));
+  };
 
   const para = (p) => {
     const t = p.trim();
@@ -453,12 +464,19 @@ function emailTemplate(bodyText, studioEmail) {
     if (/^-{3,}$/.test(t)) {
       return '<div style="border-top:1px solid #e5e5e5;margin:22px 0 18px;"></div>';
     }
+    // A paragraph where every line is "- something" is a bullet list
+    if (isBulletBlock(t)) {
+      const items = t.split('\n').map(l => l.trim()).filter(Boolean);
+      return `<ul style="margin:0 0 14px;padding-left:20px;">` +
+        items.map(l => `<li style="margin:0 0 6px;line-height:1.5;">${formatInline(l.slice(2))}</li>`).join('') +
+        `</ul>`;
+    }
     // A short ALL-CAPS line is a heading
-    if (/^[A-Z][A-Z0-9 &'’,.\-]{2,40}$/.test(t) && !t.includes('\n')) {
+    if (/^[A-Z][A-Z0-9 &'’,.\-\/]{2,40}$/.test(t) && !t.includes('\n')) {
       return `<p style="margin:0 0 10px;font-size:12px;font-weight:bold;letter-spacing:0.08em;
               text-transform:uppercase;color:#E8491E;">${t}</p>`;
     }
-    return `<p style="margin:0 0 14px;">${inlineBold(t.replace(/\n/g, '<br>'))}</p>`;
+    return `<p style="margin:0 0 14px;">${formatInline(t.replace(/\n/g, '<br>'))}</p>`;
   };
 
   const callout = (inner) =>
@@ -467,7 +485,7 @@ function emailTemplate(bodyText, studioEmail) {
         <td style="width:4px;background:#E8491E;border-radius:2px 0 0 2px;">&nbsp;</td>
         <td style="background:#f5f5f7;padding:14px 16px;border-radius:0 2px 2px 0;font-size:15px;line-height:1.6;color:#1c1c1e;">
           ${inner.split(/\n\s*\n/).map(b =>
-            `<div style="margin:0 0 10px;">${inlineBold(b.trim().replace(/\n/g, '<br>'))}</div>`
+            `<div style="margin:0 0 10px;">${formatInline(b.trim().replace(/\n/g, '<br>'))}</div>`
           ).join('')}
         </td>
       </tr>

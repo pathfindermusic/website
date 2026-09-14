@@ -172,6 +172,11 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
       Teachers
     </a>
+    <div class="sidebar-section">Curriculum</div>
+    <a class="nav-item" href="bok-artefacts.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Artefact Library
+    </a>
     <div class="sidebar-section">Front desk</div>
     <a class="nav-item" href="enquiries.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
@@ -461,6 +466,11 @@ let myStudioIds   = [];   // studios this admin may create students in
 let csvData      = [];
 let currentProfile = null;
 
+// Instruments with a formal Body of Knowledge grading framework show a
+// grade selector instead of the 0-8 skill slider. Guitar only, for now.
+const GRADED_INSTRUMENTS = ['Guitar'];
+let bokGradeLevels = [];   // [{id, code, tier, label, sort_order}]
+
 // ---- Init ----
 (async () => {
   currentProfile = await requireAuth(['superuser','admin']);
@@ -472,6 +482,8 @@ let currentProfile = null;
     document.getElementById('adminsLink').classList.remove('hidden');
   }
   if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
+  const { data: gl } = await db.from('bok_grade_levels').select('*').order('sort_order');
+  bokGradeLevels = gl ?? [];
   await loadStudios();
   await loadStudents();
 })();
@@ -532,8 +544,11 @@ async function loadStudents() {
     studentIds.length > 0
       ? db.from('student_instruments').select('student_id, instrument, skill_level').in('student_id', studentIds)
       : Promise.resolve({ data: [] }),
+    // Permanent assignment only — a one-off guest on someone else's
+    // lesson isn't a regular teacher assignment for this student.
     studentIds.length > 0
-      ? db.from('lesson_students').select('student_id, lesson_id').in('student_id', studentIds)
+      ? db.from('lesson_students').select('student_id, lesson_id')
+          .in('student_id', studentIds).is('added_for_occurrence_id', null)
       : Promise.resolve({ data: [] }),
   ]);
 
@@ -582,11 +597,21 @@ async function loadStudents() {
     if (p) teacherProfileMap[t.id] = p;
   });
 
+  // Current grade for instruments with a formal BoK framework (Guitar
+  // only, for now) — used by the edit modal to show/prefill grade.
+  const { data: cgData } = studentIds.length > 0
+    ? await db.from('student_current_grades')
+        .select('student_id,instrument,grade_level_id,tier,label').in('student_id', studentIds)
+    : { data: [] };
+  const gradeMap = {};
+  (cgData ?? []).forEach(r => { (gradeMap[r.student_id] ??= {})[r.instrument] = r; });
+
   // Merge everything
   allStudents = (studentData ?? []).map(s => ({
     ...s,
     profiles:            profileMap[s.user_id] ?? null,
     student_instruments: instrMap[s.id] ?? [],
+    grades:              gradeMap[s.id] ?? {},
     student_teachers:    (assignMap[s.id] ?? []).map(st => ({
       ...st,
       teachers: { profiles: teacherProfileMap[st.teacher_id] ?? null }
@@ -760,10 +785,11 @@ async function loadProcesses() {
     }
   });
 
-  // When does each of them actually finish?
+  // When does each of them actually finish? Permanent membership only —
+  // a one-off guest appearance elsewhere isn't part of their own ending series.
   await Promise.all(Object.keys(endDone).map(async sid => {
     const { data: ls } = await db.from('lesson_students')
-      .select('lesson_id').eq('student_id', sid);
+      .select('lesson_id').eq('student_id', sid).is('added_for_occurrence_id', null);
     const lids = (ls ?? []).map(r => r.lesson_id);
     if (!lids.length) return;
     const { data: occ } = await db.from('lesson_occurrences')
@@ -1194,24 +1220,31 @@ function updateStudentCount(studio) {
 }
 
 // ---- Instrument rows ----
+// currentGrade, when given, is this student's existing student_current_grades
+// row for `instrument` ({grade_level_id, tier, label}) — used to prefill the
+// grade select and as the baseline saveStudent() diffs against, so re-saving
+// the form without changing the grade doesn't create a duplicate milestone.
 let instrumentCount = 0;
-function addInstrumentRow(instrument = '', skillLevel = 0) {
+function addInstrumentRow(instrument = '', skillLevel = 0, currentGrade = null) {
   if (instrumentCount >= 5) return;
   instrumentCount++;
+  const rowNum = instrumentCount;
+  const isGraded = GRADED_INSTRUMENTS.includes(instrument);
   const wrap = document.getElementById('instrumentRows');
   const div  = document.createElement('div');
   div.className = 'form-row';
-  div.id = `instRow${instrumentCount}`;
+  div.id = `instRow${rowNum}`;
+  div.dataset.originalGradeId = currentGrade?.grade_level_id ?? '';
   div.style.marginBottom = '0.65rem';
   div.innerHTML = `
     <div class="form-group">
-      <label class="form-label">Instrument ${instrumentCount}</label>
-      <select class="form-select inst-select">
+      <label class="form-label">Instrument ${rowNum}</label>
+      <select class="form-select inst-select" onchange="onInstrumentRowChange('instRow${rowNum}', this.value)">
         <option value="">— Select —</option>
         ${INSTRUMENTS.map(i => `<option value="${i}" ${i===instrument?'selected':''}>${i}</option>`).join('')}
       </select>
     </div>
-    <div class="form-group">
+    <div class="form-group inst-level-wrap" style="${isGraded ? 'display:none;' : ''}">
       <label class="form-label">Skill Level (0–8)</label>
       <div style="display:flex;align-items:center;gap:0.65rem;">
         <input type="range" class="inst-level" min="0" max="8" value="${skillLevel}"
@@ -1220,11 +1253,30 @@ function addInstrumentRow(instrument = '', skillLevel = 0) {
         <span style="font-size:0.78rem;color:var(--dark-grey);min-width:110px;">${skillLabel(skillLevel)}</span>
       </div>
     </div>
+    <div class="form-group inst-grade-wrap" style="${isGraded ? '' : 'display:none;'}">
+      <label class="form-label">Grade</label>
+      <select class="form-select inst-grade">
+        <option value="">Not yet graded</option>
+        ${bokGradeLevels.map(g => `<option value="${g.id}" ${g.id===currentGrade?.grade_level_id?'selected':''}>${g.tier} — ${g.label}</option>`).join('')}
+      </select>
+    </div>
     <div style="display:flex;align-items:flex-end;padding-bottom:0.1rem;">
-      <button class="btn btn-danger btn-sm" onclick="removeInstrumentRow('instRow${instrumentCount}')">✕</button>
+      <button class="btn btn-danger btn-sm" onclick="removeInstrumentRow('instRow${rowNum}')">✕</button>
     </div>`;
   wrap.appendChild(div);
   if (instrumentCount >= 5) document.getElementById('addInstrumentBtn').style.display = 'none';
+}
+
+// Switching a row's instrument to/from a graded one swaps which control
+// shows. Any grade already picked before the switch is simply dropped —
+// the row's original grade baseline in data-original-grade-id doesn't
+// change, so switching away and back without saving is harmless.
+function onInstrumentRowChange(rowId, instrument) {
+  const row = document.getElementById(rowId);
+  if (!row) return;
+  const isGraded = GRADED_INSTRUMENTS.includes(instrument);
+  row.querySelector('.inst-level-wrap').style.display = isGraded ? 'none' : '';
+  row.querySelector('.inst-grade-wrap').style.display = isGraded ? '' : 'none';
 }
 
 function removeInstrumentRow(id) {
@@ -1410,7 +1462,8 @@ function openStudentModal(student = null) {
     document.getElementById('sParentName').value   = student.parent_name          ?? '';
     document.getElementById('sParentPhone').value  = student.parent_phone         ?? '';
     document.getElementById('sParentEmail').value  = student.parent_email         ?? '';
-    (student.student_instruments ?? []).forEach(i => addInstrumentRow(i.instrument, i.skill_level));
+    (student.student_instruments ?? []).forEach(i =>
+      addInstrumentRow(i.instrument, i.skill_level, student.grades?.[i.instrument] ?? null));
   } else {
     document.getElementById('studentModalTitle').textContent = 'Add Student';
     document.getElementById('editStudentId').value = '';
@@ -1452,12 +1505,26 @@ async function saveStudent() {
 
   // Duplicate email check is handled inside the Netlify Function
 
-  // Gather instruments
-  const instruments = [];
+  // Gather instruments. A graded instrument's row carries a grade select
+  // rather than a skill slider — student_instruments still gets a row
+  // for it (skill_level unused, kept at 0), and a separate list collects
+  // grade changes to record as milestones, diffed against the grade the
+  // row started with so re-saving without touching it doesn't duplicate.
+  const instruments  = [];
+  const gradeChanges = [];   // { instrument, gradeLevelId }
   document.querySelectorAll('#instrumentRows .form-row').forEach(row => {
-    const inst  = row.querySelector('.inst-select')?.value;
-    const level = parseInt(row.querySelector('.inst-level')?.value ?? 0);
-    if (inst) instruments.push({ instrument: inst, skill_level: level });
+    const inst = row.querySelector('.inst-select')?.value;
+    if (!inst) return;
+    if (GRADED_INSTRUMENTS.includes(inst)) {
+      instruments.push({ instrument: inst, skill_level: 0 });
+      const gradeLevelId = row.querySelector('.inst-grade')?.value ?? '';
+      if (gradeLevelId && gradeLevelId !== row.dataset.originalGradeId) {
+        gradeChanges.push({ instrument: inst, gradeLevelId });
+      }
+    } else {
+      const level = parseInt(row.querySelector('.inst-level')?.value ?? 0);
+      instruments.push({ instrument: inst, skill_level: level });
+    }
   });
 
   try {
@@ -1549,6 +1616,20 @@ async function saveStudent() {
       await db.from('student_instruments').delete().eq('student_id', studentId);
       await db.from('student_instruments').insert(
         instruments.map(i => ({ student_id: studentId, ...i }))
+      );
+    }
+
+    // Record any grade changes as new milestones — always an insert,
+    // never an update, so the history stays intact.
+    if (gradeChanges.length > 0) {
+      await db.from('student_grade_milestones').insert(
+        gradeChanges.map(g => ({
+          student_id:     studentId,
+          instrument:     g.instrument,
+          grade_level_id: g.gradeLevelId,
+          achieved_on:    toISODate(new Date()),
+          recorded_by:    currentProfile.id,
+        }))
       );
     }
 
@@ -1650,8 +1731,12 @@ async function endLessonsFor(studentId) {
   const s = allStudents.find(x => x.id === studentId);
   const name = `${s?.profiles?.first_name ?? ''} ${s?.profiles?.last_name ?? ''}`.trim();
 
+  // Permanent series membership only — ending an ad-hoc, one-off
+  // occurrence elsewhere isn't "this student's series" to end, and
+  // could otherwise cancel a whole group lesson for every other student
+  // in it over a guest appearance that was never permanent.
   const { data: ls } = await db.from('lesson_students')
-    .select('lesson_id').eq('student_id', studentId);
+    .select('lesson_id').eq('student_id', studentId).is('added_for_occurrence_id', null);
   const ids = (ls ?? []).map(r => r.lesson_id);
   if (!ids.length) { showToast('This student has no lessons.', 'warning'); return; }
 

@@ -57,6 +57,14 @@
       cursor: pointer;
     }
     .skill-edit-btn:hover { background: var(--light-grey); }
+    .grade-pill {
+      display: inline-block; font-size: 0.75rem; font-weight: 600;
+      padding: 0.15rem 0.55rem; border-radius: 3px;
+      background: rgba(232,73,30,0.08); border: 1px solid rgba(232,73,30,0.25); color: var(--orange);
+    }
+    .grade-pill.ungraded {
+      background: var(--off-white); border-color: var(--border); color: var(--mid-grey); font-weight: 500; font-style: italic;
+    }
     .recent-note {
       background: var(--off-white);
       border-left: 3px solid var(--orange);
@@ -162,6 +170,35 @@
   </div>
 </div>
 
+<!-- GRADE MODAL (Body of Knowledge instruments) -->
+<div class="modal-overlay hidden" id="gradeModal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <span class="modal-title" id="gradeModalTitle">Record Grade</span>
+      <button class="modal-close" onclick="closeGradeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label" id="gradeModalLabel">Grade</label>
+        <select class="form-select" id="gradeSelect"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Date achieved</label>
+        <input class="form-input" type="date" id="gradeAchievedOn">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes (optional)</label>
+        <textarea class="form-textarea" id="gradeNotes" style="min-height:55px;"></textarea>
+      </div>
+      <div class="text-sm text-muted" id="gradeHistoryHint"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeGradeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveGradeMilestone()">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- MESSAGE STUDENT MODAL -->
 <div class="modal-overlay hidden" id="messageModal">
   <div class="modal" style="max-width:520px;">
@@ -204,6 +241,14 @@ let teacherRecord  = null;
 let activeSkillEdit = null; // { studentId, instrument, currentLevel }
 let teacherStudios  = [];
 
+// Instruments with a formal Body of Knowledge grading framework show a
+// grade badge + "Record grade" instead of the 0-8 skill slider. Guitar
+// only, for now — the schema is generic so more can be added here later.
+const GRADED_INSTRUMENTS = ['Guitar'];
+let bokGradeLevels  = [];   // [{id, code, tier, label, sort_order}]
+let activeGradeEdit = null; // { studentId, instrument }
+let allStudentsCache = [];  // last loadStudents() result, for the grade modal's "currently" hint
+
 (async () => {
   currentProfile = await requireAuth(['teacher']);
   if (!currentProfile) return;
@@ -220,6 +265,9 @@ let teacherStudios  = [];
       .select('id,name,email').in('id', sIds).eq('status','active').order('name');
     teacherStudios = sData ?? [];
   }
+
+  const { data: gl } = await db.from('bok_grade_levels').select('*').order('sort_order');
+  bokGradeLevels = gl ?? [];
 
   await loadStudents();
 })();
@@ -253,8 +301,10 @@ async function loadStudents() {
   const instByLesson = {};
   (lessons ?? []).forEach(l => { instByLesson[l.id] = l.instrument; });
 
+  // Permanent roster only — a one-off guest sitting in on a single
+  // lesson isn't a regular student of this teacher's.
   const { data: ls } = await db.from('lesson_students')
-    .select('lesson_id,student_id').in('lesson_id', lessonIds);
+    .select('lesson_id,student_id').in('lesson_id', lessonIds).is('added_for_occurrence_id', null);
 
   // studentId -> instruments this teacher teaches them
   const instByStudent = {};
@@ -273,11 +323,16 @@ async function loadStudents() {
     return;
   }
 
-  // Student records, profiles and recorded skill levels
-  const [sRes, siRes] = await Promise.all([
+  // Student records, profiles, recorded skill levels and (for graded
+  // instruments) current grades
+  const [sRes, siRes, cgRes] = await Promise.all([
     db.from('students').select('id,user_id,status').in('id', studentIds),
     db.from('student_instruments').select('student_id,instrument,skill_level').in('student_id', studentIds),
+    db.from('student_current_grades').select('student_id,instrument,grade_level_id,tier,label').in('student_id', studentIds),
   ]);
+
+  const gradeMap = {};
+  (cgRes.data ?? []).forEach(r => { (gradeMap[r.student_id] ??= {})[r.instrument] = r; });
 
   const userIds = (sRes.data ?? []).map(s => s.user_id).filter(Boolean);
   const { data: pData } = userIds.length
@@ -298,9 +353,11 @@ async function loadStudents() {
     profiles:            pMap[s.user_id] ?? {},
     myInstruments:       [...(instByStudent[s.id] ?? [])],
     student_instruments: siMap[s.id] ?? [],
+    grades:              gradeMap[s.id] ?? {},
   })).sort((a, b) =>
     (a.profiles.first_name ?? '').localeCompare(b.profiles.first_name ?? '')
   );
+  allStudentsCache = students;
 
   const active = students.filter(s => s.status === 'active').length;
   document.getElementById('studentCount').textContent =
@@ -344,6 +401,16 @@ async function loadStudents() {
     const latestNote = latestNoteByStudent[s.id];
 
     const skillRows = myInsts.map(inst => {
+      if (GRADED_INSTRUMENTS.includes(inst)) {
+        const g = s.grades[inst];
+        return `<div class="skill-row">
+          <div class="skill-instrument">${inst}</div>
+          <div style="flex:1;">${g
+            ? `<span class="grade-pill">${g.tier} — ${g.label}</span>`
+            : `<span class="grade-pill ungraded">Not yet graded</span>`}</div>
+          <button class="skill-edit-btn" onclick="openGradeModal('${s.id}','${inst}')">Record grade</button>
+        </div>`;
+      }
       const instData = allInsts.find(i => i.instrument === inst);
       const level    = instData?.skill_level ?? 0;
       const pct      = Math.round((level / 8) * 100);
@@ -374,7 +441,7 @@ async function loadStudents() {
             ✉ Message
           </button>
         </div>
-        <div class="form-label mb-1">Skill levels</div>
+        <div class="form-label mb-1">Skill levels &amp; grades</div>
         ${skillRows || '<div class="text-sm text-muted">No instruments on file</div>'}
         ${latestNote ? `
           <div class="recent-note">
@@ -424,6 +491,61 @@ async function saveSkillLevel() {
   } else {
     showToast('Skill level updated.', 'success');
     closeSkillModal();
+    await loadStudents();
+  }
+}
+
+// ---- Grade modal (Body of Knowledge instruments) ----
+// A milestone is always an INSERT, never an update — the whole point is
+// a history of every grade reached and when, not a single overwritten
+// field like skill_level.
+function openGradeModal(studentId, instrument) {
+  activeGradeEdit = { studentId, instrument };
+  document.getElementById('gradeModalTitle').textContent = 'Record Grade';
+  document.getElementById('gradeModalLabel').textContent = `${instrument} — new grade`;
+  document.getElementById('gradeSelect').innerHTML =
+    bokGradeLevels.map(g => `<option value="${g.id}">${g.tier} — ${g.label}</option>`).join('');
+  document.getElementById('gradeAchievedOn').value = toISODate(new Date());
+  document.getElementById('gradeNotes').value = '';
+
+  const student = allStudentsCache.find(s => s.id === studentId);
+  const current = student?.grades?.[instrument];
+  document.getElementById('gradeHistoryHint').textContent = current
+    ? `Currently: ${current.tier} — ${current.label}. Saving records a new milestone; it doesn't overwrite this.`
+    : 'Not yet graded — this will be their first recorded milestone.';
+  if (current?.grade_level_id) document.getElementById('gradeSelect').value = current.grade_level_id;
+
+  document.getElementById('gradeModal').classList.remove('hidden');
+}
+
+function closeGradeModal() {
+  document.getElementById('gradeModal').classList.add('hidden');
+  activeGradeEdit = null;
+}
+
+async function saveGradeMilestone() {
+  if (!activeGradeEdit) return;
+  const { studentId, instrument } = activeGradeEdit;
+  const gradeLevelId = document.getElementById('gradeSelect').value;
+  const achievedOn    = document.getElementById('gradeAchievedOn').value;
+  const notes          = document.getElementById('gradeNotes').value.trim();
+
+  if (!gradeLevelId || !achievedOn) { showToast('Grade and date are required.', 'error'); return; }
+
+  const { error } = await db.from('student_grade_milestones').insert({
+    student_id:     studentId,
+    instrument,
+    grade_level_id: gradeLevelId,
+    achieved_on:    achievedOn,
+    notes:          notes || null,
+    recorded_by:    currentProfile.id,
+  });
+
+  if (error) {
+    showToast('Could not record grade: ' + error.message, 'error');
+  } else {
+    showToast('Grade recorded.', 'success');
+    closeGradeModal();
     await loadStudents();
   }
 }
@@ -502,6 +624,7 @@ async function sendStudentMessage() {
 
 document.getElementById('messageModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeMessageModal(); });
 document.getElementById('skillModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeSkillModal(); });
+document.getElementById('gradeModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeGradeModal(); });
 function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
 </script>
 </body>

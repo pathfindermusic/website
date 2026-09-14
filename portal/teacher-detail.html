@@ -92,6 +92,15 @@
     .skill-track { flex: 1; background: var(--light-grey); border-radius: 20px; height: 4px; }
     .skill-fill  { height: 4px; border-radius: 20px; }
     .skill-text  { min-width: 104px; text-align: right; color: var(--mid-grey); font-size: 0.72rem; }
+
+    .grade-pill {
+      display: inline-block; font-size: 0.72rem; font-weight: 600;
+      padding: 0.12rem 0.55rem; border-radius: 3px;
+      background: rgba(232,73,30,0.08); border: 1px solid rgba(232,73,30,0.25); color: var(--orange);
+    }
+    .grade-pill.ungraded {
+      background: var(--off-white); border-color: var(--border); color: var(--mid-grey); font-weight: 500; font-style: italic;
+    }
   </style>
 </head>
 <body>
@@ -130,6 +139,11 @@
     <a class="nav-item active" href="teachers.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
       Teachers
+    </a>
+    <div class="sidebar-section">Curriculum</div>
+    <a class="nav-item" href="bok-artefacts.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Artefact Library
     </a>
     <div class="sidebar-section">Front desk</div>
     <a class="nav-item" href="enquiries.html">
@@ -414,11 +428,12 @@ async function loadStats() {
     .select('id').eq('teacher_id', teacherId).eq('status','active');
   const lessonIds = (lessons ?? []).map(l => l.id);
 
-  // Distinct students across active lessons
+  // Distinct students across active lessons — permanent roster only,
+  // not a one-off guest on someone else's occurrence.
   let studentCount = 0;
   if (lessonIds.length) {
     const { data: ls } = await db.from('lesson_students')
-      .select('student_id').in('lesson_id', lessonIds);
+      .select('student_id').in('lesson_id', lessonIds).is('added_for_occurrence_id', null);
     studentCount = new Set((ls ?? []).map(r => r.student_id)).size;
   }
   document.getElementById('statStudents').textContent = studentCount;
@@ -457,8 +472,10 @@ async function loadStudents() {
   const instByLesson = {};
   (lessons ?? []).forEach(l => { instByLesson[l.id] = l.instrument; });
 
+  // Permanent roster only — a one-off guest isn't this teacher's
+  // regular student.
   const { data: ls } = await db.from('lesson_students')
-    .select('lesson_id,student_id').in('lesson_id', lessonIds);
+    .select('lesson_id,student_id').in('lesson_id', lessonIds).is('added_for_occurrence_id', null);
 
   const instByStudent = {};
   (ls ?? []).forEach(r => {
@@ -472,9 +489,10 @@ async function loadStudents() {
     return;
   }
 
-  const [sRes, siRes] = await Promise.all([
+  const [sRes, siRes, cgRes] = await Promise.all([
     db.from('students').select('id,user_id,status').in('id', studentIds),
     db.from('student_instruments').select('student_id,instrument,skill_level').in('student_id', studentIds),
+    db.from('student_current_grades').select('student_id,instrument,tier,label').in('student_id', studentIds),
   ]);
 
   const userIds = (sRes.data ?? []).map(s => s.user_id).filter(Boolean);
@@ -489,11 +507,18 @@ async function loadStudents() {
     (skillMap[r.student_id] ??= {})[r.instrument] = r.skill_level;
   });
 
+  // Instruments with a formal Body of Knowledge grading framework show a
+  // grade badge instead of the 0-8 skill bar. Guitar only, for now.
+  const GRADED_INSTRUMENTS = ['Guitar'];
+  const gradeMap = {};
+  (cgRes.data ?? []).forEach(r => { (gradeMap[r.student_id] ??= {})[r.instrument] = r; });
+
   const students = (sRes.data ?? []).map(s => ({
     ...s,
     profile:     pMap[s.user_id] ?? {},
     instruments: [...(instByStudent[s.id] ?? [])].filter(Boolean).sort(),
     skills:      skillMap[s.id] ?? {},
+    grades:      gradeMap[s.id] ?? {},
   })).sort((a, b) =>
     (a.profile.first_name ?? '').localeCompare(b.profile.first_name ?? ''));
 
@@ -504,6 +529,14 @@ async function loadStudents() {
   body.innerHTML = students.map(s => {
     const name = `${s.profile.first_name ?? ''} ${s.profile.last_name ?? ''}`.trim() || '(unnamed)';
     const skills = s.instruments.map(inst => {
+      if (GRADED_INSTRUMENTS.includes(inst)) {
+        const g = s.grades[inst];
+        return `<div class="skill-line">
+          <span class="skill-inst">${inst}</span>
+          <span style="flex:1;"></span>
+          ${g ? `<span class="grade-pill">${g.tier} — ${g.label}</span>` : `<span class="grade-pill ungraded">Not yet graded</span>`}
+        </div>`;
+      }
       const lvl    = s.skills[inst];
       const pct    = lvl == null ? 0 : Math.round((lvl / 8) * 100);
       const colour = lvl == null ? 'var(--light-grey)'

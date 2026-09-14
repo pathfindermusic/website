@@ -121,11 +121,11 @@
        still clickable (admins can override), just visually muted */
     .grid-cell.cell-unavailable {
       background: repeating-linear-gradient(
-        45deg, var(--off-white), var(--off-white) 6px,
-        rgba(0,0,0,0.035) 6px, rgba(0,0,0,0.035) 12px
+        45deg, var(--light-grey), var(--light-grey) 6px,
+        rgba(0,0,0,0.13) 6px, rgba(0,0,0,0.13) 12px
       );
     }
-    .grid-cell.cell-unavailable:hover { background: rgba(232,73,30,0.06); }
+    .grid-cell.cell-unavailable:hover { background: rgba(232,73,30,0.10); }
 
     /* Lesson block inside cell */
     .lesson-block {
@@ -295,6 +295,11 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
       Teachers
     </a>
+    <div class="sidebar-section">Curriculum</div>
+    <a class="nav-item" href="bok-artefacts.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Artefact Library
+    </a>
     <div class="sidebar-section">Front desk</div>
     <a class="nav-item" href="enquiries.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
@@ -391,8 +396,6 @@
            style="background:var(--off-white);border-left:3px solid var(--orange);
                   border-radius:0 var(--r-sm) var(--r-sm) 0;padding:0.65rem 0.85rem;
                   margin-bottom:0.85rem;font-size:0.82rem;color:var(--dark-grey);line-height:1.55;">
-        Changes apply to lessons <strong>from today onwards</strong>. Past lessons stay
-        exactly as they were, with their attendance and notes intact.
       </div>
       <input type="hidden" id="editOccurrenceId">
 
@@ -401,9 +404,17 @@
         <span>🚫</span><span id="clashMsg">Scheduling clash detected.</span>
       </div>
 
+      <!-- No student — block the teacher's calendar for something else,
+           e.g. supervising another lesson or admin time. -->
+      <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;
+                    margin-bottom:0.85rem;font-size:0.875rem;color:var(--charcoal);">
+        <input type="checkbox" id="lNoStudent" onchange="onNoStudentChange()">
+        No student — this is a non-teaching event (e.g. supervision, admin time)
+      </label>
+
       <!-- Lesson type -->
       <div class="form-row">
-        <div class="form-group">
+        <div class="form-group" id="lTypeGroup">
           <label class="form-label">Lesson type *</label>
           <select class="form-select" id="lType" onchange="onTypeChange()">
             <option value="private">Private (1-on-1)</option>
@@ -411,8 +422,10 @@
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Instrument *</label>
+          <label class="form-label" id="instrumentLabel">Instrument *</label>
           <select class="form-select" id="lInstrument" onchange="onInstrumentChange()"></select>
+          <input class="form-input hidden" type="text" id="lInstrumentText"
+                 placeholder="What's this for? e.g. Studio supervision">
         </div>
       </div>
 
@@ -469,7 +482,7 @@
       </div>
 
       <!-- Students section -->
-      <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:0.75rem;">
+      <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:0.75rem;" id="studentsSection">
         <div class="form-label" style="margin-bottom:0.65rem;" id="studentsLabel">Student *</div>
         <div class="students-list" id="studentsList"></div>
         <div class="add-student-row">
@@ -617,16 +630,16 @@
         </div>
       </div>
 
-      <!-- Add student to group lesson -->
+      <!-- Add a one-off guest to this occurrence only -->
       <div class="form-group hidden" id="occAddStudentWrap">
-        <label class="form-label">Add student to this lesson</label>
+        <label class="form-label">Add a student for this lesson only</label>
         <div class="add-student-row">
           <select class="form-select" id="occStudentPicker">
             <option value="">— Select student —</option>
           </select>
           <button class="btn btn-secondary btn-sm" onclick="addStudentToOccurrence()">Add</button>
         </div>
-        <div class="form-hint">Group lessons: up to 6 students</div>
+        <div class="form-hint">Group lessons: up to 6 students. This adds a one-off guest to just this occurrence — for a permanent addition to the series, use <strong>Edit series</strong>.</div>
       </div>
 
       <!-- Online toggle -->
@@ -645,9 +658,9 @@
 
       <!-- Cancel this occurrence -->
       <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:0.5rem;">
-        <div class="form-label" style="margin-bottom:0.65rem;">Cancel options</div>
+        <div class="form-label" style="margin-bottom:0.65rem;">Edit or cancel</div>
         <div class="flex gap-1" style="flex-wrap:wrap;">
-          <button class="btn btn-secondary btn-sm" onclick="editSeries()">Edit series…</button>
+          <button class="btn btn-secondary btn-sm" onclick="editSeries()">Edit series</button>
           <button class="btn btn-danger btn-sm" onclick="cancelOccurrence('single')">Cancel this lesson only</button>
           <button class="btn btn-danger btn-sm" onclick="cancelOccurrence('future')">Cancel this + all future</button>
           <button class="btn btn-danger btn-sm" onclick="cancelOccurrence('all')">Cancel entire series</button>
@@ -754,6 +767,38 @@ function computeTimeSlots(occurrences) {
     slots.push(`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`);
   }
   return slots.length > 0 ? slots : ALL_TIME_SLOTS;
+}
+
+// ============================================================
+// ROSTERS — a lesson_students row is either permanent (applies to
+// every occurrence of the series) or scoped to one specific
+// occurrence (added_for_occurrence_id set — an ad-hoc guest added
+// for that lesson only, e.g. a sibling sitting in on one class).
+// Every place that displays "who's in this lesson" needs to merge
+// both for the occurrence being shown; every place that manages the
+// SERIES roster (Edit series, clash detection) wants permanent rows
+// only, filtered directly in the query instead.
+// ============================================================
+function splitRosterRows(lsData) {
+  const byLesson = {};     // lesson_id -> [student_id], permanent members
+  const byOccurrence = {}; // occurrence_id -> [student_id], ad-hoc guests
+  (lsData ?? []).forEach(r => {
+    if (r.added_for_occurrence_id) {
+      (byOccurrence[r.added_for_occurrence_id] ??= []).push(r.student_id);
+    } else {
+      (byLesson[r.lesson_id] ??= []).push(r.student_id);
+    }
+  });
+  return { byLesson, byOccurrence };
+}
+function rosterFor(lessonId, occurrenceId, maps) {
+  return [...(maps.byLesson[lessonId] ?? []), ...(maps.byOccurrence[occurrenceId] ?? [])];
+}
+// Just the ad-hoc (occurrence-only) guests for one occurrence — used
+// wherever the UI needs to tell them apart from permanent members
+// (e.g. only a guest can be removed from the occurrence modal).
+function adhocFor(occurrenceId, maps) {
+  return maps.byOccurrence[occurrenceId] ?? [];
 }
 
 // ============================================================
@@ -1045,11 +1090,15 @@ async function loadMonthlyView() {
 
   // Filtering by student needs lesson membership, which the view
   // doesn't carry — it holds one row per occurrence, not per student.
+  // A permanent row (added_for_occurrence_id NULL) matches every
+  // occurrence of that lesson; an ad-hoc row matches only the one
+  // occurrence it was added for.
   if (studentId) {
     const { data: ls } = await db.from('lesson_students')
-      .select('lesson_id').eq('student_id', studentId);
-    const mine = new Set((ls ?? []).map(r => r.lesson_id));
-    rows = rows.filter(r => mine.has(r.lesson_id));
+      .select('lesson_id,added_for_occurrence_id').eq('student_id', studentId);
+    const mineLessons = new Set((ls ?? []).filter(r => !r.added_for_occurrence_id).map(r => r.lesson_id));
+    const mineOccurrences = new Set((ls ?? []).filter(r => r.added_for_occurrence_id).map(r => r.added_for_occurrence_id));
+    rows = rows.filter(r => mineLessons.has(r.lesson_id) || mineOccurrences.has(r.occurrence_id));
   }
 
   const byDate = {};
@@ -1099,9 +1148,11 @@ async function loadMonthlyView() {
             </div>
             ${list.map(r => {
               const cancelled = r.occurrence_status === 'cancelled';
-              const who = r.lesson_type === 'group'
-                ? `${r.student_count} students`
-                : (r.student_name ?? '—');
+              // A non-teaching event has no student at all — its
+              // "instrument" field holds the free-text label instead.
+              const who = r.student_count > 0
+                ? (r.lesson_type === 'group' ? `${r.student_count} students` : (r.student_name ?? '—'))
+                : (r.instrument || '—');
               // Same colours as the daily grid. This view was written
               // later and used the brand orange for everything, so the
               // same lesson looked different depending on the view.
@@ -1178,10 +1229,14 @@ async function loadDailyView() {
 
   if (error) { wrap.innerHTML = `<div class="empty-state"><p style="color:#dc2626;">${error.message}</p></div>`; return; }
 
-  // Load lesson_students for all lessons
+  // Load lesson_students for all lessons — a row for a lesson shown
+  // today always carries that lesson_id, whether it's a permanent
+  // member or an occurrence-only guest, so this one filter catches
+  // both (splitRosterRows below sorts out which is which).
   const lessonIds = [...new Set((occData ?? []).map(o => o.lessons?.id).filter(Boolean))];
   const { data: lsData } = lessonIds.length > 0
-    ? await db.from('lesson_students').select('lesson_id,student_id').in('lesson_id', lessonIds)
+    ? await db.from('lesson_students')
+        .select('lesson_id,student_id,added_for_occurrence_id').in('lesson_id', lessonIds)
     : { data: [] };
 
   // Attendance too, so the grid can show it without opening each lesson
@@ -1211,15 +1266,14 @@ async function loadDailyView() {
     if (p) spMap[s.id] = `${p.first_name} ${p.last_name}`.trim();
   });
 
-  // Group occurrences by lesson_id → lesson_students
-  const lsMap = {}; // lesson_id → [student_ids]
-  (lsData ?? []).forEach(ls => {
-    if (!lsMap[ls.lesson_id]) lsMap[ls.lesson_id] = [];
-    lsMap[ls.lesson_id].push(ls.student_id);
-  });
+  // Each occurrence's actual roster: permanent members plus any
+  // ad-hoc guest added for that specific occurrence.
+  const rosterMaps = splitRosterRows(lsData);
 
   allOccurrences = (occData ?? []).map(o => ({
-    ...o, lessonStudents: lsMap[o.lessons?.id ?? o.lesson_id] ?? [],
+    ...o,
+    lessonStudents: rosterFor(o.lessons?.id ?? o.lesson_id, o.id, rosterMaps),
+    adhocStudentIds: adhocFor(o.id, rosterMaps),
   })).filter(o => {
     // Cancelling a series marks every occurrence from the cancellation
     // point onwards as cancelled. Hide exactly those — earlier lessons
@@ -1328,54 +1382,84 @@ async function loadDailyView() {
       TIME_SLOTS.sort();
     }
 
-    // Build occupied slots map: teacherId → Set of slot strings
-    const occupied = {}; // teacherId → { slotKey: occurrenceId }
-    teachers.forEach(t => { occupied[t.id] = {}; });
+    // Group each teacher's occurrences into overlap clusters by their
+    // actual time range, not just by shared start time. Two lessons
+    // that genuinely overlap — a real double-booking — must still end
+    // up as ONE table cell: rendering the later one as its own <td>
+    // while an earlier lesson's rowspan is still covering that slot
+    // inserts a genuinely extra cell into the row, which silently
+    // shoves every following teacher's column sideways for that one
+    // row (reported 14 Sep 2026 — an overlap on Daniel Vu's own
+    // timetable pushed a different, unrelated teacher's lesson block
+    // outside the grid entirely). Clustering up front means the render
+    // loop below only ever emits exactly one <td> per teacher per row,
+    // however messy the underlying booking is — an overlap now shows
+    // as both lessons stacked in one tall cell, which also doubles as
+    // a visible flag that something needs sorting out.
+    const clustersByTeacher = {}; // teacherId -> [{ startMin, mergeEnd, renderEnd, occs }]
+    teachers.forEach(t => { clustersByTeacher[t.id] = []; });
 
     allOccurrences
-      .filter(o => o.lessons?.studio_id === studio.id && o.status !== 'cancelled')
+      .filter(o => o.lessons?.studio_id === studio.id)
+      .slice()
+      .sort((a, b) => (a.lessons?.start_time ?? '').localeCompare(b.lessons?.start_time ?? ''))
       .forEach(o => {
         const tid   = o.lessons?.teacher_id;
         const start = o.lessons?.start_time;
-        const dur   = o.lessons?.duration_mins ?? 30;
-        if (!tid || !start || !occupied[tid]) return;
+        if (!tid || !start || !clustersByTeacher[tid]) return;
 
         const [sh, sm] = start.split(':').map(Number);
         const startMin = sh * 60 + sm;
-        for (let i = 0; i < dur; i += 30) {
-          const slotMin = startMin + i;
-          const slotKey = `${String(Math.floor(slotMin/60)).padStart(2,'0')}:${String(slotMin%60).padStart(2,'0')}`;
-          occupied[tid][slotKey] = o.id;
+        const dur    = o.lessons?.duration_mins ?? 30;
+        const isLive = o.status !== 'cancelled';
+        const ownEnd = startMin + dur;
+
+        const clusters = clustersByTeacher[tid];
+        const last = clusters[clusters.length - 1];
+        // Join the previous cluster when this genuinely overlaps its
+        // live reach, or when it starts at the exact same slot (several
+        // things sharing one start time, cancelled and live alike —
+        // the existing "share" case). A cancelled lesson doesn't
+        // extend a cluster's reach for anything AFTER it — it frees
+        // the slot — but it still joins whatever cluster it started
+        // inside of, and still renders at its own height if it ends up
+        // alone.
+        if (last && (startMin < last.mergeEnd || startMin === last.startMin)) {
+          last.occs.push(o);
+          if (isLive) last.mergeEnd = Math.max(last.mergeEnd, ownEnd);
+          last.renderEnd = Math.max(last.renderEnd, ownEnd);
+        } else {
+          clusters.push({ startMin, mergeEnd: isLive ? ownEnd : startMin, renderEnd: ownEnd, occs: [o] });
         }
       });
+
+    const occupied = {}; // teacherId → { slotKey: true } — rows a cluster's rowspan already covers
+    teachers.forEach(t => {
+      const set = {};
+      clustersByTeacher[t.id].forEach(c => {
+        for (let m = c.startMin + 30; m < c.renderEnd; m += 30) {
+          set[`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`] = true;
+        }
+      });
+      occupied[t.id] = set;
+    });
 
     TIME_SLOTS.forEach((slot, idx) => {
       const [h, m] = slot.split(':').map(Number);
       const isHour = m === 0;
       const timeLabel = formatTime(slot + ':00');
+      const slotMin = h * 60 + m;
 
       html += `<tr>
         <td class="time-label ${isHour ? 'full-hour' : 'half-hour'}">${isHour ? timeLabel : ''}</td>`;
 
       teachers.forEach(t => {
-        // Every lesson starting in this slot, not just the first. A
-        // cancelled lesson frees its slot for rebooking, so the slot can
-        // legitimately hold both — the cancelled one and its
-        // replacement. Using find() showed whichever came back first and
-        // silently hid the other.
-        const startOccs = allOccurrences.filter(o =>
-          o.lessons?.teacher_id === t.id &&
-          o.lessons?.studio_id  === studio.id &&
-          o.lessons?.start_time?.startsWith(slot)
-        ).sort((a, b) => (a.status === 'cancelled' ? 1 : 0) - (b.status === 'cancelled' ? 1 : 0));
+        const cluster = clustersByTeacher[t.id].find(c => c.startMin === slotMin);
 
-        if (startOccs.length) {
-          // Tallest lesson decides the cell height
-          const liveOccs = startOccs.filter(o => o.status !== 'cancelled');
-          const maxDur   = Math.max(...(liveOccs.length ? liveOccs : startOccs)
-                                      .map(o => o.lessons?.duration_mins ?? 30));
-          const rowspan  = Math.max(1, maxDur / 30);
-          const share    = startOccs.length > 1;
+        if (cluster) {
+          const startOccs = cluster.occs.slice()
+            .sort((a, b) => (a.status === 'cancelled' ? 1 : 0) - (b.status === 'cancelled' ? 1 : 0));
+          const rowspan = Math.max(1, (cluster.renderEnd - cluster.startMin) / 30);
 
           // A slot can accumulate several cancellations before something
           // sticks. Live lessons get the space; cancelled ones collapse
@@ -1389,6 +1473,10 @@ async function loadDailyView() {
           const nameOf = (o) => {
             const sIds = o.lessonStudents ?? [];
             const att  = attByOccurrence[o.id] ?? {};
+            // No students at all on a private lesson — a non-teaching
+            // event. Its "instrument" field is really the free-text
+            // label. (An emptied-out group lesson still reads as group.)
+            if (sIds.length === 0 && o.lessons?.lesson_type !== 'group') return o.lessons?.instrument || 'Blocked';
             if (o.lessons?.lesson_type === 'group') {
               return `${groupAttendanceSummary(att, sIds.length)}${sIds.length} student${sIds.length !== 1 ? 's' : ''}`;
             }
@@ -1397,6 +1485,7 @@ async function loadDailyView() {
 
           const liveBlocks = live.map(o => {
             const lType = o.lessons?.lesson_type ?? 'private';
+            const isBlock = lType !== 'group' && (o.lessonStudents ?? []).length === 0;
             // A makeup overrides the private/group colour — that it is a
             // makeup matters more than which kind of lesson it is.
             const cls   = o.is_makeup ? 'makeup' : lType;
@@ -1404,7 +1493,7 @@ async function loadDailyView() {
               onclick="event.stopPropagation();openOccurrenceModal('${o.id}')"
               style="flex:1 1 auto;min-height:24px;overflow:hidden;cursor:pointer;">
               <div class="lesson-block-name">${nameOf(o)}</div>
-              <div class="lesson-block-meta">${o.is_makeup ? 'Makeup · ' : ''}${o.lessons?.frequency === 'fortnightly' ? 'Fortnightly · ' : ''}${lType === 'group' ? 'Group' : 'Private'} · ${o.lessons?.instrument}</div>
+              <div class="lesson-block-meta">${o.is_makeup ? 'Makeup · ' : ''}${o.lessons?.frequency === 'fortnightly' ? 'Fortnightly · ' : ''}${isBlock ? 'Non-teaching event' : `${lType === 'group' ? 'Group' : 'Private'} · ${o.lessons?.instrument}`}</div>
               ${substituteLabel(o)}
               ${o.occurrence_notes ? `<div class="lesson-block-meta" style="font-style:italic;">📝 ${o.occurrence_notes.slice(0,30)}…</div>` : ''}
             </div>`;
@@ -1517,16 +1606,14 @@ async function loadWeeklyView() {
     return;
   }
 
-  // Load lesson students
+  // Load lesson students — permanent members plus any occurrence-only
+  // guests among this week's occurrences (same lesson_id either way).
   const lessonIds = [...new Set(allOccurrences.map(o => o.lessons?.id ?? o.lesson_id).filter(Boolean))];
   const { data: lsData } = lessonIds.length > 0
-    ? await db.from('lesson_students').select('lesson_id,student_id').in('lesson_id', lessonIds)
+    ? await db.from('lesson_students')
+        .select('lesson_id,student_id,added_for_occurrence_id').in('lesson_id', lessonIds)
     : { data: [] };
-  const lsMap = {};
-  (lsData ?? []).forEach(ls => {
-    if (!lsMap[ls.lesson_id]) lsMap[ls.lesson_id] = [];
-    lsMap[ls.lesson_id].push(ls.student_id);
-  });
+  const rosterMaps = splitRosterRows(lsData);
 
   // Student name map
   const studentIds = [...new Set((lsData ?? []).map(ls => ls.student_id))];
@@ -1558,7 +1645,8 @@ async function loadWeeklyView() {
   // structure leaves it with nothing to mark attendance against.
   allOccurrences = allOccurrences.map(o => ({
     ...o,
-    lessonStudents: lsMap[o.lessons?.id ?? o.lesson_id] ?? [],
+    lessonStudents: rosterFor(o.lessons?.id ?? o.lesson_id, o.id, rosterMaps),
+    adhocStudentIds: adhocFor(o.id, rosterMaps),
   }));
 
   // Attendance, so the week shows who turned up without opening each one
@@ -1598,9 +1686,12 @@ async function loadWeeklyView() {
     lessons.forEach(o => {
       const l        = o.lessons ?? {};
       const lType    = l.lesson_type ?? 'private';
-      const sIds     = lsMap[l.id] ?? [];
+      const sIds     = rosterFor(l.id, o.id, rosterMaps);
       const sNames   = sIds.map(id => spMap[id]).filter(Boolean);
       const isCancelled = o.status === 'cancelled';
+      // No students on a private lesson — a non-teaching event. (An
+      // emptied-out group lesson still reads as a group lesson.)
+      const isBlock  = sIds.length === 0 && lType !== 'group';
 
       html += `<div style="display:grid;grid-template-columns:85px 1fr auto;gap:1rem;align-items:center;padding:0.85rem 1.25rem;border-bottom:1px solid var(--border);${isCancelled ? 'opacity:0.5;' : ''}cursor:pointer;"
         onclick="openOccurrenceModal('${o.id}')">
@@ -1610,11 +1701,13 @@ async function loadWeeklyView() {
         </div>
         <div>
           <div class="lesson-name">${
-            lType === 'group'
-              ? `Group · ${sIds.map((sid, i) => nameWithAttendance(sNames[i] ?? '—', (attByOccurrence[o.id] ?? {})[sid])).join(', ')}`
-              : nameWithAttendance(sNames[0] ?? '—', (attByOccurrence[o.id] ?? {})[sIds[0]])
+            isBlock
+              ? (l.instrument || 'Blocked')
+              : lType === 'group'
+                ? `Group · ${sIds.map((sid, i) => nameWithAttendance(sNames[i] ?? '—', (attByOccurrence[o.id] ?? {})[sid])).join(', ')}`
+                : nameWithAttendance(sNames[0] ?? '—', (attByOccurrence[o.id] ?? {})[sIds[0]])
           }</div>
-          <div class="lesson-instrument">${l.instrument}</div>
+          ${!isBlock ? `<div class="lesson-instrument">${l.instrument}</div>` : ''}
           <div class="lesson-meta">${
             (o.substitute_teacher_id || o.substitute_name)
               ? `<span style="color:var(--orange);font-weight:600;">${substituteName(o)}</span> covering ${teacherMap[l.teacher_id] ?? '—'}`
@@ -1625,7 +1718,9 @@ async function loadWeeklyView() {
         <div>
           ${isCancelled
             ? `<span class="pill pill-cancelled" style="display:flex;align-items:center;gap:0.3rem;">✕ Cancelled</span>`
-            : `<span class="pill pill-${lType === 'group' ? 'active' : 'scheduled'}">${lType === 'private' ? 'Private' : 'Group'}</span>`}
+            : isBlock
+              ? `<span class="pill pill-scheduled">Non-teaching</span>`
+              : `<span class="pill pill-${lType === 'group' ? 'active' : 'scheduled'}">${lType === 'private' ? 'Private' : 'Group'}</span>`}
           ${o.is_online ? `<div class="mt-1"><span class="pill pill-online">Online</span></div>` : ''}
           ${l.frequency === 'fortnightly' ? `<div class="mt-1"><span class="pill pill-fortnightly">Fortnightly</span></div>` : ''}
         </div>
@@ -1663,6 +1758,17 @@ function openLessonModal(lesson = null) {
   document.getElementById('lRecurrence').value  = 'indefinite';
   document.getElementById('lFrequency').value   = 'weekly';
   document.getElementById('lSeriesNotes').value = '';
+  document.getElementById('lNoStudent').checked = false;
+  document.getElementById('lInstrumentText').value = '';
+  // Lesson type and duration used to be left exactly as the PREVIOUS
+  // lesson left them — reopening "Add Lesson" right after saving a
+  // 60-minute group lesson silently offered "group, 60 minutes" again.
+  // Reported 14 Sep 2026: that's how a 30-minute private makeup got
+  // saved as an hour-long group slot and collided with another lesson.
+  // Reset to the form's own sensible defaults every time it opens.
+  document.getElementById('lType').value     = 'private';
+  document.getElementById('lDuration').value = '30';
+  onNoStudentChange();  // reset visibility in case a previous edit left it in "no student" mode
   toggleRecurrenceFields();
   onTypeChange();
   onTeacherChange(); // filter instruments + studios for default teacher
@@ -1703,6 +1809,28 @@ function onTypeChange() {
     lessonStudents = [lessonStudents[0]];
     renderLessonStudents();
     showToast('Switched to Private — only one student kept.', 'warning');
+  }
+}
+
+// A non-teaching event has no student and no real instrument — it's
+// just a block on the teacher's calendar (e.g. covering another
+// lesson, admin time). Swap the Instrument dropdown for free text and
+// hide the parts of the form that only make sense with a student.
+function onNoStudentChange() {
+  const noStudent = document.getElementById('lNoStudent').checked;
+
+  document.getElementById('studentsSection').classList.toggle('hidden', noStudent);
+  document.getElementById('lTypeGroup').classList.toggle('hidden', noStudent);
+  document.getElementById('lInstrument').classList.toggle('hidden', noStudent);
+  document.getElementById('lInstrumentText').classList.toggle('hidden', !noStudent);
+  document.getElementById('instrumentLabel').textContent = noStudent ? "What's this for? *" : 'Instrument *';
+
+  if (noStudent) {
+    // A block has no roster — clear anything picked before it was checked.
+    lessonStudents = [];
+    renderLessonStudents();
+    document.getElementById('lType').value = 'private';
+    updateRecurrenceForTrial();
   }
 }
 
@@ -1904,8 +2032,13 @@ function autoPopulateSeriesNotes() {
 async function saveLesson() {
   const teacherId   = document.getElementById('lTeacher').value;
   const studioId    = document.getElementById('lStudio').value;
-  const instrument  = document.getElementById('lInstrument').value;
-  const lType       = document.getElementById('lType').value;
+  const noStudent   = document.getElementById('lNoStudent').checked;
+  // A non-teaching event has no real instrument — the free-text field
+  // doubles as its "what's this for" label, stored in the same column.
+  const instrument  = noStudent
+    ? document.getElementById('lInstrumentText').value.trim()
+    : document.getElementById('lInstrument').value;
+  const lType       = noStudent ? 'private' : document.getElementById('lType').value;
   const day         = parseInt(document.getElementById('lDay').value);
   const time        = document.getElementById('lTime').value + ':00';
   const duration    = parseInt(document.getElementById('lDuration').value);
@@ -1920,12 +2053,14 @@ async function saveLesson() {
   clashEl.classList.remove('show');
 
   if (!teacherId || !studioId || !instrument || !time || !startDate) {
-    showToast('Please fill in all required fields.', 'error'); return;
+    showToast(noStudent
+      ? 'Please fill in all required fields, including what this event is for.'
+      : 'Please fill in all required fields.', 'error'); return;
   }
-  if (lessonStudents.length === 0) {
+  if (!noStudent && lessonStudents.length === 0) {
     showToast('Please add at least one student.', 'error'); return;
   }
-  if (lType === 'private' && lessonStudents.length > 1) {
+  if (!noStudent && lType === 'private' && lessonStudents.length > 1) {
     showToast('Private lessons can only have one student.', 'error'); return;
   }
 
@@ -1941,8 +2076,10 @@ async function saveLesson() {
   }
 
   // ---- HARD BLOCK: Teacher must teach this instrument ----
+  // Doesn't apply to a non-teaching event — its "instrument" is a
+  // free-text label, not a real instrument the teacher needs to teach.
   const teacher = allTeachers.find(t => t.id === teacherId);
-  if (teacher && (teacher.instruments ?? []).length > 0) {
+  if (!noStudent && teacher && (teacher.instruments ?? []).length > 0) {
     if (!teacher.instruments.includes(instrument)) {
       const tName = `${teacher.profile?.first_name ?? ''} ${teacher.profile?.last_name ?? ''}`.trim();
       showToast(`${tName} does not teach ${instrument}. Please select a different teacher or instrument.`, 'error');
@@ -1995,10 +2132,14 @@ async function saveLesson() {
 
   const { data: existingLessons } = await clashQuery;
 
-  // Also get lesson_students for those lessons
+  // Also get lesson_students for those lessons — permanent members
+  // only. This check is about a weekly recurring pattern clashing
+  // with another; an occurrence-only guest on one specific date
+  // elsewhere isn't a recurring commitment, so it doesn't belong here.
   const existingIds = (existingLessons ?? []).map(l => l.id);
   const { data: existingLS } = existingIds.length > 0
-    ? await db.from('lesson_students').select('lesson_id,student_id').in('lesson_id', existingIds)
+    ? await db.from('lesson_students').select('lesson_id,student_id')
+        .in('lesson_id', existingIds).is('added_for_occurrence_id', null)
     : { data: [] };
 
   const newStart = timeToMins(time);
@@ -2077,9 +2218,11 @@ async function saveLesson() {
     // Editing an existing series takes a different path: the lesson is
     // updated and only its FUTURE occurrences are rebuilt.
     if (editingId) {
+      const isOneOff = document.getElementById('lPattern').value === 'oneoff';
       await saveSeriesEdit(editingId, {
         teacherId, studioId, instrument, lType, day, time, duration, frequency,
         seriesNotes: seriesNotes || null,
+        isOneOff, oneOffKind: isOneOff ? document.getElementById('lOneOffKind').value : null,
       });
       return;
     }
@@ -2099,10 +2242,13 @@ async function saveLesson() {
     if (lErr) throw new Error(lErr.message);
     const lessonId = lessonData.id;
 
-    // Insert lesson_students
-    await db.from('lesson_students').insert(
-      lessonStudents.map(sid => ({ lesson_id: lessonId, student_id: sid }))
-    );
+    // Insert lesson_students as permanent series members. A
+    // non-teaching event has none — nothing to insert.
+    if (lessonStudents.length > 0) {
+      await db.from('lesson_students').insert(
+        lessonStudents.map(sid => ({ lesson_id: lessonId, student_id: sid, added_for_occurrence_id: null }))
+      );
+    }
 
     // Generate occurrences
     await generateOccurrences(lessonId, day, startDate, recurrence, count, endDate, frequency);
@@ -2233,11 +2379,15 @@ async function openOccurrence(occId) {
   if (error || !occ) { showToast('Could not open that lesson.', 'error'); return; }
 
   const { data: ls } = await db.from('lesson_students')
-    .select('student_id').eq('lesson_id', occ.lessons?.id);
+    .select('student_id,added_for_occurrence_id').eq('lesson_id', occ.lessons?.id);
+
+  const merged = (ls ?? []).filter(r => !r.added_for_occurrence_id || r.added_for_occurrence_id === occId)
+                            .map(r => r.student_id);
+  const adhoc  = (ls ?? []).filter(r => r.added_for_occurrence_id === occId).map(r => r.student_id);
 
   allOccurrences = [
     ...allOccurrences.filter(o => o.id !== occId),
-    { ...occ, lessonStudents: (ls ?? []).map(r => r.student_id) },
+    { ...occ, lessonStudents: merged, adhocStudentIds: adhoc },
   ];
 
   return openOccurrenceModal(occId);
@@ -2252,8 +2402,10 @@ async function openOccurrenceModal(occId) {
   const studio  = allStudios.find(s => s.id === l.studio_id);
   const tName   = teacher ? `${teacher.profile?.first_name ?? ''} ${teacher.profile?.last_name ?? ''}`.trim() : '—';
 
-  // Load student names for this occurrence
+  // Load student names for this occurrence — permanent series members
+  // plus any ad-hoc guest added just for this one occurrence.
   const sIds = occ.lessonStudents ?? [];
+  const adhocIds = new Set(occ.adhocStudentIds ?? []);
   const sNames = sIds.map(sid => {
     const s = allStudents.find(s => s.id === sid);
     return s ? `${s.profile?.first_name ?? ''} ${s.profile?.last_name ?? ''}`.trim() : '—';
@@ -2266,27 +2418,39 @@ async function openOccurrenceModal(occId) {
   document.getElementById('occIsOnline').checked    = occ.is_online ?? false;
   document.getElementById('occNotes').value          = occ.occurrence_notes ?? '';
 
+  const isNonTeaching = sIds.length === 0 && l.lesson_type !== 'group';
+
   document.getElementById('occSummary').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
       <div><span class="text-muted text-sm">Teacher</span><div class="font-bold">${tName}</div></div>
-      <div><span class="text-muted text-sm">Instrument</span><div class="font-bold">${l.instrument ?? '—'}</div></div>
+      <div><span class="text-muted text-sm">${isNonTeaching ? "What's this for" : 'Instrument'}</span><div class="font-bold">${l.instrument ?? '—'}</div></div>
       <div><span class="text-muted text-sm">Time</span><div class="font-bold">${formatTime(l.start_time)} · ${formatDuration(l.duration_mins)}</div></div>
       <div><span class="text-muted text-sm">Studio</span><div class="font-bold">${studio?.name ?? '—'}</div></div>
-      <div><span class="text-muted text-sm">Type</span><div class="font-bold">${l.lesson_type === 'group' ? 'Group' : 'Private'}</div></div>
-      <div><span class="text-muted text-sm">Status</span><div id="occStatusPill">${attendancePill(null)}</div></div>
+      <div><span class="text-muted text-sm">Type</span><div class="font-bold">${isNonTeaching ? 'Non-teaching event' : (l.lesson_type === 'group' ? 'Group' : 'Private')}</div></div>
+      ${isNonTeaching ? '' : `<div><span class="text-muted text-sm">Status</span><div id="occStatusPill">${attendancePill(null)}</div></div>`}
       ${l.frequency === 'fortnightly' ? `<div><span class="text-muted text-sm">Frequency</span><div class="font-bold">Fortnightly</div></div>` : ''}
     </div>
     ${l.series_notes ? `<div style="margin-top:0.65rem;padding-top:0.65rem;border-top:1px solid var(--border);font-size:0.82rem;color:var(--dark-grey);">📋 Series note: ${l.series_notes}</div>` : ''}`;
 
-  // Render students with remove button for group lessons
+  // Render students. A permanent series member is read-only here —
+  // removing them belongs to Edit series, which changes every future
+  // occurrence, not just this one. An ad-hoc guest was only ever added
+  // for this occurrence, so they can be removed right from here.
   const isGroup = l.lesson_type === 'group';
   document.getElementById('occStudentsList').innerHTML = sIds.length > 0
-    ? sIds.map((sid, i) => `
-        <div class="student-tag">
-          <span class="student-tag-name">${sNames[i] ?? '—'}</span>
-          ${isGroup ? `<button class="student-tag-remove" onclick="removeStudentFromOccurrence('${l.id}','${sid}')">✕</button>` : ''}
-        </div>`).join('')
-    : '<div class="text-sm text-muted">No students assigned.</div>';
+    ? sIds.map((sid, i) => {
+        const isAdhoc = adhocIds.has(sid);
+        return `
+        <div class="student-tag"${isAdhoc ? ' style="background:rgba(232,73,30,0.08);"' : ''}>
+          <span class="student-tag-name">${sNames[i] ?? '—'}${isAdhoc ? ' <span class="text-muted" style="font-size:0.7rem;font-weight:500;">(this lesson only)</span>' : ''}</span>
+          ${isAdhoc ? `<button class="student-tag-remove" onclick="removeStudentFromOccurrence('${l.id}','${sid}','${occId}')">✕</button>` : ''}
+        </div>`;
+      }).join('')
+    : `<div class="text-sm text-muted">${isNonTeaching ? 'Non-teaching event — no student.' : 'No students assigned.'}</div>`;
+  if (isGroup && sIds.some(sid => !adhocIds.has(sid))) {
+    document.getElementById('occStudentsList').innerHTML +=
+      `<div class="text-sm text-muted" style="margin-top:0.35rem;">To remove a regular student, use <strong>Edit series</strong> instead.</div>`;
+  }
 
   document.getElementById('occIsMakeup').checked = !!occ.is_makeup;
   renderSubstitutePicker(occ, l);
@@ -2320,6 +2484,7 @@ function closeOccModal() { document.getElementById('occurrenceModal').classList.
 
 async function addStudentToOccurrence() {
   const lessonId = document.getElementById('occurrenceModal').dataset.lessonId;
+  const occId    = document.getElementById('occId').value;
   const picker   = document.getElementById('occStudentPicker');
   const sid      = picker.value;
   if (!sid) { showToast('Please select a student.', 'warning'); return; }
@@ -2328,28 +2493,29 @@ async function addStudentToOccurrence() {
   const currentCount = document.querySelectorAll('#occStudentsList .student-tag').length;
   if (currentCount >= 6) { showToast('Group lessons can have a maximum of 6 students.', 'warning'); return; }
 
-  // Check student not already in another lesson at this time (clash detection)
-  const { error } = await db.from('lesson_students').insert({ lesson_id: lessonId, student_id: sid });
+  // A guest for this occurrence only — not a permanent series member.
+  const { error } = await db.from('lesson_students')
+    .insert({ lesson_id: lessonId, student_id: sid, added_for_occurrence_id: occId });
   if (error) {
     showToast('Could not add student: ' + error.message, 'error'); return;
   }
 
-  showToast('Student added to lesson.', 'success');
+  showToast('Student added to this lesson.', 'success');
   // Reload the occurrence modal
-  const occId = document.getElementById('occId').value;
   closeOccModal();
   await loadView();
   // Re-fetch allOccurrences and reopen
   openOccurrenceModal(occId);
 }
 
-async function removeStudentFromOccurrence(lessonId, studentId) {
+async function removeStudentFromOccurrence(lessonId, studentId, occId) {
   if (!confirm('Remove this student from the lesson?')) return;
+  // Scoped to the ad-hoc row for THIS occurrence only — never touches
+  // a permanent series membership, even if the same student also has one.
   const { error } = await db.from('lesson_students')
-    .delete().eq('lesson_id', lessonId).eq('student_id', studentId);
+    .delete().eq('lesson_id', lessonId).eq('student_id', studentId).eq('added_for_occurrence_id', occId);
   if (error) { showToast('Could not remove student: ' + error.message, 'error'); return; }
   showToast('Student removed from lesson.', 'success');
-  const occId = document.getElementById('occId').value;
   closeOccModal();
   await loadView();
   openOccurrenceModal(occId);
@@ -2514,7 +2680,9 @@ async function renderOccurrenceAttendance(occId, studentIds, studentNames) {
 
   if (!studentIds.length) {
     wrap.innerHTML = '<div class="text-sm text-muted">No students to mark.</div>';
-    document.getElementById('occStatusPill').innerHTML = attendancePill(null);
+    // Non-teaching events don't render an occStatusPill element at all.
+    const pill = document.getElementById('occStatusPill');
+    if (pill) pill.innerHTML = attendancePill(null);
     return;
   }
 
@@ -2593,18 +2761,41 @@ async function saveSeriesEdit(lessonId, f) {
   }).eq('id', lessonId);
   if (uErr) { showToast('Could not save: ' + uErr.message, 'error'); return; }
 
-  // Students may have changed too
+  // Students may have changed too — the permanent roster only. An
+  // occurrence-only guest on some other date of this lesson is a
+  // separate row (added_for_occurrence_id set) and isn't touched here.
   const { data: existing } = await db.from('lesson_students')
-    .select('student_id').eq('lesson_id', lessonId);
+    .select('student_id').eq('lesson_id', lessonId).is('added_for_occurrence_id', null);
   const before = new Set((existing ?? []).map(r => r.student_id));
   const after  = new Set(lessonStudents);
 
   for (const sid of after) if (!before.has(sid)) {
-    await db.from('lesson_students').insert({ lesson_id: lessonId, student_id: sid });
+    await db.from('lesson_students').insert({
+      lesson_id: lessonId, student_id: sid, added_for_occurrence_id: null,
+    });
   }
   for (const sid of before) if (!after.has(sid)) {
     await db.from('lesson_students').delete()
-      .eq('lesson_id', lessonId).eq('student_id', sid);
+      .eq('lesson_id', lessonId).eq('student_id', sid).is('added_for_occurrence_id', null);
+  }
+
+  // A one-off is exactly one lesson on one fixed date — there is
+  // nothing to regenerate. The logic below (rebuilding future
+  // occurrences out to a bounded date range) is for real recurring
+  // series; run it against a one-off and it deletes that single
+  // occurrence and replaces it with a run of new ones on the same
+  // weekday, silently turning a single makeup/trial/one-off lesson
+  // into a repeating series and losing its makeup flag. So: just sync
+  // the "what is it for" kind onto the existing occurrence and stop.
+  if (f.isOneOff) {
+    await db.from('lesson_occurrences')
+      .update({ is_makeup: f.oneOffKind === 'makeup' })
+      .eq('lesson_id', lessonId);
+
+    showToast('Lesson updated.', 'success');
+    closeLessonModal();
+    loadView();
+    return;
   }
 
   // How far did the old series run? The rebuilt one should reach the
@@ -2679,8 +2870,27 @@ async function editSeriesInner() {
     .select('*').eq('id', lessonId).maybeSingle();
   if (error || !l) { showToast('Could not load that series.', 'error'); return; }
 
+  // The series roster — permanent members only. An occurrence-only
+  // guest (added_for_occurrence_id set) belongs to one specific
+  // lesson, not the series, and is managed from that lesson's own
+  // Edit lesson view instead.
   const { data: ls } = await db.from('lesson_students')
-    .select('student_id').eq('lesson_id', lessonId);
+    .select('student_id').eq('lesson_id', lessonId).is('added_for_occurrence_id', null);
+
+  // A one-off is stored exactly like a "fixed number of lessons" series
+  // with a count of one — there is no separate flag for it. Reopening
+  // this form used to always default back to "Repeating lesson", and
+  // saving from there fed the one-off through saveSeriesEdit()'s
+  // regenerate-future-occurrences logic, which deleted its single
+  // occurrence and rebuilt it as a bounded weekly/fortnightly run —
+  // silently turning a makeup lesson into a repeating one and losing
+  // its makeup flag. Detecting it here is what lets both the display
+  // and saveSeriesEdit() (below) treat it correctly.
+  const isOneOff = l.recurrence_type === 'occurrences' && l.recurrence_count === 1;
+
+  const { data: occs } = await db.from('lesson_occurrences')
+    .select('is_makeup').eq('lesson_id', lessonId);
+  const wasMakeup = (occs ?? []).some(o => o.is_makeup);
 
   closeOccModal();
   openLessonModal();
@@ -2689,18 +2899,42 @@ async function editSeriesInner() {
   document.getElementById('lTeacher').value     = l.teacher_id;
   await onTeacherChange();                       // fills instruments and studios
   document.getElementById('lStudio').value      = l.studio_id;
-  document.getElementById('lInstrument').value  = l.instrument;
   document.getElementById('lType').value        = l.lesson_type ?? 'private';
   document.getElementById('lDay').value         = l.day_of_week;
   document.getElementById('lDuration').value    = l.duration_mins;
   document.getElementById('lFrequency').value   = l.frequency ?? 'weekly';
-  document.getElementById('lSeriesNotes').value = l.series_notes ?? '';
   document.getElementById('lTime').value        = l.start_time?.slice(0,5) ?? '';
   checkAvailability();   // warn straight away if the slot no longer suits
 
   lessonStudents = (ls ?? []).map(r => r.student_id);
   renderLessonStudents();
   updateRecurrenceForTrial();
+
+  // No permanent roster at all means this series is a non-teaching
+  // block (its "instrument" is actually the free-text label). Detect
+  // it and restore the form to that mode before setting the field.
+  document.getElementById('lNoStudent').checked = lessonStudents.length === 0;
+  onNoStudentChange();
+  if (lessonStudents.length === 0) {
+    document.getElementById('lInstrumentText').value = l.instrument ?? '';
+  } else {
+    document.getElementById('lInstrument').value = l.instrument;
+  }
+
+  // Reflect the actual pattern, not the form's default. onPatternChange()
+  // also re-populates Series notes from a template, which would stomp
+  // the notes actually saved on the lesson — so it runs first, then the
+  // real notes are written back over whatever it guessed.
+  document.getElementById('lPattern').value = isOneOff ? 'oneoff' : 'series';
+  if (isOneOff) {
+    const trialStudent = lessonStudents.some(sid =>
+      allStudents.find(s => s.id === sid)?.status === 'trial');
+    document.getElementById('lOneOffKind').value =
+      trialStudent ? 'trial' : (wasMakeup ? 'makeup' : 'adhoc');
+  }
+  onPatternChange();
+  document.getElementById('lSeriesNotes').value = l.series_notes ?? '';
+  document.getElementById('lSeriesNotes').dataset.autoPopulated = 'false';
 
   // Recurrence is not editable here. Changing it would mean deciding
   // what happens to occurrences already generated, and the common need
@@ -2709,12 +2943,22 @@ async function editSeriesInner() {
   // count/end-date — saveSeriesEdit() only rebuilds occurrences from
   // today forward, so a change here can't touch the past.
   // Editing an existing series: the pattern is fixed, only its details
-  // can change.
-  ['lRecurrence','lCount','lEndDate','lStartDate','lPattern'].forEach(id => {
+  // can change. A one-off has no "day of week" to move independently of
+  // its one fixed date, so that's locked too.
+  const lockedFields = ['lRecurrence','lCount','lEndDate','lStartDate','lPattern'];
+  if (isOneOff) lockedFields.push('lDay');
+  lockedFields.forEach(id => {
     const el = document.getElementById(id); if (el) el.disabled = true;
   });
 
-  document.getElementById('lessonModalTitle').textContent = 'Edit lesson series';
+  document.getElementById('lessonModalTitle').textContent =
+    isOneOff ? 'Edit one-off lesson' : 'Edit series';
+  document.getElementById('editSeriesNote').innerHTML = isOneOff
+    ? 'This is the single lesson — there is no series to affect.'
+    : 'Changes apply to lessons <strong>from today onwards</strong>. Past lessons stay ' +
+      'exactly as they were, with their attendance and notes intact. The student list ' +
+      'above is the regular roster — a one-off guest added to a single lesson from its ' +
+      'own <strong>Edit lesson</strong> view isn\'t shown or changed here.';
   document.getElementById('editSeriesNote').classList.remove('hidden');
 }
 
@@ -2882,10 +3126,11 @@ async function previewAgenda() {
     lessons: (teacherLessons ?? []).find(l => l.id === o.lesson_id) ?? null,
   })).sort((a, b) => (a.lessons?.start_time ?? '').localeCompare(b.lessons?.start_time ?? ''));
 
-  // Load students for each lesson
+  // Load students for each lesson — permanent members plus any
+  // occurrence-only guest for this specific date.
   const lessonIds = [...new Set((occsWithLessons ?? []).map(o => o.lesson_id).filter(Boolean))];
   const { data: lsData } = lessonIds.length > 0
-    ? await db.from('lesson_students').select('lesson_id,student_id').in('lesson_id', lessonIds)
+    ? await db.from('lesson_students').select('lesson_id,student_id,added_for_occurrence_id').in('lesson_id', lessonIds)
     : { data: [] };
 
   const studentIds = [...new Set((lsData ?? []).map(ls => ls.student_id))];
@@ -2901,11 +3146,7 @@ async function previewAgenda() {
     const p = (spProfiles ?? []).find(p => p.id === s.user_id);
     if (p) spMap[s.id] = `${p.first_name} ${p.last_name}`.trim();
   });
-  const lsMap = {};
-  (lsData ?? []).forEach(ls => {
-    if (!lsMap[ls.lesson_id]) lsMap[ls.lesson_id] = [];
-    lsMap[ls.lesson_id].push(ls.student_id);
-  });
+  const rosterMaps = splitRosterRows(lsData);
 
   if (!occsWithLessons || occsWithLessons.length === 0) {
     preview.innerHTML = `<div class="agenda-heading">${tName}</div>
@@ -2920,7 +3161,7 @@ async function previewAgenda() {
   (occsWithLessons ?? []).forEach(o => {
     const l       = o.lessons ?? {};
     const lType   = l.lesson_type ?? 'private';
-    const sIds    = lsMap[o.lesson_id] ?? [];
+    const sIds    = rosterFor(o.lesson_id, o.id, rosterMaps);
     const sNames  = sIds.map(id => spMap[id]).filter(Boolean);
     const studio  = allStudios.find(s => s.id === l.studio_id);
     const location = o.is_online
@@ -2932,10 +3173,11 @@ async function previewAgenda() {
     const endTime   = `${String(Math.floor(endMins/60)).padStart(2,'0')}:${String(endMins%60).padStart(2,'0')}:00`;
 
     const notes = [o.occurrence_notes, l.series_notes].filter(Boolean).join(' · ');
+    const isBlock = sIds.length === 0 && lType !== 'group';
     html += `<div class="agenda-item" style="grid-template-columns:90px 1fr 80px 1fr;">
       <div class="agenda-time">${formatTime(l.start_time)}–${formatTime(endTime)}</div>
-      <div class="agenda-student">${lType === 'group' ? sNames.join(', ') : (sNames[0] ?? '—')}</div>
-      <div class="agenda-type">${lType === 'private' ? 'Private' : 'Group'}</div>
+      <div class="agenda-student">${isBlock ? (l.instrument || 'Non-teaching event') : (lType === 'group' ? sNames.join(', ') : (sNames[0] ?? '—'))}</div>
+      <div class="agenda-type">${isBlock ? '—' : (lType === 'private' ? 'Private' : 'Group')}</div>
       <div class="agenda-location">${location}</div>
       ${notes ? `<div></div><div class="agenda-notes" style="grid-column:2/-1;font-size:0.75rem;color:var(--mid-grey);font-style:italic;padding-bottom:0.35rem;">📝 ${notes}</div>` : ''}
     </div>`;

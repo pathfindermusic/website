@@ -58,6 +58,21 @@
       -webkit-appearance: none;
     }
     .att-select:focus { outline: none; border-color: var(--orange); }
+
+    .component-pill {
+      display: inline-block; font-size: 0.68rem; font-weight: 600;
+      padding: 0.1rem 0.45rem; border-radius: 3px; white-space: nowrap;
+      border: 1px solid transparent;
+    }
+    .component-repertoire { background: rgba(232,73,30,0.08); border-color: rgba(232,73,30,0.25); color: var(--orange); }
+    .component-technique  { background: rgba(37,99,235,0.08); border-color: rgba(37,99,235,0.25); color: #1e40af; }
+    .component-knowledge  { background: rgba(22,163,74,0.08); border-color: rgba(22,163,74,0.25); color: #15803d; }
+
+    .grade-pill {
+      display: inline-block; font-size: 0.68rem; font-weight: 600;
+      padding: 0.05rem 0.45rem; border-radius: 3px; margin-left: 0.4rem;
+      background: rgba(232,73,30,0.08); border: 1px solid rgba(232,73,30,0.25); color: var(--orange);
+    }
   </style>
 </head>
 <body>
@@ -183,19 +198,90 @@
       <button class="modal-close" onclick="closeNoteModal()">✕</button>
     </div>
     <div class="modal-body">
+      <div class="form-group" id="prevLessonGroup" style="display:none;">
+        <div id="prevLessonBox"></div>
+      </div>
+
       <div class="form-group">
         <label class="form-label">Practice notes for student</label>
         <textarea class="form-textarea" id="noteText" placeholder="What did you work on? What should the student practice before next lesson?"></textarea>
       </div>
+
+      <div class="form-group" id="noteArtefactsGroup" style="display:none;">
+        <label class="form-label">Materials for this lesson</label>
+        <div class="form-hint" style="margin-bottom:0.5rem;">
+          Pick from the Artefact Library — these are captured automatically into
+          the note shared with the student, no need to type them below. Hold
+          Ctrl (⌘ on Mac) to pick more than one in a list. Don't see what you
+          need? Use "+ Add your own" under the right category — it'll be
+          attached to this lesson right away, and an admin will tidy it into
+          the shared library.
+        </div>
+        <select class="form-select" id="noteArtefactGrade" onchange="renderNoteArtefactList()" style="margin-bottom:0.65rem;">
+          <option value="">All grades</option>
+        </select>
+
+        <div style="display:flex;flex-direction:column;gap:0.65rem;">
+          <div>
+            <label class="form-label" style="font-size:0.75rem;margin-bottom:0.2rem;">Repertoire / Songs</label>
+            <select class="form-select note-artefact-select" data-component="repertoire" multiple size="6"></select>
+            <button type="button" class="text-orange" style="font-size:0.78rem;margin-top:0.3rem;background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;" onclick="openCustomArtefactModal('repertoire')">+ Add your own song/repertoire</button>
+          </div>
+          <div>
+            <label class="form-label" style="font-size:0.75rem;margin-bottom:0.2rem;">Technique</label>
+            <select class="form-select note-artefact-select" data-component="technique" multiple size="4"></select>
+            <button type="button" class="text-orange" style="font-size:0.78rem;margin-top:0.3rem;background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;" onclick="openCustomArtefactModal('technique')">+ Add your own technique</button>
+          </div>
+          <div>
+            <label class="form-label" style="font-size:0.75rem;margin-bottom:0.2rem;">Musical knowledge (theory &amp; aural)</label>
+            <select class="form-select note-artefact-select" data-component="knowledge" multiple size="4"></select>
+            <button type="button" class="text-orange" style="font-size:0.78rem;margin-top:0.3rem;background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;" onclick="openCustomArtefactModal('knowledge')">+ Add your own</button>
+          </div>
+        </div>
+      </div>
+
       <div class="form-group">
-        <label class="form-label">Google Drive link (optional)</label>
+        <label class="form-label">Other Google Drive link (optional)</label>
         <input class="form-input" type="url" id="driveLink" placeholder="https://drive.google.com/...">
-        <div class="form-hint">Paste a link to any shared recordings, sheet music or materials.</div>
+        <div class="form-hint">For a one-off file that isn't in the Artefact Library yet.</div>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeNoteModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveNote()">Save Note</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD CUSTOM ARTEFACT (teacher-added, pending admin review) -->
+<div class="modal-overlay hidden" id="customArtefactModal">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-header">
+      <span class="modal-title" id="customArtefactModalTitle">Add your own</span>
+      <button class="modal-close" onclick="closeCustomArtefactModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-hint" style="margin-bottom:0.85rem;">
+        This is saved so it shows correctly in this lesson's note and in the
+        student's history right away. It won't appear in other teachers'
+        pickers until an admin has reviewed it.
+      </div>
+      <div class="form-group">
+        <label class="form-label">Title *</label>
+        <input class="form-input" type="text" id="caTitle" placeholder="e.g. Wonderwall — chord chart">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Grade *</label>
+        <select class="form-select" id="caGrade"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Google Drive link (optional)</label>
+        <input class="form-input" type="url" id="caDriveUrl" placeholder="https://drive.google.com/…">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeCustomArtefactModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCustomArtefact()">Add &amp; select</button>
     </div>
   </div>
 </div>
@@ -244,6 +330,24 @@ let currentProfile = null;
 let teacherRecord  = null;
 let weekStart      = getWeekStart(new Date());
 let activeOccurrenceId = null;
+let activeLessonViewOccurrenceId = null;
+let noteModalInstrument = null;   // instrument for the occurrence the note modal has open — used by the "add custom artefact" flow
+
+// ---- Body of Knowledge: artefact library, loaded once ----
+let bokGradeLevels = [];            // [{id, code, tier, label, sort_order}]
+let bokArtefacts   = [];            // active artefacts, every instrument
+let noteArtefactsForInstrument = []; // this modal open's instrument-filtered subset
+let noteArtefactOriginalIds = new Set(); // what was linked when the modal opened — the diff baseline on save
+let noteArtefactSelectedIds = new Set(); // live picks across every grade filter shown this modal session
+
+async function loadBokLibrary() {
+  const [glRes, artRes] = await Promise.all([
+    db.from('bok_grade_levels').select('*').order('sort_order'),
+    db.from('bok_artefacts').select('*').eq('is_active', true).order('title'),
+  ]);
+  bokGradeLevels = glRes.data ?? [];
+  bokArtefacts   = artRes.data ?? [];
+}
 
 // ---- Init ----
 (async () => {
@@ -257,7 +361,7 @@ let activeOccurrenceId = null;
   const { data: t } = await db.from('teachers').select('*').eq('user_id', currentProfile.id).single();
   teacherRecord = t;
 
-  await Promise.all([loadStats(), loadSchedule(), loadMyTasks()]);
+  await Promise.all([loadStats(), loadSchedule(), loadMyTasks(), loadBokLibrary()]);
 })();
 
 // ---- Stats ----
@@ -397,16 +501,20 @@ function goToday()  { weekStart = getWeekStart(new Date()); loadSchedule(); }
 
 // ---- Load schedule ----
 let scheduleRows = [];
+const GRADED_INSTRUMENTS = ['Guitar'];   // instruments tracked via bok grade milestones instead of skill_level
 
 // schedule_view only exposes the first student's name, which is wrong for
-// group lessons — pull the full roster per lesson.
+// group lessons — pull the full roster per lesson. A row's roster is its
+// lesson's permanent members plus any occurrence-only guest added just
+// for that row's own occurrence — a teacher should see an ad-hoc guest
+// sitting in on their lesson too, not only the regular students.
 async function attachStudentNames(rows) {
   rows.forEach(r => { r.studentNames = []; r.students = []; });
   const lessonIds = [...new Set(rows.map(r => r.lesson_id).filter(Boolean))];
   if (lessonIds.length === 0) return;
 
   const { data: ls } = await db.from('lesson_students')
-    .select('lesson_id,student_id').in('lesson_id', lessonIds);
+    .select('lesson_id,student_id,added_for_occurrence_id').in('lesson_id', lessonIds);
   const sIds = [...new Set((ls ?? []).map(r => r.student_id))];
   if (sIds.length === 0) return;
 
@@ -424,17 +532,46 @@ async function attachStudentNames(rows) {
     if (p) nameById[s.id] = `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim();
   });
 
-  const byLesson = {};
+  const byLesson = {};      // lesson_id -> permanent members
+  const byOccurrence = {};  // occurrence_id -> ad-hoc guests
   (ls ?? []).forEach(r => {
-    if (!byLesson[r.lesson_id]) byLesson[r.lesson_id] = [];
     const n = nameById[r.student_id];
-    if (n) byLesson[r.lesson_id].push({ id: r.student_id, name: n });
+    if (!n) return;
+    const entry = { id: r.student_id, name: n };
+    if (r.added_for_occurrence_id) {
+      (byOccurrence[r.added_for_occurrence_id] ??= []).push(entry);
+    } else {
+      (byLesson[r.lesson_id] ??= []).push(entry);
+    }
   });
   rows.forEach(r => {
-    const list = (byLesson[r.lesson_id] ?? []).slice()
+    const list = [...(byLesson[r.lesson_id] ?? []), ...(byOccurrence[r.occurrence_id] ?? [])]
       .sort((a, b) => a.name.localeCompare(b.name));
     r.students     = list;
     r.studentNames = list.map(s => s.name);
+  });
+}
+
+// Attaches r.currentGrade ({tier, label}) for a private lesson on a graded
+// instrument, so "My Schedule" can show the student's grade next to the
+// instrument name. A group lesson has no single "current grade" to show,
+// so it's left null and the card just shows the instrument as before.
+async function attachCurrentGrades(rows) {
+  rows.forEach(r => { r.currentGrade = null; });
+
+  const graded = rows.filter(r => r.students?.length === 1 && GRADED_INSTRUMENTS.includes(r.instrument));
+  const studentIds = [...new Set(graded.map(r => r.students[0].id))];
+  if (studentIds.length === 0) return;
+
+  const { data } = await db.from('student_current_grades')
+    .select('student_id, instrument, tier, label')
+    .in('student_id', studentIds);
+
+  const byKey = {};
+  (data ?? []).forEach(g => { byKey[`${g.student_id}|${g.instrument}`] = g; });
+
+  graded.forEach(r => {
+    r.currentGrade = byKey[`${r.students[0].id}|${r.instrument}`] ?? null;
   });
 }
 
@@ -466,6 +603,7 @@ async function loadSchedule() {
 
   scheduleRows = data ?? [];   // used by the lesson-note notification
   await attachStudentNames(scheduleRows);
+  await attachCurrentGrades(scheduleRows);
 
   if (!data || data.length === 0) {
     wrap.innerHTML = `<div class="card"><div class="empty-state">
@@ -516,7 +654,7 @@ async function loadSchedule() {
         </div>
         <div>
           <div class="lesson-name">${displayName}</div>
-          <div class="lesson-instrument">${l.instrument}</div>
+          <div class="lesson-instrument">${l.instrument}${l.currentGrade ? `<span class="grade-pill">${l.currentGrade.tier} — ${l.currentGrade.label}</span>` : ''}</div>
           ${l.substitute_teacher_id === teacherRecord?.id
             ? `<div style="font-size:0.7rem;color:var(--orange);font-weight:600;">
                  Covering for ${l.original_teacher_name ?? 'another teacher'}
@@ -697,9 +835,11 @@ async function saveGroupAttendance() {
 }
 
 // ---- Read-only lesson view ----
-function openLessonView(occurrenceId) {
+async function openLessonView(occurrenceId) {
   const l = scheduleRows.find(r => r.occurrence_id === occurrenceId);
   if (!l) { showToast('Could not load that lesson. Please refresh.', 'error'); return; }
+
+  activeLessonViewOccurrenceId = occurrenceId;
 
   const isGroup = l.lesson_type === 'group';
   const names   = l.studentNames ?? [];
@@ -707,7 +847,24 @@ function openLessonView(occurrenceId) {
   document.getElementById('lvTitle').textContent =
     `${formatShortDate(parseLocalDate(l.date))} · ${formatTime(l.start_time)}`;
 
+  // Show one lightweight loading state — never the finished layout without
+  // its "Last lesson" recap and materials, which would flash and then
+  // reflow the instant the fetch below resolves. Everything is fetched
+  // first and the whole body is rendered once, in one shot.
+  document.getElementById('lvBody').innerHTML =
+    `<div class="text-muted" style="padding:1rem 0;font-size:0.875rem;">Loading…</div>`;
+  document.getElementById('lessonViewModal').classList.remove('hidden');
+
+  const [prev, myArtefacts] = await Promise.all([
+    fetchPreviousLessonData(l.lesson_id, l.date),
+    fetchOccurrenceArtefacts(occurrenceId),
+  ]);
+
+  if (activeLessonViewOccurrenceId !== occurrenceId) return; // superseded by another open
+
   document.getElementById('lvBody').innerHTML = `
+    ${prev ? `<div style="margin-bottom:1rem;">${previousLessonBoxHtml(prev)}</div>` : ''}
+
     <div style="background:var(--off-white);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.85rem;margin-bottom:1rem;">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.65rem;font-size:0.875rem;">
         <div><div class="text-sm text-muted">Instrument</div><div class="font-bold">${l.instrument ?? '—'}</div></div>
@@ -734,12 +891,12 @@ function openLessonView(occurrenceId) {
         ${l.note_text}
       </div>` : ''}
     ${l.drive_link ? `<div style="margin-top:0.6rem;"><a href="${l.drive_link}" target="_blank" style="color:var(--orange);font-size:0.845rem;text-decoration:none;">📁 Open lesson materials</a></div>` : ''}
+    ${artefactListHtml(myArtefacts, 'Materials covered')}
   `;
-
-  document.getElementById('lessonViewModal').classList.remove('hidden');
 }
 
 function closeLessonView() {
+  activeLessonViewOccurrenceId = null;
   document.getElementById('lessonViewModal').classList.add('hidden');
 }
 
@@ -762,34 +919,275 @@ function openNoteByOccurrence(occurrenceId) {
   openNoteModal(occurrenceId, label, r.note_text ?? '', r.drive_link ?? '');
 }
 
-function openNoteModal(occurrenceId, studentName, noteText, driveLink) {
+async function openNoteModal(occurrenceId, studentName, noteText, driveLink) {
   activeOccurrenceId = occurrenceId;
   document.getElementById('noteModalTitle').textContent = `Lesson Note — ${studentName}`;
   document.getElementById('noteText').value  = noteText  ?? '';
   document.getElementById('driveLink').value = driveLink ?? '';
+
+  const row = scheduleRows.find(r => r.occurrence_id === occurrenceId);
+  const instrument = row?.instrument ?? null;
+  noteModalInstrument = instrument;
+  const artefactsGroup = document.getElementById('noteArtefactsGroup');
+
+  loadPreviousLessonContext(row?.lesson_id, row?.date);
+
+  if (!instrument) {
+    // This occurrence has no instrument on record (e.g. a non-teaching
+    // block) — no point showing a picker with nothing to attach to.
+    artefactsGroup.style.display = 'none';
+    noteArtefactsForInstrument = [];
+    noteArtefactOriginalIds = new Set();
+    noteArtefactSelectedIds = new Set();
+  } else {
+    artefactsGroup.style.display = '';
+    noteArtefactsForInstrument = bokArtefacts.filter(a => a.instrument === instrument);
+
+    const gradeSel = document.getElementById('noteArtefactGrade');
+    gradeSel.innerHTML = '<option value="">All grades</option>' +
+      bokGradeLevels.map(g => `<option value="${g.id}">${g.tier} — ${g.label}</option>`).join('');
+
+    // A single-student (private) lesson: default the filter to that
+    // student's current grade, if they have one recorded yet. A group
+    // lesson has no single "current grade" to default to.
+    gradeSel.value = '';
+    if (row?.students?.length === 1) {
+      const { data: cg } = await db.from('student_current_grades')
+        .select('grade_level_id')
+        .eq('student_id', row.students[0].id)
+        .eq('instrument', instrument)
+        .maybeSingle();
+      if (cg?.grade_level_id) gradeSel.value = cg.grade_level_id;
+    }
+
+    const { data: picks } = await db.from('lesson_occurrence_artefacts')
+      .select('artefact_id').eq('occurrence_id', occurrenceId);
+    noteArtefactOriginalIds = new Set((picks ?? []).map(p => p.artefact_id));
+    noteArtefactSelectedIds = new Set(noteArtefactOriginalIds);
+
+    renderNoteArtefactList();
+  }
+
   document.getElementById('noteModal').classList.remove('hidden');
+}
+
+// Which artefacts were picked for one occurrence, with their titles —
+// a single embedded-select query rather than an id fetch followed by a
+// second round trip, so callers that render immediately after don't see
+// a staggered reveal (materials popping in a beat after everything else).
+async function fetchOccurrenceArtefacts(occurrenceId) {
+  const { data } = await db.from('lesson_occurrence_artefacts')
+    .select('bok_artefacts(id, title, drive_url, component)')
+    .eq('occurrence_id', occurrenceId);
+  return (data ?? []).map(row => row.bok_artefacts).filter(Boolean);
+}
+
+// Shared "last lesson" logic, used by both the read-only lesson view
+// (opened by clicking a lesson card) and the note-editing modal — so a
+// teacher sees the previous occurrence's practice note, shared file, and
+// materials picked no matter which way they get into a lesson.
+// "Last lesson" means the most recent earlier occurrence of this same
+// series; for a group lesson that's the one shared note the whole group
+// saw, same as today's note will be.
+// Returns { date, noteText, driveLink, artefacts } or null if there's
+// nothing worth showing (no earlier occurrence, or nothing was recorded).
+async function fetchPreviousLessonData(lessonId, beforeDate) {
+  if (!lessonId || !beforeDate) return null;
+
+  const { data: prevOcc } = await db.from('lesson_occurrences')
+    .select('id, date')
+    .eq('lesson_id', lessonId)
+    .lt('date', beforeDate)
+    .order('date', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!prevOcc) return null;
+
+  const [{ data: prevNote }, artefacts] = await Promise.all([
+    db.from('lesson_notes').select('note_text, drive_link')
+      .eq('lesson_occurrence_id', prevOcc.id).maybeSingle(),
+    fetchOccurrenceArtefacts(prevOcc.id),
+  ]);
+
+  const hasContent = !!(prevNote?.note_text || prevNote?.drive_link || artefacts.length > 0);
+  if (!hasContent) return null;   // e.g. a first lesson, or attendance was marked but nothing written
+
+  return {
+    date: prevOcc.date,
+    noteText: prevNote?.note_text ?? '',
+    driveLink: prevNote?.drive_link ?? '',
+    artefacts,
+  };
+}
+
+function artefactListHtml(artefacts, heading) {
+  if (!artefacts || artefacts.length === 0) return '';
+  return `<div style="font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--mid-grey);margin:0.5rem 0 0.2rem;">${heading}</div>` +
+    artefacts.map(a => `<div style="font-size:0.82rem;">
+      ${a.drive_url
+        ? `<a href="${a.drive_url}" target="_blank" class="text-orange" style="text-decoration:none;">📁 ${a.title}</a>`
+        : a.title}
+      <span class="component-pill component-${a.component}" style="margin-left:0.3rem;font-size:0.6rem;">${NOTE_ARTEFACT_COMPONENTS[a.component] ?? a.component}</span>
+    </div>`).join('');
+}
+
+// Renders the "Last lesson" recap box. `prev` is whatever
+// fetchPreviousLessonData() returned; an empty string means "show nothing".
+function previousLessonBoxHtml(prev) {
+  if (!prev) return '';
+  return `
+    <div style="background:var(--off-white);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.75rem 0.85rem;">
+      <div style="font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--mid-grey);">
+        Last lesson — ${formatLongDate(new Date(prev.date))}
+      </div>
+      ${prev.noteText ? `<div style="margin-top:0.35rem;font-size:0.845rem;line-height:1.6;color:var(--dark-grey);">${prev.noteText}</div>` : ''}
+      ${prev.driveLink ? `<div style="margin-top:0.4rem;"><a href="${prev.driveLink}" target="_blank" class="text-orange" style="font-size:0.82rem;text-decoration:none;">📁 View shared file</a></div>` : ''}
+      ${artefactListHtml(prev.artefacts, 'Materials covered')}
+    </div>`;
+}
+
+async function loadPreviousLessonContext(lessonId, beforeDate) {
+  const group = document.getElementById('prevLessonGroup');
+  const box   = document.getElementById('prevLessonBox');
+  group.style.display = 'none';
+  const prev = await fetchPreviousLessonData(lessonId, beforeDate);
+  if (!prev) return;
+  box.innerHTML = previousLessonBoxHtml(prev);
+  group.style.display = '';
+}
+
+// Reads whatever is currently highlighted in the three multi-selects into
+// noteArtefactSelectedIds. Call this before rebuilding them (the grade
+// filter changed) or before saving — otherwise a pick made under one grade
+// filter is lost the moment the filter changes, since a filtered-out
+// artefact isn't in the DOM to read a selection back from.
+function captureNoteArtefactSelection() {
+  document.querySelectorAll('.note-artefact-select').forEach(sel => {
+    Array.from(sel.options).forEach(opt => {
+      if (!opt.value) return;   // the disabled "nothing here" placeholder
+      if (opt.selected) noteArtefactSelectedIds.add(opt.value);
+      else noteArtefactSelectedIds.delete(opt.value);
+    });
+  });
+}
+
+const NOTE_ARTEFACT_COMPONENTS = {
+  repertoire: 'repertoire / songs',
+  technique:  'technique',
+  knowledge:  'musical knowledge',
+};
+
+function renderNoteArtefactList() {
+  captureNoteArtefactSelection();
+
+  const gradeId = document.getElementById('noteArtefactGrade').value;
+  const list = noteArtefactsForInstrument.filter(a => !gradeId || a.grade_level_id === gradeId);
+
+  Object.keys(NOTE_ARTEFACT_COMPONENTS).forEach(component => {
+    const sel = document.querySelector(`.note-artefact-select[data-component="${component}"]`);
+    const items = list.filter(a => a.component === component);
+
+    if (items.length === 0) {
+      sel.disabled = true;
+      sel.innerHTML = `<option value="" disabled>No ${NOTE_ARTEFACT_COMPONENTS[component]} artefacts${gradeId ? ' for this grade' : ''} yet</option>`;
+      return;
+    }
+    sel.disabled = false;
+    sel.innerHTML = items.map(a =>
+      `<option value="${a.id}" ${noteArtefactSelectedIds.has(a.id) ? 'selected' : ''}>${a.title}</option>`
+    ).join('');
+  });
+}
+
+// ---- "Add your own" — a teacher covering something not yet in the
+// library. Saved as a real bok_artefacts row (is_custom=true,
+// is_active=false) so it's correctly attached to this lesson and shows
+// in history right away, without being offered to other teachers until
+// an admin has reviewed it (see phase6c-bok-teacher-custom-artefacts.sql).
+let pendingCustomComponent = null;
+
+function openCustomArtefactModal(component) {
+  pendingCustomComponent = component;
+  const titles = { repertoire: 'Add your own song/repertoire', technique: 'Add your own technique', knowledge: 'Add your own' };
+  document.getElementById('customArtefactModalTitle').textContent = titles[component] ?? 'Add your own';
+  document.getElementById('caTitle').value = '';
+  document.getElementById('caDriveUrl').value = '';
+
+  const gradeSel = document.getElementById('caGrade');
+  gradeSel.innerHTML = bokGradeLevels.map(g => `<option value="${g.id}">${g.tier} — ${g.label}</option>`).join('');
+  // Default to whatever grade the picker above is currently filtered to,
+  // if any — most of the time that's exactly the grade this belongs at.
+  const currentFilter = document.getElementById('noteArtefactGrade').value;
+  if (currentFilter) gradeSel.value = currentFilter;
+
+  document.getElementById('customArtefactModal').classList.remove('hidden');
+}
+
+function closeCustomArtefactModal() {
+  document.getElementById('customArtefactModal').classList.add('hidden');
+  pendingCustomComponent = null;
+}
+
+async function saveCustomArtefact() {
+  const title    = document.getElementById('caTitle').value.trim();
+  const gradeId  = document.getElementById('caGrade').value;
+  const driveUrl = document.getElementById('caDriveUrl').value.trim();
+
+  if (!title)   { showToast('Title is required.', 'error'); return; }
+  if (!gradeId) { showToast('Grade is required.', 'error'); return; }
+  if (!noteModalInstrument || !pendingCustomComponent) {
+    showToast('Could not add that — please close and reopen the note.', 'error');
+    return;
+  }
+
+  const { data, error } = await db.from('bok_artefacts').insert({
+    title,
+    instrument:     noteModalInstrument,
+    grade_level_id: gradeId,
+    component:      pendingCustomComponent,
+    drive_url:      driveUrl || null,
+    is_custom:      true,
+    is_active:      false,
+    created_by:     currentProfile.id,
+  }).select().single();
+
+  if (error) { showToast('Error adding: ' + error.message, 'error'); return; }
+
+  // Fold straight into this session's working set and mark it selected,
+  // same as ticking an existing artefact — the grade defaulted above to
+  // match the current filter, so it renders immediately.
+  noteArtefactsForInstrument.push(data);
+  noteArtefactSelectedIds.add(data.id);
+  renderNoteArtefactList();
+
+  closeCustomArtefactModal();
+  showToast('Added — you\'ll find it selected above.', 'success');
 }
 
 function closeNoteModal() {
   document.getElementById('noteModal').classList.add('hidden');
   activeOccurrenceId = null;
+  noteModalInstrument = null;
 }
 
 async function saveNote() {
   const noteText  = document.getElementById('noteText').value.trim();
   const driveLink = document.getElementById('driveLink').value.trim();
+  captureNoteArtefactSelection();   // fold in whatever's currently highlighted before reading it
+  const pickedIds = noteArtefactSelectedIds;
 
   if (!activeOccurrenceId) return;
+  const occurrenceId = activeOccurrenceId;
 
   const { data: existing } = await db
     .from('lesson_notes')
     .select('id')
-    .eq('lesson_occurrence_id', activeOccurrenceId)
+    .eq('lesson_occurrence_id', occurrenceId)
     .maybeSingle();
 
   let error;
   const payload = {
-    lesson_occurrence_id: activeOccurrenceId,
+    lesson_occurrence_id: occurrenceId,
     teacher_id:           teacherRecord.id,
     note_text:            noteText   || null,
     drive_link:           driveLink  || null,
@@ -807,17 +1205,39 @@ async function saveNote() {
     return;
   }
 
+  // Reconcile picked artefacts against what's already linked, rather than
+  // delete-then-reinsert-everything — keeps added_by/created_at accurate
+  // for picks that didn't change.
+  const toAdd    = [...pickedIds].filter(id => !noteArtefactOriginalIds.has(id));
+  const toRemove = [...noteArtefactOriginalIds].filter(id => !pickedIds.has(id));
+
+  if (toAdd.length > 0) {
+    await db.from('lesson_occurrence_artefacts').insert(
+      toAdd.map(artefact_id => ({ occurrence_id: occurrenceId, artefact_id, added_by: currentProfile.id }))
+    );
+  }
+  if (toRemove.length > 0) {
+    await db.from('lesson_occurrence_artefacts')
+      .delete().eq('occurrence_id', occurrenceId).in('artefact_id', toRemove);
+  }
+
+  // noteArtefactsForInstrument, not the global bokArtefacts — the global
+  // only holds active library items, so a just-added custom (still
+  // pending, inactive) pick would silently drop out of the email here.
+  const pickedArtefacts = noteArtefactsForInstrument.filter(a => pickedIds.has(a.id));
+
   showToast('Note saved — student can now see it.', 'success');
-  const occIdForEmail = activeOccurrenceId;
   closeNoteModal();
   loadSchedule();
 
   // Scenario 7 — let the student know a new note is available
-  if (noteText) await notifyStudentOfNote(occIdForEmail, noteText, driveLink);
+  if (noteText || pickedArtefacts.length > 0) {
+    await notifyStudentOfNote(occurrenceId, noteText, driveLink, pickedArtefacts);
+  }
 }
 
 // Scenario 7 — automatic "new lesson note" email
-async function notifyStudentOfNote(occurrenceId, noteText, driveLink) {
+async function notifyStudentOfNote(occurrenceId, noteText, driveLink, pickedArtefacts = []) {
   const row = scheduleRows.find(r => r.occurrence_id === occurrenceId);
   if (!row?.studio_email) {
     showToast('Note saved, but no email sent — the studio has no email address set.', 'warning');
@@ -829,9 +1249,25 @@ async function notifyStudentOfNote(occurrenceId, noteText, driveLink) {
   let bodyText =
     'Dear {{student_name}},\n\n' +
     'Your teacher, {{teacher_name}}, has added a note from your ' +
-    '{{instrument}} lesson on {{lesson_day}}.\n\n' +
-    `**${noteText}**\n\n`;
-  if (driveLink) bodyText += `Lesson materials: ${driveLink}\n\n`;
+    '{{instrument}} lesson on {{lesson_day}}.\n\n';
+  if (noteText) bodyText += `**${noteText}**\n\n`;
+
+  // Same grouping as the "Materials for this lesson" picker in the note
+  // modal — one heading + bullet list per component, skipping any
+  // component nothing was picked from. A picked item with a drive_url
+  // becomes a clickable [title](url); the email template turns both the
+  // "- " lines and the [..](..) links into a real list.
+  if (pickedArtefacts.length > 0) {
+    const order  = ['repertoire', 'technique', 'knowledge'];
+    order.forEach(component => {
+      const items = pickedArtefacts.filter(a => a.component === component);
+      if (items.length === 0) return;
+      bodyText += `${(NOTE_ARTEFACT_COMPONENTS[component] ?? component).toUpperCase()}\n\n`;
+      bodyText += items.map(a => `- ${a.drive_url ? `[${a.title}](${a.drive_url})` : a.title}`).join('\n') + '\n\n';
+    });
+  }
+
+  if (driveLink) bodyText += `Lesson materials: [View](${driveLink})\n\n`;
   bodyText += 'You can also view this any time in your student portal.\n\n' +
               'Kind regards,\nPathfinder Music Lessons';
 
@@ -863,6 +1299,9 @@ async function notifyStudentOfNote(occurrenceId, noteText, driveLink) {
 
 document.getElementById('noteModal').addEventListener('click', (e) => {
   if (e.target === e.currentTarget) closeNoteModal();
+});
+document.getElementById('customArtefactModal').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeCustomArtefactModal();
 });
 
 function toggleSidebar() {

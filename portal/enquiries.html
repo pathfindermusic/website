@@ -254,6 +254,7 @@ function renderSidebar() {
     inbox: '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
     home:  '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
     shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+    book:  '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
   };
   const it = (h,l,p,a) => `<a class="nav-item ${a?'active':''}" href="${h}">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${p}</svg>${l}</a>`;
@@ -264,6 +265,8 @@ function renderSidebar() {
     ${it('lessons.html','Lessons',I.cal)}
     ${it('students.html','Students',I.people)}
     ${it('teachers.html','Teachers',I.person)}
+    <div class="sidebar-section">Curriculum</div>
+    ${it('bok-artefacts.html','Artefact Library',I.book)}
     <div class="sidebar-section">Front desk</div>
     ${it('enquiries.html','Enquiries',I.inbox,true)}
     ${it('tasks.html','Tasks',I.task)}
