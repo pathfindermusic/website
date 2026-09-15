@@ -531,6 +531,15 @@ function addAvailSlot(existing = null) {
 }
 
 // ---- Save teacher ----
+// The hint under Teaching Room promises "Studio Name - Teacher First
+// Name's Room" when the field is left blank. Uses the first selected
+// studio — a teacher can cover more than one, but the room itself is
+// still just one name.
+function defaultTeachingRoom(studioIds, firstName) {
+  const studioName = allStudios.find(s => s.id === studioIds[0])?.name;
+  return (studioName && firstName) ? `${studioName} - ${firstName}'s Room` : '';
+}
+
 async function saveTeacher() {
   const firstName     = document.getElementById('tFirstName').value.trim();
   const lastName      = document.getElementById('tLastName').value.trim();
@@ -615,8 +624,7 @@ async function saveTeacher() {
       }, { onConflict: 'id' });
 
       const room = document.getElementById('tRoom').value.trim();
-      // Auto-generate teaching room if blank
-      const autoRoom = room || '';
+      const autoRoom = room || defaultTeachingRoom(studioIds, firstName);
       const { data: tData } = await db.from('teachers').insert({
         user_id: userId, instruments, studio_ids: studioIds, virtual_room_link: zoom || null,
         teaching_room: autoRoom || null,
@@ -630,7 +638,8 @@ async function saveTeacher() {
     } else {
       await db.from('profiles').update({ first_name: firstName, last_name: lastName, phone }).eq('id', userId);
       const room = document.getElementById('tRoom').value.trim();
-      await db.from('teachers').update({ instruments, studio_ids: studioIds, virtual_room_link: zoom || null, teaching_room: room || null }).eq('id', editId);
+      const autoRoom = room || defaultTeachingRoom(studioIds, firstName);
+      await db.from('teachers').update({ instruments, studio_ids: studioIds, virtual_room_link: zoom || null, teaching_room: autoRoom || null }).eq('id', editId);
     }
 
     // Replace availability
