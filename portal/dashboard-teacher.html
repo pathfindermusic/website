@@ -1263,7 +1263,11 @@ async function notifyStudentOfNote(occurrenceId, noteText, driveLink, pickedArte
       const items = pickedArtefacts.filter(a => a.component === component);
       if (items.length === 0) return;
       bodyText += `${(NOTE_ARTEFACT_COMPONENTS[component] ?? component).toUpperCase()}\n\n`;
-      bodyText += items.map(a => `- ${a.drive_url ? `[${a.title}](${a.drive_url})` : a.title}`).join('\n') + '\n\n';
+      // 📁 prefix on a linked item — same convention as everywhere else
+      // materials show as links (note modal recap, student portal) — so a
+      // clickable title reads as a link, not as the heading's orange
+      // bleeding onto it.
+      bodyText += items.map(a => `- ${a.drive_url ? `[📁 ${a.title}](${a.drive_url})` : a.title}`).join('\n') + '\n\n';
     });
   }
 

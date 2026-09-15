@@ -321,7 +321,7 @@ async function fetchOccurrenceMaterials(occurrenceIds) {
   if (artefactIds.length === 0) return {};
 
   const { data: artefacts } = await db.from('bok_artefacts')
-    .select('id, title, drive_url').in('id', artefactIds);
+    .select('id, title, drive_url, component').in('id', artefactIds);
   const artefactById = {};
   (artefacts ?? []).forEach(a => { artefactById[a.id] = a; });
 
@@ -334,15 +334,32 @@ async function fetchOccurrenceMaterials(occurrenceIds) {
   return map;
 }
 
+// Same grouping as the teacher's "Materials for this lesson" picker and
+// the note email — one heading + real bullet list per component, so a
+// lesson's materials read the same way everywhere a student sees them.
+const MATERIALS_COMPONENT_ORDER  = ['repertoire', 'technique', 'knowledge'];
+const MATERIALS_COMPONENT_LABELS = { repertoire: 'Repertoire / Songs', technique: 'Technique', knowledge: 'Musical Knowledge' };
+
 function materialsHtml(list) {
   if (!list || list.length === 0) return '';
+
+  const groupsHtml = MATERIALS_COMPONENT_ORDER.map(component => {
+    const items = list.filter(a => a.component === component);
+    if (items.length === 0) return '';
+    return `
+      <div style="font-size:0.7rem;font-weight:600;color:var(--dark-grey);margin:0.4rem 0 0.15rem;">${MATERIALS_COMPONENT_LABELS[component]}</div>
+      <ul style="margin:0;padding-left:1.1rem;">
+        ${items.map(a => `<li style="font-size:0.82rem;margin-bottom:0.15rem;">
+          ${a.drive_url
+            ? `<a href="${a.drive_url}" target="_blank" class="text-orange" style="text-decoration:none;">📁 ${a.title}</a>`
+            : a.title}
+        </li>`).join('')}
+      </ul>`;
+  }).join('');
+
   return `<div style="margin-top:0.5rem;">
     <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--mid-grey);margin-bottom:0.2rem;">Materials covered</div>
-    ${list.map(a => `<div style="font-size:0.82rem;">
-      ${a.drive_url
-        ? `<a href="${a.drive_url}" target="_blank" class="text-orange" style="text-decoration:none;">📁 ${a.title}</a>`
-        : a.title}
-    </div>`).join('')}
+    ${groupsHtml}
   </div>`;
 }
 
@@ -651,15 +668,36 @@ async function loadNotes() {
   const wrap = document.getElementById('notesWrap');
   wrap.innerHTML = `<div class="loading"><div class="spinner"></div> Loading…</div>`;
 
-  const { data, error } = await db
+  // Pull a generous pool of this student's own recent PAST occurrences
+  // first (student_id already scopes it — safe for a shared family
+  // login), then keep the ones with a typed note OR picked materials. A
+  // teacher can save materials without typing anything, and that lesson
+  // should still show up here — filtering by note_text alone at the query
+  // level used to make those vanish from this tab entirely.
+  // The date <= today bound matters: without it, "order by date desc"
+  // pulls the FARTHEST-future pre-scheduled occurrences first (recurring
+  // lessons are generated months ahead), so the 300-row window could fill
+  // entirely with not-yet-happened lessons and push every real past note
+  // out — which is exactly what happened when this bound was missing.
+  const { data: recent, error } = await db
     .from('student_schedule_view')
     .select('*')
     .eq('student_id', studentRecord.id)
-    .not('note_text', 'is', null)
+    .lte('date', toISODate(new Date()))
     .order('date', { ascending: false })
-    .limit(50);
+    .limit(300);
 
-  if (error || !data || data.length === 0) {
+  if (error) {
+    wrap.innerHTML = `<div class="card"><div class="empty-state"><p style="color:#dc2626;">${error.message}</p></div></div>`;
+    return;
+  }
+
+  const materialsMap = await fetchOccurrenceMaterials((recent ?? []).map(r => r.occurrence_id));
+  const data = (recent ?? [])
+    .filter(l => l.note_text || (materialsMap[l.occurrence_id]?.length > 0))
+    .slice(0, 50);
+
+  if (data.length === 0) {
     wrap.innerHTML = `<div class="card"><div class="empty-state">
       <div class="empty-state-icon">📝</div>
       <h3>No practice notes yet</h3>
@@ -667,8 +705,6 @@ async function loadNotes() {
     </div></div>`;
     return;
   }
-
-  const materialsMap = await fetchOccurrenceMaterials(data.map(r => r.occurrence_id));
 
   let html = `<div class="card">`;
   data.forEach((l, i) => {
@@ -682,7 +718,7 @@ async function loadNotes() {
           <div class="text-sm text-muted">${formatLongDate(new Date(l.date))}</div>
         </div>
         <div class="note-box" style="margin-top:0;">
-          ${l.note_text}
+          ${l.note_text ?? ''}
           ${l.drive_link ? `<div style="margin-top:0.5rem;"><a href="${l.drive_link}" target="_blank" class="text-orange" style="font-size:0.82rem;text-decoration:none;">📁 View shared file</a></div>` : ''}
           ${materialsHtml(materialsMap[l.occurrence_id])}
         </div>
@@ -870,25 +906,33 @@ async function loadProgress() {
     (occRes.data ?? []).forEach(o => { dateByOcc[o.id] = o.date; });
     const artById = {};
     (artRes.data ?? []).forEach(a => { artById[a.id] = a; });
-    const compLabel = { repertoire: 'Repertoire', technique: 'Technique', knowledge: 'Knowledge' };
+
+    // Same grouping as My Lessons / Practice Notes — one heading per
+    // component, items within a group staying newest-first (matRows was
+    // already fetched in that order).
+    const rowsWithData = matRows
+      .map(r => ({ artefact: artById[r.artefact_id], date: dateByOcc[r.occurrence_id] }))
+      .filter(r => r.artefact);
+
+    const groupsHtml = MATERIALS_COMPONENT_ORDER.map(component => {
+      const items = rowsWithData.filter(r => r.artefact.component === component);
+      if (items.length === 0) return '';
+      return `
+        <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--mid-grey);margin:0.85rem 0 0.2rem;">${MATERIALS_COMPONENT_LABELS[component]}</div>
+        ${items.map(({ artefact: a, date: d }) => `<div style="display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0;border-bottom:1px solid var(--border);">
+          <div style="font-size:0.85rem;">
+            ${a.drive_url
+              ? `<a href="${a.drive_url}" target="_blank" class="text-orange" style="text-decoration:none;">📁 ${a.title}</a>`
+              : a.title}
+          </div>
+          <div class="text-sm text-muted">${d ? formatLongDate(new Date(d)) : ''}</div>
+        </div>`).join('')}`;
+    }).join('');
 
     html += `<div class="card" style="margin-top:1.25rem;">
       <div class="card-header"><span class="card-title">Materials you've covered</span></div>
       <div class="card-body">
-        ${matRows.map(r => {
-          const a = artById[r.artefact_id];
-          if (!a) return '';
-          const d = dateByOcc[r.occurrence_id];
-          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0;border-bottom:1px solid var(--border);">
-            <div style="font-size:0.85rem;">
-              ${a.drive_url
-                ? `<a href="${a.drive_url}" target="_blank" class="text-orange" style="text-decoration:none;">📁 ${a.title}</a>`
-                : a.title}
-              <span class="component-pill component-${a.component}" style="margin-left:0.4rem;">${compLabel[a.component] ?? a.component}</span>
-            </div>
-            <div class="text-sm text-muted">${d ? formatLongDate(new Date(d)) : ''}</div>
-          </div>`;
-        }).join('')}
+        ${groupsHtml}
       </div>
     </div>`;
   }

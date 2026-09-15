@@ -559,6 +559,54 @@ tasks when `studio_id` changes, leaves them **unassigned** so they land in the
 receiving studio's queue rather than being pushed at one named admin, and writes
 a handover record explaining why. Closed tasks stay put — they are history.
 
+### Recurring tasks
+
+For work that repeats on a schedule — weekly manual payment collection,
+cancelling a lesson on the 1st Monday of each month for certain students,
+a standing reminder — rather than an admin re-creating the same task by hand
+every cycle. Managed inline on the Tasks page (`🔁 Recurring tasks` button,
+admins only), not a separate page.
+
+**A rule appears as a task the morning it's due, not ahead of time.** No
+pre-generated future tasks cluttering the list — `generate-recurring-tasks.js`
+runs once a day (Netlify scheduled function, 19:00 UTC — see `netlify.toml`)
+and creates that day's task(s) for any rule whose schedule matches.
+
+**Four recurrence types:** daily, weekly (a chosen weekday), monthly on a
+chosen date (with a day like the 31st falling back to the month's last day
+in a shorter month), and monthly on a chosen occurrence of a weekday — e.g.
+"the 1st Monday" or "the last Friday". `ruleFiresOn(rule, date)` is the pure
+function that decides; it is duplicated between the Netlify function (which
+generates) and `tasks.html` (which only previews "next occurrence" in the
+rule editor) because this codebase has no shared-module mechanism between
+static HTML and Netlify Functions — a change to one needs the same change
+in the other.
+
+**A rule can target nobody in particular, or specific students/teachers.**
+With nobody named, one generic task is generated per firing. With one or
+more students/teachers attached, **one task is generated per subject** per
+firing (an admin's explicit choice — five students on a shared task reads
+worse than five separate ones), and an inactive/lapsed subject is silently
+skipped rather than generating a task for someone no longer relevant.
+
+**Idempotent.** `recurring_task_runs` logs every (rule, date, subject) that
+has already fired, checked before every insert, so the schedule firing
+twice — or being re-run by hand — never duplicates a task. It uses non-null
+sentinel values (`'none'` / the nil UUID) rather than NULL for the "no
+specific subject" case, because Postgres never treats two NULLs as equal
+inside a UNIQUE constraint — a nullable pair there would have let the
+generic case duplicate on every run.
+
+**Generated tasks need no title templating.** `tasks.html` already resolves
+and displays a task's linked student/teacher name as its own UI tag
+(independent of the title text), so a rule's title is used verbatim — the
+UI does the rest.
+
+**⚠ Deploying `generate-recurring-tasks.js` and its `netlify.toml` schedule
+entry requires an actual Netlify deploy to take effect** — unlike the
+portal's static HTML/JS pages, a Netlify Function and its schedule are not
+picked up by just updating files on disk.
+
 ### Enquiries
 
 **An enquiry is a student record with status `prospective`.** No auth account —
@@ -1010,6 +1058,7 @@ Run in order. All are re-runnable.
 38. `phase6-bok-grading.sql` — `bok_grade_levels` (seeded, 9 rows), `bok_artefacts`, `student_grade_milestones`, `lesson_occurrence_artefacts`, `student_current_grades` view, RLS on all four tables — Body of Knowledge / grading framework, milestone 1 (see "Planned" section above)
 39. `phase6b-bok-retired-artefact-visibility.sql` — fixes the `bok_artefacts` read policy so a retired artefact stays visible to a teacher/student already looking at a past lesson that used it, instead of vanishing from their history
 40. `phase6c-bok-teacher-custom-artefacts.sql` — adds `bok_artefacts.is_custom`, plus RLS letting a teacher insert/update their own pending (`is_active=false`) custom artefact and read it back — lets a teacher add a song/technique that isn't in the library yet, straight from the lesson-note picker
+41. `phase7-recurring-tasks.sql` — `recurring_tasks`, `recurring_task_subjects`, `recurring_task_runs`, `tasks.recurring_task_id`, extends `tasks.source` to include `'recurring'`, RLS on all three new tables — repeating task rules, generated each morning by `generate-recurring-tasks.js` (see "Recurring tasks" above)
 
 ---
 

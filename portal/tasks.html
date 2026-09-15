@@ -115,6 +115,26 @@
       font-size: 0.78rem; color: var(--dark-grey); margin-bottom: 0.75rem;
     }
     .attempt-banner strong { color: var(--charcoal); }
+
+    /* Recurring tasks */
+    .rt-row {
+      display: grid; grid-template-columns: 1fr auto;
+      gap: 0.75rem; align-items: start;
+      padding: 0.7rem 1rem; border-bottom: 1px solid var(--border);
+    }
+    .rt-row:last-child { border-bottom: none; }
+    .rt-subfield { display: none; }
+    .rt-subfield.visible { display: block; }
+    .rt-subject-list {
+      max-height: 160px; overflow-y: auto; border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 0.3rem 0.6rem; margin-top: 0.4rem;
+      background: var(--off-white);
+    }
+    .rt-preview {
+      font-size: 0.78rem; color: var(--mid-grey); margin-top: 0.6rem;
+      background: rgba(232,73,30,0.06); border-radius: var(--r-sm);
+      padding: 0.5rem 0.7rem;
+    }
   </style>
 </head>
 <body>
@@ -145,6 +165,7 @@
         <div class="page-sub" id="pageSub">Loading…</div>
       </div>
       <div class="flex items-center gap-2" style="flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-sm hidden" id="recurringBtn" onclick="openRecurringListModal()">🔁 Recurring tasks</button>
         <div class="week-nav">
           <button class="week-nav-btn" onclick="taskNavBack()">‹</button>
           <button class="btn btn-ghost btn-sm" onclick="taskGoToday()">Today</button>
@@ -331,6 +352,133 @@
   </div>
 </div>
 
+<!-- RECURRING TASKS — rule list -->
+<div class="modal-overlay hidden" id="recurringListModal">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header">
+      <span class="modal-title">Recurring tasks</span>
+      <button class="modal-close" onclick="closeRecurringListModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-sm text-muted" style="margin-bottom:0.85rem;line-height:1.55;">
+        A rule generates an actual task automatically, the morning it's due — nothing
+        appears on the calendar ahead of time. Tasks it creates behave like any other
+        task, tagged <span class="tag tag-wait">🔁 Recurring</span> so you know where they came from.
+      </p>
+      <button class="btn btn-primary btn-sm" style="margin-bottom:0.85rem;" onclick="openRecurringEditModal(null)">+ New rule</button>
+      <div id="recurringListBody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- RECURRING TASKS — rule editor -->
+<div class="modal-overlay hidden" id="recurringEditModal">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <span class="modal-title" id="rtModalTitle">New recurring task</span>
+      <button class="modal-close" onclick="closeRecurringEditModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="rtId">
+
+      <div class="form-group">
+        <label class="form-label">Title</label>
+        <input class="form-input" type="text" id="rtTitle" placeholder="e.g. Weekly manual payment collection">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Repeats</label>
+        <select class="form-select" id="rtType" onchange="onRecurrenceTypeChange()">
+          <option value="daily">Every day</option>
+          <option value="weekly">Weekly, on a chosen day</option>
+          <option value="monthly_day">Monthly, on a chosen date</option>
+          <option value="monthly_weekday">Monthly, on a chosen weekday (e.g. 1st Monday)</option>
+        </select>
+      </div>
+
+      <div class="rt-subfield" id="rtWeeklyField">
+        <div class="form-group">
+          <label class="form-label">Day of the week</label>
+          <select class="form-select" id="rtWeekday" onchange="updateRecurringPreview()">
+            <option value="1">Monday</option><option value="2">Tuesday</option>
+            <option value="3">Wednesday</option><option value="4">Thursday</option>
+            <option value="5">Friday</option><option value="6">Saturday</option>
+            <option value="0">Sunday</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="rt-subfield" id="rtMonthlyDayField">
+        <div class="form-group">
+          <label class="form-label">Day of the month</label>
+          <select class="form-select" id="rtDayOfMonth" onchange="updateRecurringPreview()"></select>
+          <div class="form-hint">A date beyond a shorter month (e.g. the 31st) falls back to that month's last day.</div>
+        </div>
+      </div>
+
+      <div class="rt-subfield" id="rtMonthlyWeekdayField">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Which one</label>
+            <select class="form-select" id="rtWeekOfMonth" onchange="updateRecurringPreview()">
+              <option value="1">1st</option><option value="2">2nd</option>
+              <option value="3">3rd</option><option value="4">4th</option>
+              <option value="-1">Last</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Day of the week</label>
+            <select class="form-select" id="rtWeekdayNth" onchange="updateRecurringPreview()">
+              <option value="1">Monday</option><option value="2">Tuesday</option>
+              <option value="3">Wednesday</option><option value="4">Thursday</option>
+              <option value="5">Friday</option><option value="6">Saturday</option>
+              <option value="0">Sunday</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div id="rtPreview" class="rt-preview"></div>
+
+      <div class="form-row" style="margin-top:0.85rem;">
+        <div class="form-group">
+          <label class="form-label">Studio</label>
+          <select class="form-select" id="rtStudio"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Assigned to</label>
+          <select class="form-select" id="rtAssignee"></select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">About</label>
+        <select class="form-select" id="rtSubjectType" onchange="onSubjectTypeChange()">
+          <option value="">Nothing in particular — one shared task each time</option>
+          <option value="student">Specific students — one task each, per student</option>
+          <option value="teacher">Specific teachers — one task each, per teacher</option>
+        </select>
+        <div class="rt-subfield" id="rtSubjectPicker">
+          <input class="form-input" type="text" id="rtSubjectSearch" placeholder="Search…"
+                 style="margin-top:0.5rem;" oninput="renderSubjectChecklist()">
+          <div class="rt-subject-list" id="rtSubjectList"></div>
+        </div>
+      </div>
+
+      <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.85rem;color:var(--dark-grey);cursor:pointer;">
+        <input type="checkbox" id="rtActive" checked> Active
+      </label>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between;">
+      <button class="btn btn-danger btn-sm hidden" id="rtDeleteBtn" onclick="deleteRecurringTaskFromEditor()">Delete rule</button>
+      <div class="flex gap-1">
+        <button class="btn btn-ghost" onclick="closeRecurringEditModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveRecurringTask()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="toastWrap" class="toast-wrap"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-client.js"></script>
@@ -352,6 +500,12 @@ let bucket       = null;      // null | overdue | today | unassigned | upcoming 
 let selectedDate = new Date(); // drives the null-bucket "due on this date" half
 let openTask    = null;
 
+// Recurring tasks — rules the front desk sets up once, that generate
+// an actual task automatically each time they're due.
+let recurringTasks         = [];
+let recurringSubjectsByRule = {};   // rule id -> [{subject_type, subject_id}]
+let rtSelectedSubjects     = new Set();  // subject ids checked in the rule editor
+
 // ============================================================
 // INIT
 // ============================================================
@@ -365,7 +519,9 @@ let openTask    = null;
 
   if (!isTeacher) {
     document.getElementById('quickAdd').classList.remove('hidden');
+    document.getElementById('recurringBtn').classList.remove('hidden');
     await loadOptions();
+    initRecurringFormOptions();
   } else {
     document.getElementById('filterBar').classList.add('hidden');
   }
@@ -781,6 +937,7 @@ function render() {
     }
     if (dueTxt) bits.push(`<span class="${dueCls}">${dueTxt}</span>`);
     if (t.kind === 'waitlist') bits.push(`<span class="tag tag-wait">Waiting</span>`);
+    if (t.recurring_task_id) bits.push(`<span class="tag tag-wait">🔁 Recurring</span>`);
     if (t.awaiting_admin && !isTeacher) bits.push(`<span class="tag tag-replied">Teacher replied</span>`);
     if (t.subject_type === 'student') {
       const subj = studentOpts.find(x => x.id === t.subject_id);
@@ -1582,6 +1739,346 @@ document.getElementById('outcomeModal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeOutcome();
 });
 function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+// ============================================================
+// RECURRING TASKS
+// ============================================================
+const WEEKDAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+// ------------------------------------------------------------
+// ruleFiresOn(rule, dateObj) — pure function, no I/O.
+//
+// A COPY of this lives in netlify/functions/generate-recurring-
+// tasks.js, which actually generates the tasks — this copy only
+// drives the "next occurrence" preview below. There is no shared
+// module mechanism between the static portal and Netlify Functions
+// in this codebase, so the two must be kept in sync by hand: a
+// change here needs the same change there, and vice versa.
+// ------------------------------------------------------------
+function ruleFiresOn(rule, dateObj) {
+  const d   = dateObj.getDate();
+  const dow = dateObj.getDay();
+  const lastDayOfMonth =
+    new Date(dateObj.getFullYear(), dateObj.getMonth() + 1, 0).getDate();
+
+  switch (rule.recurrence_type) {
+    case 'daily':
+      return true;
+    case 'weekly':
+      return dow === rule.weekday;
+    case 'monthly_day':
+      if (rule.day_of_month === -1) return d === lastDayOfMonth;
+      return d === rule.day_of_month || (rule.day_of_month > lastDayOfMonth && d === lastDayOfMonth);
+    case 'monthly_weekday': {
+      if (dow !== rule.weekday) return false;
+      const nth = Math.ceil(d / 7);
+      if (rule.week_of_month === -1) return d + 7 > lastDayOfMonth;
+      return nth === rule.week_of_month;
+    }
+    default:
+      return false;
+  }
+}
+
+function previewNextOccurrences(rule, count) {
+  const out = [];
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  for (let i = 0; i < 400 && out.length < count; i++) {
+    if (ruleFiresOn(rule, d)) out.push(new Date(d));
+    d.setDate(d.getDate() + 1);
+  }
+  return out;
+}
+
+function ordinal(n) {
+  const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+function describeRecurrence(r) {
+  if (r.recurrence_type === 'daily')  return 'Every day';
+  if (r.recurrence_type === 'weekly') return `Weekly on ${WEEKDAY_NAMES[r.weekday]}`;
+  if (r.recurrence_type === 'monthly_day') {
+    return r.day_of_month === -1 ? 'Monthly on the last day' : `Monthly on the ${ordinal(r.day_of_month)}`;
+  }
+  if (r.recurrence_type === 'monthly_weekday') {
+    const nth = r.week_of_month === -1 ? 'last' : ordinal(r.week_of_month);
+    return `Monthly on the ${nth} ${WEEKDAY_NAMES[r.weekday]}`;
+  }
+  return r.recurrence_type;
+}
+
+// One-time setup of the fields that don't depend on any rule: the
+// day-of-month list, and the studio/assignee selects (reusing the
+// same `studios`/`admins` globals the task modal already uses).
+function initRecurringFormOptions() {
+  const dom = document.getElementById('rtDayOfMonth');
+  dom.innerHTML = Array.from({ length: 31 }, (_, i) => i + 1)
+    .map(n => `<option value="${n}">${ordinal(n)}</option>`).join('')
+    + `<option value="-1">Last day of the month</option>`;
+
+  document.getElementById('rtStudio').innerHTML =
+    `<option value="">All studios — shared queue</option>` +
+    studios.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
+  document.getElementById('rtAssignee').innerHTML =
+    `<option value="">Unassigned — studio queue</option>` +
+    admins.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+}
+
+async function loadRecurringTasks() {
+  const { data, error } = await db.from('recurring_tasks').select('*')
+    .order('created_at', { ascending: false });
+  if (error) { showToast('Could not load recurring tasks: ' + error.message, 'error'); return; }
+  recurringTasks = data ?? [];
+
+  recurringSubjectsByRule = {};
+  const ids = recurringTasks.map(r => r.id);
+  if (ids.length) {
+    const { data: subs } = await db.from('recurring_task_subjects').select('*')
+      .in('recurring_task_id', ids);
+    (subs ?? []).forEach(s => { (recurringSubjectsByRule[s.recurring_task_id] ??= []).push(s); });
+  }
+}
+
+async function openRecurringListModal() {
+  document.getElementById('recurringListModal').classList.remove('hidden');
+  document.getElementById('recurringListBody').innerHTML =
+    `<div class="loading"><div class="spinner"></div> Loading…</div>`;
+  await loadRecurringTasks();
+  renderRecurringList();
+}
+
+function closeRecurringListModal() {
+  document.getElementById('recurringListModal').classList.add('hidden');
+}
+
+function renderRecurringList() {
+  const el = document.getElementById('recurringListBody');
+  if (!recurringTasks.length) {
+    el.innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon">🔁</div>
+      <h3>No recurring tasks yet</h3>
+      <p>Set one up for anything that repeats on a schedule.</p>
+    </div>`;
+    return;
+  }
+
+  const studioName   = id => studios.find(s => s.id === id)?.name ?? 'All studios';
+  const assigneeName = id => admins.find(a => a.id === id)?.name ?? 'Unassigned';
+
+  el.innerHTML = recurringTasks.map(r => {
+    const subs = recurringSubjectsByRule[r.id] ?? [];
+    const subjTxt = subs.length
+      ? `${subs.length} specific ${subs[0].subject_type}${subs.length > 1 ? 's' : ''}`
+      : 'Generic — no specific subject';
+
+    return `<div class="rt-row">
+      <div>
+        <div class="task-title">${escapeHtml(r.title)}</div>
+        <div class="task-meta">
+          <span>${describeRecurrence(r)}</span>
+          <span class="tag">${studioName(r.studio_id)}</span>
+          <span class="tag">${assigneeName(r.assigned_to)}</span>
+          <span class="tag">${subjTxt}</span>
+          ${!r.is_active ? '<span class="tag" style="opacity:0.65;">Paused</span>' : ''}
+        </div>
+      </div>
+      <div class="flex gap-1" style="align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+        <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.78rem;color:var(--mid-grey);cursor:pointer;white-space:nowrap;">
+          <input type="checkbox" ${r.is_active ? 'checked' : ''} onchange="toggleRecurringActive('${r.id}', this.checked)">
+          Active
+        </label>
+        <button class="btn btn-ghost btn-sm" onclick="openRecurringEditModal('${r.id}')">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteRecurringTask('${r.id}')">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function toggleRecurringActive(id, checked) {
+  const { error } = await db.from('recurring_tasks').update({ is_active: checked }).eq('id', id);
+  if (error) { showToast('Could not update: ' + error.message, 'error'); return; }
+  const r = recurringTasks.find(x => x.id === id);
+  if (r) r.is_active = checked;
+  renderRecurringList();
+}
+
+async function deleteRecurringTask(id) {
+  const r = recurringTasks.find(x => x.id === id);
+  if (!confirm(
+    `Delete the recurring rule "${r?.title ?? ''}"?\n\n` +
+    `Tasks it already generated stay on the record — only the rule itself is removed.`
+  )) return;
+
+  const { error } = await db.from('recurring_tasks').delete().eq('id', id);
+  if (error) { showToast('Could not delete: ' + error.message, 'error'); return; }
+  showToast('Recurring rule deleted.', 'success');
+  await loadRecurringTasks();
+  renderRecurringList();
+}
+
+// Delete button inside the editor — same confirm-and-delete, then
+// close the editor and return to the list rather than leaving a
+// modal open over a rule that no longer exists.
+async function deleteRecurringTaskFromEditor() {
+  const id = document.getElementById('rtId').value;
+  if (!id) return;
+  await deleteRecurringTask(id);
+  closeRecurringEditModal();
+}
+
+function openRecurringEditModal(id) {
+  const r = id ? recurringTasks.find(x => x.id === id) : null;
+
+  document.getElementById('rtId').value = id ?? '';
+  document.getElementById('rtModalTitle').textContent = id ? 'Edit recurring task' : 'New recurring task';
+  document.getElementById('rtTitle').value = r?.title ?? '';
+  document.getElementById('rtType').value  = r?.recurrence_type ?? 'weekly';
+  document.getElementById('rtStudio').value   = r?.studio_id   ?? '';
+  document.getElementById('rtAssignee').value = r?.assigned_to ?? '';
+  document.getElementById('rtActive').checked = r ? r.is_active : true;
+  document.getElementById('rtDeleteBtn').classList.toggle('hidden', !id);
+
+  // Reasonable defaults so the sub-fields are never blank, then
+  // override from the existing rule where one is being edited.
+  document.getElementById('rtWeekday').value     = r?.weekday ?? 1;
+  document.getElementById('rtWeekdayNth').value  = r?.weekday ?? 1;
+  document.getElementById('rtDayOfMonth').value  = r?.day_of_month ?? 1;
+  document.getElementById('rtWeekOfMonth').value = r?.week_of_month ?? 1;
+
+  onRecurrenceTypeChange();
+
+  const subs = id ? (recurringSubjectsByRule[id] ?? []) : [];
+  rtSelectedSubjects = new Set(subs.map(s => s.subject_id));
+  document.getElementById('rtSubjectType').value = subs.length ? subs[0].subject_type : '';
+  document.getElementById('rtSubjectSearch').value = '';
+  onSubjectTypeChange();
+
+  document.getElementById('recurringEditModal').classList.remove('hidden');
+}
+
+function closeRecurringEditModal() {
+  document.getElementById('recurringEditModal').classList.add('hidden');
+}
+
+function onRecurrenceTypeChange() {
+  const type = document.getElementById('rtType').value;
+  document.getElementById('rtWeeklyField').classList.toggle('visible', type === 'weekly');
+  document.getElementById('rtMonthlyDayField').classList.toggle('visible', type === 'monthly_day');
+  document.getElementById('rtMonthlyWeekdayField').classList.toggle('visible', type === 'monthly_weekday');
+  updateRecurringPreview();
+}
+
+function onSubjectTypeChange() {
+  const type = document.getElementById('rtSubjectType').value;
+  document.getElementById('rtSubjectPicker').classList.toggle('visible', !!type);
+  if (!type) rtSelectedSubjects.clear();
+  renderSubjectChecklist();
+}
+
+function renderSubjectChecklist() {
+  const type   = document.getElementById('rtSubjectType').value;
+  const search = document.getElementById('rtSubjectSearch').value.trim().toLowerCase();
+  const el     = document.getElementById('rtSubjectList');
+
+  if (!type) { el.innerHTML = ''; return; }
+
+  // Only students/teachers still active are offered — matches the
+  // filter the generator itself applies, so a rule can't be set up
+  // against someone it would silently skip at generation time.
+  const pool = type === 'student'
+    ? studentOpts.filter(s => ['active', 'trial'].includes(s.status))
+    : teacherOpts;
+  const filtered = pool.filter(x => !search || x.name.toLowerCase().includes(search));
+
+  el.innerHTML = filtered.length
+    ? filtered.map(x => `
+      <label style="display:flex;align-items:center;gap:0.4rem;padding:0.3rem 0.1rem;font-size:0.85rem;cursor:pointer;">
+        <input type="checkbox" value="${x.id}" ${rtSelectedSubjects.has(x.id) ? 'checked' : ''}
+               onchange="onSubjectCheck('${x.id}', this.checked)">
+        ${escapeHtml(x.name)}
+      </label>`).join('')
+    : `<div class="text-sm text-muted" style="padding:0.4rem 0;">No match.</div>`;
+}
+
+function onSubjectCheck(id, checked) {
+  if (checked) rtSelectedSubjects.add(id); else rtSelectedSubjects.delete(id);
+}
+
+function updateRecurringPreview() {
+  const type = document.getElementById('rtType').value;
+  const draft = {
+    recurrence_type: type,
+    weekday: type === 'weekly' ? Number(document.getElementById('rtWeekday').value)
+           : type === 'monthly_weekday' ? Number(document.getElementById('rtWeekdayNth').value)
+           : null,
+    day_of_month:  type === 'monthly_day' ? Number(document.getElementById('rtDayOfMonth').value) : null,
+    week_of_month: type === 'monthly_weekday' ? Number(document.getElementById('rtWeekOfMonth').value) : null,
+  };
+  const dates = previewNextOccurrences(draft, 3);
+  document.getElementById('rtPreview').textContent = dates.length
+    ? 'Next occurrences: ' + dates.map(d => formatShortDate(d)).join(', ')
+    : 'No upcoming date found.';
+}
+
+async function saveRecurringTask() {
+  const id    = document.getElementById('rtId').value;
+  const title = document.getElementById('rtTitle').value.trim();
+  if (!title) { showToast('A recurring task needs a title.', 'error'); return; }
+
+  const type = document.getElementById('rtType').value;
+  const payload = {
+    title,
+    recurrence_type: type,
+    weekday: null, day_of_month: null, week_of_month: null,
+    studio_id:   document.getElementById('rtStudio').value   || null,
+    assigned_to: document.getElementById('rtAssignee').value || null,
+    is_active:   document.getElementById('rtActive').checked,
+  };
+  if (type === 'weekly')          payload.weekday = Number(document.getElementById('rtWeekday').value);
+  if (type === 'monthly_day')     payload.day_of_month = Number(document.getElementById('rtDayOfMonth').value);
+  if (type === 'monthly_weekday') {
+    payload.weekday       = Number(document.getElementById('rtWeekdayNth').value);
+    payload.week_of_month = Number(document.getElementById('rtWeekOfMonth').value);
+  }
+
+  let ruleId = id || null;
+  if (id) {
+    const { error } = await db.from('recurring_tasks').update(payload).eq('id', id);
+    if (error) { showToast('Could not save: ' + error.message, 'error'); return; }
+  } else {
+    const { data, error } = await db.from('recurring_tasks')
+      .insert({ ...payload, created_by: me.id }).select('id').single();
+    if (error) { showToast('Could not save: ' + error.message, 'error'); return; }
+    ruleId = data.id;
+  }
+
+  // Subjects are replaced wholesale — simplest correct approach for a
+  // list that's realistically a handful of names, not hundreds.
+  await db.from('recurring_task_subjects').delete().eq('recurring_task_id', ruleId);
+  const subjType = document.getElementById('rtSubjectType').value;
+  if (subjType && rtSelectedSubjects.size) {
+    const rows = [...rtSelectedSubjects].map(sid => ({
+      recurring_task_id: ruleId, subject_type: subjType, subject_id: sid,
+    }));
+    const { error: sErr } = await db.from('recurring_task_subjects').insert(rows);
+    if (sErr) { showToast('Rule saved, but the subjects failed: ' + sErr.message, 'warning'); }
+  }
+
+  showToast('Recurring task saved.', 'success');
+  closeRecurringEditModal();
+  await loadRecurringTasks();
+  renderRecurringList();
+}
+
+document.getElementById('recurringListModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeRecurringListModal();
+});
+document.getElementById('recurringEditModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeRecurringEditModal();
+});
 </script>
 </body>
 </html>

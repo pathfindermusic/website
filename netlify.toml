@@ -26,6 +26,18 @@
   schedule = "0 20 * * *"
 
 # ------------------------------------------------------------
+# Recurring tasks — turns a due rule into an actual task
+#
+# 19:00 UTC, an hour ahead of the lesson reminders — 5 AM in
+# Melbourne through winter, 6 AM through daylight saving. Tasks for
+# the day are waiting by the time anyone checks Front Desk.
+#
+# Internal only — no email, just rows in `tasks`.
+# ------------------------------------------------------------
+[functions."generate-recurring-tasks"]
+  schedule = "0 19 * * *"
+
+# ------------------------------------------------------------
 # Weekly attendance marking report
 #
 # 07:00 UTC on Sundays — 5 PM Melbourne through winter, 6 PM
