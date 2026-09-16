@@ -218,9 +218,15 @@ This caused a real bug where Wednesday lessons appeared on Thursday.
 - **`student_schedule_view`** — one row per (occurrence × student), so students
   can filter by `student_id` and group lessons appear for every member.
 
-Attendance is joined by **subquery** in `schedule_view`, not `LEFT JOIN` —
-a join would fan the view out to one row per student and duplicate every group
-lesson on the admin grid.
+Attendance is joined by **`LEFT JOIN LATERAL`** in `schedule_view` (migration
+#43), not a plain `LEFT JOIN` — a plain join would fan the view out to one row
+per student and duplicate every group lesson on the admin grid. The roster
+count/name, the attendance marks, and the substitute's name are each computed
+once per row by their own lateral subquery and reused across every column that
+needs a piece of them, rather than the same scalar subquery re-running once
+per column. `student_schedule_view` doesn't have this pattern — it's already
+one row per (occurrence × student), so a single plain subquery for
+`student_count` and a plain `LEFT JOIN` for attendance are all it needs.
 
 ---
 
@@ -970,7 +976,13 @@ table referencing `lesson_occurrences`:
   the page title, a "Teacher-added only" filter, and "Added by <name>";
   approving one is the same Retire/Reactivate button, relabelled "Approve".
   Teachers can edit their own pending item (fix a typo) but can't activate
-  it themselves.
+  it themselves. A pending item an admin doesn't want to maintain gets
+  "Discard" instead (migration #42, `phase6d-bok-artefact-discard.sql`,
+  `bok_artefacts.is_discarded`) — never a delete, since a teacher may
+  already have used it in a real lesson before review; it just drops out
+  of Pending review, behaves like a retired item (hidden unless "Show
+  retired" is checked, flagged "Discarded" rather than "Retired"), and a
+  "Restore" button puts it back to pending if an admin changes their mind.
 - **Read-only lesson view also shows "Last lesson".** Clicking a lesson
   card opens `openLessonView()`, a separate read-only modal from the note
   editor — it now shows the same "Last lesson" recap (previous occurrence's
@@ -1059,6 +1071,8 @@ Run in order. All are re-runnable.
 39. `phase6b-bok-retired-artefact-visibility.sql` — fixes the `bok_artefacts` read policy so a retired artefact stays visible to a teacher/student already looking at a past lesson that used it, instead of vanishing from their history
 40. `phase6c-bok-teacher-custom-artefacts.sql` — adds `bok_artefacts.is_custom`, plus RLS letting a teacher insert/update their own pending (`is_active=false`) custom artefact and read it back — lets a teacher add a song/technique that isn't in the library yet, straight from the lesson-note picker
 41. `phase7-recurring-tasks.sql` — `recurring_tasks`, `recurring_task_subjects`, `recurring_task_runs`, `tasks.recurring_task_id`, extends `tasks.source` to include `'recurring'`, RLS on all three new tables — repeating task rules, generated each morning by `generate-recurring-tasks.js` (see "Recurring tasks" above)
+42. `phase6d-bok-artefact-discard.sql` — adds `bok_artefacts.is_discarded`, no RLS change — lets an admin discard a pending teacher-added artefact they don't want to maintain, without deleting the row (a teacher may already have used it in a real lesson before review)
+43. `phase5-schedule-view-optimize.sql` — rebuilds `schedule_view` to compute the roster, attendance and substitute-name lookups once per row via `LEFT JOIN LATERAL`, instead of the same scalar subquery re-executing ~5 times per column — fixes a "statement timeout" on the admin's unfiltered whole-week Schedule view (same symptom as #36, different cause: repetition, not a missing index)
 
 ---
 

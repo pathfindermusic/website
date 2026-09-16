@@ -1295,6 +1295,9 @@ async function notifyStudentOfNote(occurrenceId, noteText, driveLink, pickedArte
       showToast('Note saved, but the email failed: ' + (data.error ?? ''), 'warning');
     } else if (data.sent > 0) {
       showToast(`Student notified by email.`, 'success');
+      if (data.total > 1 && data.bcc && data.summarySent === false) {
+        showToast('Students were notified, but the studio summary copy failed to send.', 'warning');
+      }
     }
   } catch (err) {
     showToast('Note saved, but the email failed: ' + err.message, 'warning');

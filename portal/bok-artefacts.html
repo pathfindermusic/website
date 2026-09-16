@@ -77,6 +77,11 @@
       padding: 0.15rem 0.55rem; border-radius: 3px; white-space: nowrap;
       background: rgba(37,99,235,0.08); border: 1px solid rgba(37,99,235,0.25); color: #1e40af;
     }
+    .discarded-pill {
+      display: inline-block; font-size: 0.68rem; font-weight: 600;
+      padding: 0.15rem 0.55rem; border-radius: 3px; white-space: nowrap;
+      background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b;
+    }
     .custom-tag {
       display: inline-block; font-size: 0.68rem; font-weight: 500;
       padding: 0.1rem 0.45rem; border-radius: 3px; white-space: nowrap;
@@ -379,10 +384,16 @@ async function loadArtefacts() {
 }
 
 // A pending item is a teacher's custom submission an admin hasn't
-// activated yet — kept distinct from "retired" (an admin-added item
+// reviewed yet — kept distinct from "retired" (an admin-added item
 // taken out of rotation) even though both are is_active=false, so it
 // isn't accidentally hidden by the "Show retired" toggle.
-function isPending(a) { return a.is_custom && !a.is_active; }
+// A discarded item is a custom submission an admin looked at and
+// decided not to maintain — never deleted (a teacher may already have
+// used it in a real lesson), just excluded from Pending review from
+// here on. It behaves like a retired item — hidden by default, visible
+// under "Show retired", reversible via Restore.
+function isPending(a)   { return a.is_custom && !a.is_active && !a.is_discarded; }
+function isDiscarded(a) { return a.is_custom && a.is_discarded; }
 
 // ---- Filter + render ----
 function filterArtefacts() {
@@ -430,11 +441,25 @@ function renderArtefacts(list) {
 
   body.innerHTML = list.map(a => {
     const grade = gradeLevelById[a.grade_level_id];
-    const pending = isPending(a);
+    const pending   = isPending(a);
+    const discarded = isDiscarded(a);
     const addedByName = a.is_custom ? (profileNameById[a.created_by] || 'a teacher') : null;
     let statusPill = '';
-    if (pending)            statusPill = `<span class="pending-pill" style="margin-top:0.3rem;display:inline-block;">Pending review</span>`;
-    else if (!a.is_active)  statusPill = `<span class="retired-pill" style="margin-top:0.3rem;display:inline-block;">Retired</span>`;
+    if (pending)             statusPill = `<span class="pending-pill" style="margin-top:0.3rem;display:inline-block;">Pending review</span>`;
+    else if (discarded)      statusPill = `<span class="discarded-pill" style="margin-top:0.3rem;display:inline-block;">Discarded</span>`;
+    else if (!a.is_active)   statusPill = `<span class="retired-pill" style="margin-top:0.3rem;display:inline-block;">Retired</span>`;
+
+    let actionBtns;
+    if (pending) {
+      actionBtns = `
+        <button class="btn btn-secondary btn-sm" onclick="toggleArtefactActive('${a.id}', true)">Approve</button>
+        <button class="btn btn-danger btn-sm" onclick="discardArtefact('${a.id}')">Discard</button>`;
+    } else if (discarded) {
+      actionBtns = `<button class="btn btn-secondary btn-sm" onclick="restoreArtefact('${a.id}')">Restore</button>`;
+    } else {
+      actionBtns = `<button class="btn btn-secondary btn-sm" onclick="toggleArtefactActive('${a.id}', ${!a.is_active})">${a.is_active ? 'Retire' : 'Reactivate'}</button>`;
+    }
+
     return `
     <tr class="art-title-row ${a.is_active ? '' : 'retired'}">
       <td>
@@ -451,9 +476,7 @@ function renderArtefacts(list) {
       <td>
         <div class="action-btns">
           <button class="btn btn-secondary btn-sm" onclick="openArtefactModal('${a.id}')">Edit</button>
-          <button class="btn btn-secondary btn-sm" onclick="toggleArtefactActive('${a.id}', ${!a.is_active})">
-            ${a.is_active ? 'Retire' : (pending ? 'Approve' : 'Reactivate')}
-          </button>
+          ${actionBtns}
         </div>
       </td>
     </tr>`;
@@ -547,6 +570,37 @@ async function toggleArtefactActive(id, makeActive) {
     .eq('id', id);
   if (error) { showToast('Error updating artefact: ' + error.message, 'error'); return; }
   showToast(makeActive ? 'Artefact reactivated.' : 'Artefact retired.', 'success');
+  await loadArtefacts();
+}
+
+// "Not maintaining this" for a pending teacher-added item — never a
+// delete. A teacher may already have used it in a real lesson before
+// review (the note picker offers a teacher's own pending items right
+// away), and that lesson's materials list depends on the row still
+// existing. Discarding just takes it out of Pending review; Restore
+// (below) undoes it.
+async function discardArtefact(id) {
+  const a = allArtefacts.find(x => x.id === id);
+  if (!confirm(
+    `Discard "${a?.title ?? 'this artefact'}"?\n\n` +
+    `It stops appearing in Pending review and won't be offered to any teacher. ` +
+    `It isn't deleted — find it again under "Show retired" to restore it.`
+  )) return;
+
+  const { error } = await db.from('bok_artefacts')
+    .update({ is_discarded: true, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) { showToast('Error discarding artefact: ' + error.message, 'error'); return; }
+  showToast('Artefact discarded.', 'success');
+  await loadArtefacts();
+}
+
+async function restoreArtefact(id) {
+  const { error } = await db.from('bok_artefacts')
+    .update({ is_discarded: false, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) { showToast('Error restoring artefact: ' + error.message, 'error'); return; }
+  showToast('Restored to pending review.', 'success');
   await loadArtefacts();
 }
 

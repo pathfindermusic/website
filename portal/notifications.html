@@ -601,6 +601,9 @@ async function doSend() {
         `Sent to ${data.sent} student${data.sent !== 1 ? 's' : ''}.` +
         (data.unreachable ? ` ${data.unreachable} skipped — no email on file.` : ''),
         data.unreachable ? 'warning' : 'success');
+      if (data.total > 1 && data.bcc && data.summarySent === false) {
+        showToast('Students were notified, but the studio summary copy failed to send.', 'warning');
+      }
       document.getElementById('subject').value  = '';
       document.getElementById('bodyText').value = '';
       clearPreview('Choose an audience to preview.');

@@ -125,7 +125,7 @@ exports.handler = async (event) => {
       // Build context for template placeholders
       const l = occ.lessons ?? {};
       const [tRows, sRows] = await Promise.all([
-        l.teacher_id ? get(`teachers?id=eq.${l.teacher_id}&select=user_id`) : [],
+        l.teacher_id ? get(`teachers?id=eq.${l.teacher_id}&select=user_id,virtual_room_link`) : [],
         l.studio_id  ? get(`studios?id=eq.${l.studio_id}&select=name,email`) : [],
       ]);
       let teacherName = '';
@@ -141,6 +141,7 @@ exports.handler = async (event) => {
         teacher_name: teacherName,
         studio:      sRows?.[0]?.name ?? '',
         studioEmail: sRows?.[0]?.email ?? null,
+        zoomLink:    tRows?.[0]?.virtual_room_link ?? '',
       };
 
     } else {
@@ -276,6 +277,7 @@ exports.handler = async (event) => {
         lesson_day:     lessonContext?.lesson_day     ?? '',
         lesson_weekday: lessonContext?.lesson_weekday ?? '',
         studio:       lessonContext?.studio       ?? '',
+        zoom_link:    lessonContext?.zoomLink     ?? '',
       };
       const filledSubject = fill(subject,  vars);
       const filledBody    = fill(bodyText, vars);
@@ -324,7 +326,8 @@ exports.handler = async (event) => {
     // ============================================================
     // 5b. Bulk send: one summary to the studio instead of N BCCs
     // ============================================================
-    let summarySent = false;
+    let summarySent  = false;
+    let summaryError = null; // null = no summary was expected this send
     if (bcc && recipients.length > 1 && sent > 0) {
       try {
         const sr = await fetch('https://api.resend.com/emails', {
@@ -348,9 +351,11 @@ exports.handler = async (event) => {
         });
         summarySent = sr.ok;
         if (!sr.ok) {
-          console.error('[send-email] Summary email failed:', sr.status, await sr.text());
+          summaryError = `${sr.status}: ${await sr.text()}`;
+          console.error('[send-email] Summary email failed:', summaryError);
         }
       } catch (err) {
+        summaryError = err.message;
         console.error('[send-email] Summary email error:', err.message);
       }
     }
@@ -376,6 +381,8 @@ exports.handler = async (event) => {
           bcc,
           status:          failures.length ? 'partial' : 'sent',
           error:           failures.length ? failures.join(' | ').slice(0, 2000) : null,
+          summary_sent:    (bcc && recipients.length > 1 && sent > 0) ? summarySent : null,
+          summary_error:   summaryError ? summaryError.slice(0, 2000) : null,
         }),
       });
     } catch (_) { /* logging must never break the send */ }

@@ -2522,9 +2522,11 @@ async function removeStudentFromOccurrence(lessonId, studentId, occId) {
 }
 
 async function saveOccurrence() {
-  const occId   = document.getElementById('occId').value;
+  const occId    = document.getElementById('occId').value;
   const isOnline = document.getElementById('occIsOnline').checked;
   const notes    = document.getElementById('occNotes').value.trim();
+  const occ      = allOccurrences.find(o => o.id === occId);
+  const wasOnline = occ?.is_online ?? false;
 
   // A substitution belongs to this occurrence alone. Staff cover moves
   // the lesson into that teacher's schedule; an external name is
@@ -2556,8 +2558,79 @@ async function saveOccurrence() {
   } else {
     showToast('Lesson updated.', 'success');
   }
+
+  // Newly marked online — offer to let the student/parent know, with
+  // the teacher's Zoom link. Only on the false→true transition, so
+  // resaving an already-online lesson (e.g. just adding a note)
+  // doesn't re-notify every time.
+  if (isOnline && !wasOnline) {
+    const notify = confirm(
+      'Email the student(s) to let them know this lesson will be conducted online, ' +
+      "with the teacher's Zoom link?"
+    );
+    if (notify) await sendOnlineLessonEmail(occId, occ);
+  }
+
   closeOccModal();
   loadView();
+}
+
+// Companion to sendCancellationEmail below — same "occurrence" recipient
+// mode and placeholder set, plus {{zoom_link}} (added server-side in
+// send-email.js from the teacher's virtual_room_link).
+async function sendOnlineLessonEmail(occId, occ) {
+  const l        = occ?.lessons ?? {};
+  const studioId = l.studio_id;
+  const studio   = allStudios.find(s => s.id === studioId);
+  const teacher  = allTeachers.find(t => t.id === l.teacher_id);
+
+  if (!studio?.email) {
+    showToast('Lesson marked online, but no notice sent — the studio has no email address set.', 'warning');
+    return;
+  }
+  if (!teacher?.virtual_room_link) {
+    showToast('Lesson marked online, but no notice sent — this teacher has no Zoom / virtual room link set.', 'warning');
+    return;
+  }
+
+  const bodyText =
+    'Dear {{student_name}},\n\n' +
+    'Just a heads up that your {{instrument}} lesson with {{teacher_name}} at {{lesson_time}} ' +
+    'on {{lesson_day}} will be conducted online instead of in person.\n\n' +
+    '**Join here: [Join on Zoom]({{zoom_link}})**\n\n' +
+    'Kind regards,\nPathfinder Music Lessons';
+
+  const subject = 'Your {{instrument}} lesson on {{lesson_day}} is now online';
+
+  try {
+    const res = await fetch('/.netlify/functions/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action:       'send',
+        mode:         'occurrence',
+        occurrenceId: occId,
+        from:         studio.email,
+        fromName:     `Pathfinder Music Lessons (${studio.name})`,
+        subject,
+        bodyText,
+        sentBy:       currentProfile?.id ?? null,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showToast('Lesson updated, but the online notice failed: ' + (data.error ?? ''), 'warning');
+    } else if (data.sent > 0) {
+      showToast(`Online lesson notice sent to ${data.sent} student${data.sent !== 1 ? 's' : ''}.`, 'success');
+      if (data.total > 1 && data.bcc && data.summarySent === false) {
+        showToast('Students were notified, but the studio summary copy failed to send.', 'warning');
+      }
+    } else {
+      showToast('Lesson updated — no contactable student email found.', 'warning');
+    }
+  } catch (err) {
+    showToast('Lesson updated, but the online notice failed: ' + err.message, 'warning');
+  }
 }
 
 // Editing a series. Changing the day, time or teacher rewrites only
@@ -3065,6 +3138,9 @@ async function sendCancellationEmail(occId, occ, scope = 'single') {
       showToast('Lesson cancelled, but the notice failed: ' + (data.error ?? ''), 'warning');
     } else if (data.sent > 0) {
       showToast(`Cancellation notice sent to ${data.sent} student${data.sent !== 1 ? 's' : ''}.`, 'success');
+      if (data.total > 1 && data.bcc && data.summarySent === false) {
+        showToast('Students were notified, but the studio summary copy failed to send.', 'warning');
+      }
     } else {
       showToast('Lesson cancelled — no contactable student email found.', 'warning');
     }

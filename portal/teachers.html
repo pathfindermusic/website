@@ -311,7 +311,7 @@ async function loadTeachers() {
   // Fetch teachers
   const { data: teacherData, error } = await db
     .from('teachers')
-    .select('id, instruments, studio_ids, virtual_room_link, user_id')
+    .select('id, instruments, studio_ids, virtual_room_link, teaching_room, user_id')
     .order('id');
 
   if (error) { showToast('Error loading teachers: ' + error.message, 'error'); return; }
