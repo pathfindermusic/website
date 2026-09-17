@@ -284,8 +284,25 @@ studio as the only record of what went out (it lands in Inbox, not Sent).
   hides everything from the cancellation point. It also sets `lessons.status`
   to cancelled, which frees the slot for rebooking — clash detection only
   considers active lessons.
+- **An occurrence where every student is marked Absent (No Credit/Notice
+  Given) or Teacher Cancelled is a freed slot, not a clash.** Clash detection
+  in `lessons.html` (`saveLesson()`) reads `attendance` directly for any
+  overlapping occurrence rather than trusting `lesson_occurrences.status` —
+  admin-marked attendance never syncs that status field the way the teacher
+  dashboard's does, so status alone isn't reliable for this. This is what
+  makes booking an ad-hoc/makeup lesson into a slot that looks occupied
+  actually work.
 - **Teacher detail page is read-only**; Edit bounces back to the Teachers page
   rather than duplicating the edit modal's validation logic.
+- **Admin sidebar order: Front desk, Teaching, Curriculum, Reports** — admins
+  spend most of their time in Front desk (Tasks/Enquiries/Notifications), so
+  it leads. Tasks is first within Front desk and is also the post-login
+  landing page for `admin`/`superuser` (`login.html`'s `redirectByRole`).
+  The old "Schedule" link (`dashboard-admin.html`) was dropped from every
+  sidebar and from the login redirect — the weekly Lessons view and the
+  Lessons/Students dashboards already cover what it showed. The page itself
+  is still on disk and reachable by direct URL if it's ever wanted back;
+  ask if it should be deleted outright.
 
 ## Row Level Security — read this before touching a policy
 
@@ -793,6 +810,15 @@ a date bucket resets the status filter, and vice versa.
   it's silently ignored and Supabase falls back to the Site URL.
 - **PowerShell prints stderr in red.** Git progress and npm warnings look like
   failures and aren't.
+- **A student roster scoped by one filter but not another silently balloons.**
+  `attendance-report.html`'s `loadReport()` built its student list from
+  `studio` alone while the lesson-row query also filtered by `teacher` — so
+  filtering to one teacher still listed every other active student at that
+  studio as a "No lessons in this range" row next to them. Fixed by deriving
+  "this teacher's students" from `lessons` → `lesson_students` (never
+  `student_teachers`, which is orphaned — see below) and unioning in anyone
+  with an actual attendance row in range, so a genuine occurrence-only guest
+  is never hidden by the narrower scope.
 
 ## Known limitations & open decisions
 
@@ -804,8 +830,8 @@ a date bucket resets the status filter, and vice versa.
   would return other students' rows if queried directly with the anon key.
   Fixing needs `security_invoker = on` plus read policies across ~8 underlying
   tables. **Should be closed before go-live.**
-- **Not built:** attendance report (sidebar link is dead), teacher Lesson Notes
-  page, email history page. `send-email.js` already records every send in
+- **Not built:** teacher Lesson Notes page, email history page.
+  `send-email.js` already records every send in
   `email_log` including each recipient's Resend message ID, so a history page
   can show delivery status without further backend work. Per-recipient
   delivery/bounce status at scale would want Resend webhooks rather than
@@ -1073,6 +1099,8 @@ Run in order. All are re-runnable.
 41. `phase7-recurring-tasks.sql` — `recurring_tasks`, `recurring_task_subjects`, `recurring_task_runs`, `tasks.recurring_task_id`, extends `tasks.source` to include `'recurring'`, RLS on all three new tables — repeating task rules, generated each morning by `generate-recurring-tasks.js` (see "Recurring tasks" above)
 42. `phase6d-bok-artefact-discard.sql` — adds `bok_artefacts.is_discarded`, no RLS change — lets an admin discard a pending teacher-added artefact they don't want to maintain, without deleting the row (a teacher may already have used it in a real lesson before review)
 43. `phase5-schedule-view-optimize.sql` — rebuilds `schedule_view` to compute the roster, attendance and substitute-name lookups once per row via `LEFT JOIN LATERAL`, instead of the same scalar subquery re-executing ~5 times per column — fixes a "statement timeout" on the admin's unfiltered whole-week Schedule view (same symptom as #36, different cause: repetition, not a missing index)
+44. `phase8-email-log-summary-outcome.sql` — adds `email_log.summary_sent`/`summary_error`, no RLS change — a bulk send's separate studio-summary email (see "Notifications" below) could fail silently: the student batch still logged status='sent' with no way to tell the two outcomes apart after the fact. `send-email.js` and every page that calls it now record and surface that failure instead of swallowing it.
+45. `phase9-lesson-students-occurrence-unique.sql` — drops a leftover `UNIQUE(lesson_id, student_id)` constraint on `lesson_students` that predated occurrence-only guests (migration #37) and wrongly blocked adding the same student as a guest to a second occurrence of the same group series; replaces it with two narrower unique indexes — one permanent membership per series, one guest row per (series, occurrence) — that allow the same student to guest on multiple occurrences of one series
 
 ---
 

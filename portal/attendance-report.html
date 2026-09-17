@@ -86,11 +86,20 @@
   </nav>
 
   <aside class="sidebar" id="sidebar">
-    <div class="sidebar-section">Teaching</div>
-    <a class="nav-item" href="dashboard-admin.html">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-      Schedule
+    <div class="sidebar-section">Front desk</div>
+    <a class="nav-item" href="tasks.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Tasks
     </a>
+    <a class="nav-item" href="enquiries.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+      Enquiries
+    </a>
+    <a class="nav-item" href="notifications.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/></svg>
+      Notifications
+    </a>
+    <div class="sidebar-section">Teaching</div>
     <a class="nav-item" href="lessons.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Lessons
@@ -107,19 +116,6 @@
     <a class="nav-item" href="bok-artefacts.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
       Artefact Library
-    </a>
-    <div class="sidebar-section">Front desk</div>
-    <a class="nav-item" href="enquiries.html">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
-      Enquiries
-    </a>
-    <a class="nav-item" href="tasks.html">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-      Tasks
-    </a>
-    <a class="nav-item" href="notifications.html">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/></svg>
-      Notifications
     </a>
     <div class="sidebar-section">Reports</div>
     <a class="nav-item active" href="attendance-report.html">
@@ -369,13 +365,33 @@ async function loadReport() {
   document.getElementById('reportBody').innerHTML =
     `<tr><td colspan="9"><div class="loading"><div class="spinner"></div> Loading…</div></td></tr>`;
 
+  // When filtering to one teacher, only THEIR students belong in this
+  // report — otherwise every other active student at the studio shows up
+  // as a "No lessons in this range" row next to them, which reads like a
+  // data problem when it's really just students who were never this
+  // teacher's in the first place. Lesson membership lives in
+  // lesson_students, not student_teachers (orphaned — see README), so
+  // that's what defines "this teacher's student" here, same as
+  // my-students.html.
+  let teacherStudentIds = null;
+  if (teacher) {
+    const { data: tLessons } = await db.from('lessons')
+      .select('id').eq('teacher_id', teacher).eq('status', 'active');
+    const tLessonIds = (tLessons ?? []).map(l => l.id);
+    const { data: tRoster } = tLessonIds.length
+      ? await db.from('lesson_students')
+          .select('student_id').in('lesson_id', tLessonIds).is('added_for_occurrence_id', null)
+      : { data: [] };
+    teacherStudentIds = new Set((tRoster ?? []).map(r => r.student_id));
+  }
+
   // Active students in scope for this filter — students with zero
   // lessons in range still show up, which is itself worth seeing.
   let studentQuery = db.from('students')
     .select('id, studio_id, status, profiles(first_name, last_name)')
     .eq('status', 'active');
   if (studio) studentQuery = studentQuery.eq('studio_id', studio);
-  const { data: students, error: studentErr } = await studentQuery;
+  const { data: allStudents, error: studentErr } = await studentQuery;
 
   if (studentErr) {
     console.error('[attendance report] students query failed:', studentErr);
@@ -383,14 +399,6 @@ async function loadReport() {
       `<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">⚠️</div><h3>Couldn't load students</h3><p>${studentErr.message}</p></div></td></tr>`;
     return;
   }
-
-  studentsMap = {};
-  (students ?? []).forEach(s => {
-    studentsMap[s.id] = {
-      name: `${s.profiles?.first_name ?? ''} ${s.profiles?.last_name ?? ''}`.trim() || '(no name)',
-      studioId: s.studio_id,
-    };
-  });
 
   let rowQuery = db.from('student_schedule_view')
     .select('student_id,date,start_time,duration_mins,occurrence_status,attendance_status,instrument,teacher_id,studio_id,teacher_name,studio_name')
@@ -408,6 +416,24 @@ async function loadReport() {
       `<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">⚠️</div><h3>Couldn't load lessons</h3><p>${rowErr.message}</p></div></td></tr>`;
     return;
   }
+
+  // A teacher's roster for this report is their permanent students, plus
+  // anyone who actually has a lesson with them in range (an occurrence-
+  // only guest, say) — so a real attendance record is never hidden just
+  // because the guest isn't a permanent member of that teacher's roster.
+  let students = allStudents ?? [];
+  if (teacherStudentIds) {
+    const withRows = new Set((rows ?? []).map(r => r.student_id));
+    students = students.filter(s => teacherStudentIds.has(s.id) || withRows.has(s.id));
+  }
+
+  studentsMap = {};
+  students.forEach(s => {
+    studentsMap[s.id] = {
+      name: `${s.profiles?.first_name ?? ''} ${s.profiles?.last_name ?? ''}`.trim() || '(no name)',
+      studioId: s.studio_id,
+    };
+  });
 
   const now     = new Date();
   const todayStr = toISODate(now);

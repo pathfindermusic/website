@@ -259,18 +259,18 @@ function renderSidebar() {
   const it = (h,l,p,a) => `<a class="nav-item ${a?'active':''}" href="${h}">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${p}</svg>${l}</a>`;
 
-  // Teaching = the operation. Front desk = work in flight.
-  let html = `<div class="sidebar-section">Teaching</div>
-    ${it('dashboard-admin.html','Schedule',I.grid)}
+  // Front desk = work in flight, so admins land here first. Teaching =
+  // the operation, Curriculum, then Reports.
+  let html = `<div class="sidebar-section">Front desk</div>
+    ${it('tasks.html','Tasks',I.task)}
+    ${it('enquiries.html','Enquiries',I.inbox,true)}
+    ${it('notifications.html','Notifications',I.mail)}
+    <div class="sidebar-section">Teaching</div>
     ${it('lessons.html','Lessons',I.cal)}
     ${it('students.html','Students',I.people)}
     ${it('teachers.html','Teachers',I.person)}
     <div class="sidebar-section">Curriculum</div>
     ${it('bok-artefacts.html','Artefact Library',I.book)}
-    <div class="sidebar-section">Front desk</div>
-    ${it('enquiries.html','Enquiries',I.inbox,true)}
-    ${it('tasks.html','Tasks',I.task)}
-    ${it('notifications.html','Notifications',I.mail)}
     <div class="sidebar-section">Reports</div>
     ${it('attendance-report.html','Attendance',I.check)}`;
   if (me.role === 'superuser') {

@@ -278,11 +278,20 @@
 
   <!-- SIDEBAR -->
   <aside class="sidebar" id="sidebar">
-    <div class="sidebar-section">Teaching</div>
-    <a class="nav-item" href="dashboard-admin.html">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-      Schedule
+    <div class="sidebar-section">Front desk</div>
+    <a class="nav-item" href="tasks.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Tasks
     </a>
+    <a class="nav-item" href="enquiries.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+      Enquiries
+    </a>
+    <a class="nav-item" href="notifications.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/></svg>
+      Notifications
+    </a>
+    <div class="sidebar-section">Teaching</div>
     <a class="nav-item active" href="lessons.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Lessons
@@ -299,19 +308,6 @@
     <a class="nav-item" href="bok-artefacts.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
       Artefact Library
-    </a>
-    <div class="sidebar-section">Front desk</div>
-    <a class="nav-item" href="enquiries.html">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
-      Enquiries
-    </a>
-    <a class="nav-item" href="tasks.html">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-      Tasks
-    </a>
-    <a class="nav-item" href="notifications.html">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/></svg>
-      Notifications
     </a>
     <div class="sidebar-section">Reports</div>
     <a class="nav-item" href="attendance-report.html">
@@ -2161,12 +2157,53 @@ async function saveLesson() {
 
   const { data: existingOcc } = overlappingIds.length
     ? await db.from('lesson_occurrences')
-        .select('lesson_id,date').in('lesson_id', overlappingIds)
-        .eq('status','scheduled')
+        .select('id,lesson_id,date').in('lesson_id', overlappingIds)
+        .neq('status','cancelled')
     : { data: [] };
+
+  // An occurrence where every student was marked Absent (No Credit/Notice
+  // Given) or Teacher Cancelled is really a freed timeslot, not a real
+  // clash — this is exactly how makeup/ad-hoc lessons get booked into a
+  // spot that looks occupied. lesson_occurrences.status alone isn't
+  // reliable for this: it only ever gets synced to 'completed'/'cancelled'
+  // when a TEACHER marks attendance from their dashboard — admin-marked
+  // attendance (markAttendanceAsAdmin, above) never updates it — so we
+  // read the actual attendance marks instead of trusting status.
+  const occIds = (existingOcc ?? []).map(o => o.id);
+  const NO_LESSON = new Set(['absent_no_credit', 'absent_notice', 'teacher_cancelled']);
+
+  const { data: occAttendance } = occIds.length
+    ? await db.from('attendance').select('lesson_occurrence_id,status').in('lesson_occurrence_id', occIds)
+    : { data: [] };
+  const marksByOcc = {};
+  (occAttendance ?? []).forEach(a => {
+    (marksByOcc[a.lesson_occurrence_id] ??= []).push(a.status);
+  });
+
+  // Occurrence-only guests count toward that occurrence's roster too —
+  // a makeup student added just for this date shouldn't make a fully-
+  // absent occurrence look freed when they were actually there (or vice
+  // versa).
+  const { data: occGuests } = occIds.length
+    ? await db.from('lesson_students').select('lesson_id,student_id,added_for_occurrence_id')
+        .in('added_for_occurrence_id', occIds)
+    : { data: [] };
+  const guestsByOcc = {};
+  (occGuests ?? []).forEach(g => {
+    (guestsByOcc[g.added_for_occurrence_id] ??= new Set()).add(g.student_id);
+  });
+  const permanentByLesson = {};
+  (existingLS ?? []).forEach(ls => {
+    (permanentByLesson[ls.lesson_id] ??= new Set()).add(ls.student_id);
+  });
 
   const datesByLesson = {};
   (existingOcc ?? []).forEach(o => {
+    const roster = new Set(permanentByLesson[o.lesson_id] ?? []);
+    (guestsByOcc[o.id] ?? []).forEach(sid => roster.add(sid));
+    const marks  = marksByOcc[o.id] ?? [];
+    const freed  = roster.size > 0 && marks.length >= roster.size && marks.every(s => NO_LESSON.has(s));
+    if (freed) return; // fully absent/cancelled — slot is open, don't block on it
     (datesByLesson[o.lesson_id] ??= new Set()).add(o.date?.slice(0,10));
   });
 

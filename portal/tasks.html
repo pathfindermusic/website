@@ -572,18 +572,18 @@ function renderSidebar() {
       ${item('my-students.html','My Students',ICONS.people)}
       ${item('tasks.html','My Tasks',ICONS.task,true)}`;
   } else {
-    // Teaching = the operation. Front desk = work in flight.
-    html = `<div class="sidebar-section">Teaching</div>
-      ${item('dashboard-admin.html','Schedule',ICONS.grid)}
+    // Front desk = work in flight, so admins land here first. Teaching =
+    // the operation, Curriculum, then Reports.
+    html = `<div class="sidebar-section">Front desk</div>
+      ${item('tasks.html','Tasks',ICONS.task,true)}
+      ${item('enquiries.html','Enquiries',ICONS.inbox)}
+      ${item('notifications.html','Notifications',ICONS.mail)}
+      <div class="sidebar-section">Teaching</div>
       ${item('lessons.html','Lessons',ICONS.cal)}
       ${item('students.html','Students',ICONS.people)}
       ${item('teachers.html','Teachers',ICONS.person)}
       <div class="sidebar-section">Curriculum</div>
       ${item('bok-artefacts.html','Artefact Library',ICONS.book)}
-      <div class="sidebar-section">Front desk</div>
-      ${item('enquiries.html','Enquiries',ICONS.inbox)}
-      ${item('tasks.html','Tasks',ICONS.task,true)}
-      ${item('notifications.html','Notifications',ICONS.mail)}
       <div class="sidebar-section">Reports</div>
       ${item('attendance-report.html','Attendance',ICONS.check)}`;
     if (me.role === 'superuser') {
