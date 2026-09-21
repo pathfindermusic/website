@@ -819,6 +819,20 @@ a date bucket resets the status filter, and vice versa.
   `student_teachers`, which is orphaned — see below) and unioning in anyone
   with an actual attendance row in range, so a genuine occurrence-only guest
   is never hidden by the narrower scope.
+- **Summary tiles computed once and never revisited.** The Tasks dashboard's
+  bucket counts (Overdue/Due today/Unassigned/…) were computed from the full
+  `tasks` array with no studio scoping, and only recomputed on load and on
+  the status filter — the studio dropdown's `onchange` called `render()`
+  (which scopes the *list*) but never `renderBuckets()`, so the tiles stayed
+  a global total no matter what studio was selected, including the default
+  studio applied on page load. Any dashboard with a summary-row-plus-list
+  pattern needs the summary explicitly recomputed on every filter that
+  should affect it — being fed by the same filtered dataset as the list
+  isn't automatic just because they're both driven by `tasks`. Fixed:
+  `bucketCounts()` now reads the studio filter itself, and the dropdown's
+  `onchange` (`onStudioFilterChange()`) calls both `renderBuckets()` and
+  `render()`. The "N open · M shown" line above the list had the identical
+  bug and got the same fix.
 
 ## Known limitations & open decisions
 
@@ -864,9 +878,15 @@ Scope for this phase was confirmed with the studio:
   certificate/recital tracking. Grades are recorded as a milestone a
   teacher/admin sets directly (same trust level as today's skill_level edit),
   not calculated from sub-scores. Revisit once the simpler version is in use.
-- Guitar only, to start. The schema is instrument-generic (see below) so the
-  same tables can carry a second instrument's BoK later without a redesign —
-  but only Guitar gets grade levels and artefacts populated in this phase.
+- Guitar only, to start, for the **artefact library** (chord charts, songs,
+  backing tracks — genuinely Guitar-specific content). The Foundation–Grade 8
+  **grade levels themselves** were always instrument-generic (see below) and,
+  as of Sep 2026, are populated/editable for every instrument, not just
+  Guitar — see the dated note under "Relationship to `student_instruments.skill_level`".
+  `bok_artefacts` stays Guitar-only until another instrument's library is
+  actually built; `student_grade_milestones` and `bok_grade_levels` never
+  were instrument-restricted at the schema level, only at the UI's
+  `GRADED_INSTRUMENTS` gate.
 
 ### Relationship to `student_instruments.skill_level`
 
@@ -880,14 +900,56 @@ and `students.html` (admin views/edits, including CSV bulk-import columns
 (≤6) / Advanced (>6) — a coarse, informal echo of the same four-tier idea the
 new framework formalises.
 
-Decision: **for Guitar students, the new Foundation–Grade 8 badge replaces
-the skill-level bar** on all four display screens above. The `skill_level`
-column, table and every non-Guitar instrument's editing flow are untouched —
-other instruments have nothing else to show yet. A Guitar student's
-`student_instruments` row still exists (instrument list, CSV import, teacher
-assignment all key off it) but its `skill_level` value stops being displayed
-once a grade-milestone row exists for that student/instrument; nothing
-deletes or migrates the old integer.
+Original decision (Phase 1): **for Guitar students, the new Foundation–Grade
+8 badge replaces the skill-level bar** on all four display screens above.
+The `skill_level` column and table are untouched either way. A graded
+student's `student_instruments` row still exists (instrument list, CSV
+import, teacher assignment all key off it) but its `skill_level` value
+stops being displayed once a grade-milestone row exists for that
+student/instrument; nothing deletes or migrates the old integer.
+
+**Sep 2026 — `dashboard-teacher.html`'s "My Schedule" was missing the
+non-Guitar half of this.** `attachCurrentGrades()` only ever populated
+`r.currentGrade` for `GRADED_INSTRUMENTS` (then just `['Guitar']`); every
+other private lesson's card showed the instrument name and nothing else,
+which read to teachers as if skill tracking didn't exist for other
+instruments at all — even though `my-students.html`, `teacher-detail.html`,
+`students.html` and the student's own dashboard were already showing the
+`skill_level` band correctly. First fix: the same function also attached
+`r.currentSkill` ({level, label}) from `student_instruments.skill_level`
+for private lessons on non-graded instruments, rendered as a neutral
+`.skill-pill` next to the instrument name — visually distinct from the
+orange `.grade-pill` so a recorded BoK grade and an informal skill
+estimate didn't look like the same kind of fact.
+
+**Sep 2026, same day — extended the Foundation–Grade 8 system to every
+instrument, not just Guitar**, per studio request: the tier/grade scheme
+requested (Foundation = the one Pre-Grade-1-equivalent level, Beginner =
+grades 1–3, Intermediate = 4–6, Advanced = 7–8) is exactly the existing
+`bok_grade_levels` table — nothing new to design or migrate, since that
+table and `student_grade_milestones` were already instrument-generic (see
+above). The only Guitar-specific thing was the UI's `GRADED_INSTRUMENTS`
+gate, hardcoded to `['Guitar']` in five places:
+`dashboard-student.html`, `dashboard-teacher.html`, `my-students.html`,
+`students.html`, `teacher-detail.html`. Each now lists all eleven
+instruments explicitly (`students.html` instead just aliases
+`GRADED_INSTRUMENTS = INSTRUMENTS` since that file already has the
+canonical list) rather than switching to an unconditional "every
+instrument is graded" — an unrecognised or mistyped instrument string
+(stray CSV import data, say) then falls back to the old skill bar
+instead of silently claiming "Not yet graded" for something that was
+never meant to be tracked this way. This makes the `.skill-pill` fallback
+added earlier the same day effectively dead code in normal use, kept only
+as that same safety net.
+
+Also added — "Tier — Grade" next to the instrument name wherever it
+previously appeared bare, so the grade is visible without opening a
+detail row: `my-students.html`'s student-card header line (was a plain
+`instrument · instrument` list) and the instrument chips in the
+`students.html` admin table (was the instrument name alone). The
+per-instrument skill/grade *rows* on `my-students.html`, `teacher-detail.html`
+and `dashboard-student.html`'s Progress tab already paired the grade with
+the instrument name and needed no display change, only the widened gate.
 
 ### Google Drive vs. querying Drive live
 

@@ -462,9 +462,10 @@ let myStudioIds   = [];   // studios this admin may create students in
 let csvData      = [];
 let currentProfile = null;
 
-// Instruments with a formal Body of Knowledge grading framework show a
-// grade selector instead of the 0-8 skill slider. Guitar only, for now.
-const GRADED_INSTRUMENTS = ['Guitar'];
+// Every instrument shows a grade selector instead of the 0-8 skill slider
+// (Sep 2026 — previously Guitar only). Reuses INSTRUMENTS directly so the
+// two lists can't drift apart.
+const GRADED_INSTRUMENTS = INSTRUMENTS;
 let bokGradeLevels = [];   // [{id, code, tier, label, sort_order}]
 
 // ---- Init ----
@@ -648,7 +649,10 @@ function renderStudents(students) {
       <td class="text-sm">${allStudiosMap[s.studio_id] ?? '–'}</td>
       <td>
         <div class="instrument-tags">
-          ${instruments.map(i => `<span class="instrument-tag">${i}</span>`).join('') || '–'}
+          ${instruments.map(i => {
+            const g = s.grades?.[i];
+            return `<span class="instrument-tag">${i}${g ? ` · ${g.tier} — ${g.label}` : ''}</span>`;
+          }).join('') || '–'}
         </div>
       </td>
       <td class="text-sm">${teachers.join(', ') || '–'}</td>

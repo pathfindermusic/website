@@ -503,9 +503,10 @@ async function loadStudents() {
     (skillMap[r.student_id] ??= {})[r.instrument] = r.skill_level;
   });
 
-  // Instruments with a formal Body of Knowledge grading framework show a
-  // grade badge instead of the 0-8 skill bar. Guitar only, for now.
-  const GRADED_INSTRUMENTS = ['Guitar'];
+  // Every instrument shows the Foundation-Grade 8 badge instead of the old
+  // 0-8 skill bar (Sep 2026 — previously Guitar only). See dashboard-student.html
+  // for why this stays an explicit list rather than "always graded".
+  const GRADED_INSTRUMENTS = ['Guitar','Bass','Drums','Piano / Keyboard','Voice / Singing','Violin','Ukulele','Music Theory','Saxophone','Band','Other'];
   const gradeMap = {};
   (cgRes.data ?? []).forEach(r => { (gradeMap[r.student_id] ??= {})[r.instrument] = r; });
 

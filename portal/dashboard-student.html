@@ -790,9 +790,13 @@ async function loadAttendance() {
 }
 
 // ---- Progress tab ----
-// Instruments with a formal Body of Knowledge grading framework show a
-// grade badge + history instead of the 0-8 skill bar. Guitar only, for now.
-const GRADED_INSTRUMENTS = ['Guitar'];
+// Every instrument shows the Foundation-Grade 8 badge + history instead of
+// the old 0-8 skill bar (Sep 2026 — previously Guitar only). Kept as an
+// explicit list rather than "always graded" so an unrecognised/mistyped
+// instrument string (e.g. from a CSV import) falls back to the skill bar
+// instead of silently showing "Not yet graded" for something that was
+// never meant to be tracked this way.
+const GRADED_INSTRUMENTS = ['Guitar','Bass','Drums','Piano / Keyboard','Voice / Singing','Violin','Ukulele','Music Theory','Saxophone','Band','Other'];
 
 async function loadProgress() {
   if (!studentRecord) return;

@@ -73,6 +73,15 @@
       padding: 0.05rem 0.45rem; border-radius: 3px; margin-left: 0.4rem;
       background: rgba(232,73,30,0.08); border: 1px solid rgba(232,73,30,0.25); color: var(--orange);
     }
+
+    /* Same shape as .grade-pill but neutral-coloured (band colour set
+       inline per level) — this is the informal 0-8 skill_level estimate,
+       not a recorded BoK grade, and shouldn't read as one. */
+    .skill-pill {
+      display: inline-block; font-size: 0.68rem; font-weight: 600;
+      padding: 0.05rem 0.45rem; border-radius: 3px; margin-left: 0.4rem;
+      background: var(--light-grey); border: 1px solid var(--border);
+    }
   </style>
 </head>
 <body>
@@ -501,7 +510,12 @@ function goToday()  { weekStart = getWeekStart(new Date()); loadSchedule(); }
 
 // ---- Load schedule ----
 let scheduleRows = [];
-const GRADED_INSTRUMENTS = ['Guitar'];   // instruments tracked via bok grade milestones instead of skill_level
+// Every instrument is tracked via bok grade milestones now (Sep 2026 —
+// previously Guitar only). Kept as an explicit list, not "always graded",
+// so an unrecognised/mistyped instrument string falls back to the
+// skill_level pill (see attachCurrentGrades()) instead of showing
+// "Not yet graded" for something never meant to be tracked this way.
+const GRADED_INSTRUMENTS = ['Guitar','Bass','Drums','Piano / Keyboard','Voice / Singing','Violin','Ukulele','Music Theory','Saxophone','Band','Other'];
 
 // schedule_view only exposes the first student's name, which is wrong for
 // group lessons — pull the full roster per lesson. A row's roster is its
@@ -554,25 +568,43 @@ async function attachStudentNames(rows) {
 
 // Attaches r.currentGrade ({tier, label}) for a private lesson on a graded
 // instrument, so "My Schedule" can show the student's grade next to the
-// instrument name. A group lesson has no single "current grade" to show,
-// so it's left null and the card just shows the instrument as before.
+// instrument name. For a private lesson on any OTHER instrument it attaches
+// r.currentSkill ({level, label}) from the informal 0-8 skill_level instead —
+// previously only Guitar showed anything here at all, which read as if
+// skill tracking simply didn't exist for other instruments. A group lesson
+// has no single student to show either against, so both stay null and the
+// card just shows the instrument as before.
 async function attachCurrentGrades(rows) {
-  rows.forEach(r => { r.currentGrade = null; });
+  rows.forEach(r => { r.currentGrade = null; r.currentSkill = null; });
 
-  const graded = rows.filter(r => r.students?.length === 1 && GRADED_INSTRUMENTS.includes(r.instrument));
-  const studentIds = [...new Set(graded.map(r => r.students[0].id))];
-  if (studentIds.length === 0) return;
+  const solo     = rows.filter(r => r.students?.length === 1);
+  const graded   = solo.filter(r => GRADED_INSTRUMENTS.includes(r.instrument));
+  const ungraded = solo.filter(r => !GRADED_INSTRUMENTS.includes(r.instrument));
 
-  const { data } = await db.from('student_current_grades')
-    .select('student_id, instrument, tier, label')
-    .in('student_id', studentIds);
+  const gradedIds = [...new Set(graded.map(r => r.students[0].id))];
+  if (gradedIds.length) {
+    const { data } = await db.from('student_current_grades')
+      .select('student_id, instrument, tier, label')
+      .in('student_id', gradedIds);
+    const byKey = {};
+    (data ?? []).forEach(g => { byKey[`${g.student_id}|${g.instrument}`] = g; });
+    graded.forEach(r => {
+      r.currentGrade = byKey[`${r.students[0].id}|${r.instrument}`] ?? null;
+    });
+  }
 
-  const byKey = {};
-  (data ?? []).forEach(g => { byKey[`${g.student_id}|${g.instrument}`] = g; });
-
-  graded.forEach(r => {
-    r.currentGrade = byKey[`${r.students[0].id}|${r.instrument}`] ?? null;
-  });
+  const ungradedIds = [...new Set(ungraded.map(r => r.students[0].id))];
+  if (ungradedIds.length) {
+    const { data } = await db.from('student_instruments')
+      .select('student_id, instrument, skill_level')
+      .in('student_id', ungradedIds);
+    const byKey = {};
+    (data ?? []).forEach(s => { byKey[`${s.student_id}|${s.instrument}`] = s; });
+    ungraded.forEach(r => {
+      const rec = byKey[`${r.students[0].id}|${r.instrument}`];
+      r.currentSkill = rec ? { level: rec.skill_level, label: skillLabel(rec.skill_level) } : null;
+    });
+  }
 }
 
 async function loadSchedule() {
@@ -654,7 +686,11 @@ async function loadSchedule() {
         </div>
         <div>
           <div class="lesson-name">${displayName}</div>
-          <div class="lesson-instrument">${l.instrument}${l.currentGrade ? `<span class="grade-pill">${l.currentGrade.tier} — ${l.currentGrade.label}</span>` : ''}</div>
+          <div class="lesson-instrument">${l.instrument}${l.currentGrade
+            ? `<span class="grade-pill">${l.currentGrade.tier} — ${l.currentGrade.label}</span>`
+            : l.currentSkill
+              ? `<span class="skill-pill" style="color:${skillBandColour(l.currentSkill.level)};border-color:${skillBandColour(l.currentSkill.level)}33;">${l.currentSkill.label}</span>`
+              : ''}</div>
           ${l.substitute_teacher_id === teacherRecord?.id
             ? `<div style="font-size:0.7rem;color:var(--orange);font-weight:600;">
                  Covering for ${l.original_teacher_name ?? 'another teacher'}

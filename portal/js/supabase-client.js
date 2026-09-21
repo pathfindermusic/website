@@ -229,6 +229,14 @@ function skillLabel(level) {
   return `Advanced (${level})`;
 }
 
+/** Same Beginner/Intermediate/Advanced banding as skillLabel(), as a colour
+ *  — matches the dots used on the student's own progress view. */
+function skillBandColour(level) {
+  if (level <= 3) return '#2563eb';
+  if (level <= 6) return '#d97706';
+  return '#16a34a';
+}
+
 // ------------------------------------------------------------
 // Default a studio filter to the admin's own studio.
 //

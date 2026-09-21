@@ -241,10 +241,13 @@ let teacherRecord  = null;
 let activeSkillEdit = null; // { studentId, instrument, currentLevel }
 let teacherStudios  = [];
 
-// Instruments with a formal Body of Knowledge grading framework show a
-// grade badge + "Record grade" instead of the 0-8 skill slider. Guitar
-// only, for now — the schema is generic so more can be added here later.
-const GRADED_INSTRUMENTS = ['Guitar'];
+// Every instrument shows the Foundation-Grade 8 badge + "Record grade"
+// instead of the 0-8 skill slider (Sep 2026 — previously Guitar only, the
+// schema was always generic). Kept as an explicit list rather than "always
+// graded" so an unrecognised/mistyped instrument string (e.g. from a CSV
+// import) falls back to the skill slider instead of silently showing
+// "Not yet graded" for something that was never meant to be tracked this way.
+const GRADED_INSTRUMENTS = ['Guitar','Bass','Drums','Piano / Keyboard','Voice / Singing','Violin','Ukulele','Music Theory','Saxophone','Band','Other'];
 let bokGradeLevels  = [];   // [{id, code, tier, label, sort_order}]
 let activeGradeEdit = null; // { studentId, instrument }
 let allStudentsCache = [];  // last loadStudents() result, for the grade modal's "currently" hint
@@ -424,11 +427,23 @@ async function loadStudents() {
       </div>`;
     }).join('');
 
+    // Same "instrument (Tier — Grade)" the skill rows below show, just
+    // compact enough for the header line — so the grade is visible at a
+    // glance without scrolling to the detail rows underneath.
+    const instMeta = myInsts.map(inst => {
+      if (GRADED_INSTRUMENTS.includes(inst)) {
+        const g = s.grades[inst];
+        return `${inst} (${g ? `${g.tier} — ${g.label}` : 'not yet graded'})`;
+      }
+      const instData = allInsts.find(i => i.instrument === inst);
+      return `${inst} (${skillLabel(instData?.skill_level ?? 0)})`;
+    }).join(' · ');
+
     return `<div class="student-card">
       <div class="student-card-top">
         <div>
           <div class="student-card-name">${p.first_name ?? ''} ${p.last_name ?? ''}</div>
-          <div class="student-card-meta">${myInsts.join(' · ')}</div>
+          <div class="student-card-meta">${instMeta}</div>
         </div>
         <div style="display:flex;align-items:center;gap:0.5rem;">
           <span class="pill pill-${s.status}">${s.status.charAt(0).toUpperCase()+s.status.slice(1)}</span>

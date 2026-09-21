@@ -190,7 +190,7 @@
 
     <!-- Filters -->
     <div class="filters-bar" id="filterBar">
-      <select class="filter-select" id="filterStudio" onchange="render()">
+      <select class="filter-select" id="filterStudio" onchange="onStudioFilterChange()">
         <option value="">All studios</option>
       </select>
       <select class="filter-select" id="filterAssignee" onchange="render()">
@@ -741,10 +741,16 @@ function bucketCounts() {
   const in7   = new Date(); in7.setDate(in7.getDate() + 7);
   const wk    = toISODate(in7);
 
+  // The tiles are meant to summarise whatever the studio filter has
+  // scoped the page to — otherwise picking a studio changes the list
+  // below but the totals above keep showing every studio combined.
+  const fStudio = document.getElementById('filterStudio')?.value ?? '';
+  const inScope = fStudio ? tasks.filter(t => t.studio_id === fStudio) : tasks;
+
   // Waitlist entries are open-ended and have no due date. Counting
   // them alongside day-to-day work would just inflate the numbers.
-  const open = tasks.filter(t => t.status === 'open' && t.kind !== 'waitlist');
-  const wait = tasks.filter(t => t.status === 'open' && t.kind === 'waitlist');
+  const open = inScope.filter(t => t.status === 'open' && t.kind !== 'waitlist');
+  const wait = inScope.filter(t => t.status === 'open' && t.kind === 'waitlist');
 
   return {
     overdue:    open.filter(t => t.due_date && t.due_date < today).length,
@@ -752,7 +758,7 @@ function bucketCounts() {
     unassigned: open.filter(t => !t.assigned_to).length,
     upcoming:   open.filter(t => t.due_date && t.due_date > today && t.due_date <= wk).length,
     waiting:    wait.length,
-    replied:    tasks.filter(t => t.status === 'open' && t.awaiting_admin).length,
+    replied:    inScope.filter(t => t.status === 'open' && t.awaiting_admin).length,
   };
 }
 
@@ -776,6 +782,14 @@ function renderBuckets() {
       <div class="bucket-label">${label}</div>
       <div class="bucket-value ${urgent && val>0 ? 'urgent' : ''}">${val}</div>
     </button>`).join('');
+}
+
+function onStudioFilterChange() {
+  // The bucket tiles read the studio filter live (see bucketCounts()),
+  // but only when they're recomputed — switching studios has to trigger
+  // that recompute explicitly, same as changing the status filter does.
+  renderBuckets();
+  render();
 }
 
 function onStatusFilterChange() {
@@ -893,8 +907,15 @@ function render() {
   const dateNote = bucket === null
     ? ` · showing overdue + ${selectedStr === today ? 'today' : formatShortDate(selectedDate)}`
     : '';
+  // Same studio scope as the list below and the bucket tiles above —
+  // otherwise this "N open" count is the one number on the page that
+  // still silently means "every studio" while everything else means
+  // "the selected studio".
+  const openInScope = fStudio
+    ? tasks.filter(t => t.status === 'open' && t.studio_id === fStudio)
+    : tasks.filter(t => t.status === 'open');
   document.getElementById('pageSub').textContent =
-    `${tasks.filter(t=>t.status==='open').length} open · ${list.length} shown${dateNote}`;
+    `${openInScope.length} open · ${list.length} shown${dateNote}`;
 
   const el = document.getElementById('taskList');
   if (!list.length) {
