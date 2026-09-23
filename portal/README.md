@@ -280,6 +280,17 @@ studio as the only record of what went out (it lands in Inbox, not Sent).
   considers active lessons.
 - **Teacher detail page is read-only**; Edit bounces back to the Teachers page
   rather than duplicating the edit modal's validation logic.
+- **Cloning a lesson occurrence (Sep 2026) is a new one-off lesson, not a copy
+  of `lesson_occurrences` alone.** `lessons.html`'s occurrence modal has a
+  "Clone to new timeslot" button that inserts a fresh `lessons` row (teacher,
+  studio, instrument, lesson type, duration all copied from the source) plus
+  its single `lesson_occurrences` row at the chosen date/time, plus
+  `lesson_students` rows replicating the exact roster the source occurrence
+  had (permanent members + any ad-hoc guest on that occurrence). Occurrence
+  notes and attendance are deliberately NOT copied — the clone is a fresh,
+  unmarked lesson. It reuses the same teacher-availability hard-block and
+  "freed slot" clash detection (absent/teacher-cancelled occurrences don't
+  block) that `saveLesson()` uses, scoped to the one target date.
 
 ## Row Level Security — read this before touching a policy
 
@@ -739,6 +750,15 @@ a date bucket resets the status filter, and vice versa.
   it's silently ignored and Supabase falls back to the Site URL.
 - **PowerShell prints stderr in red.** Git progress and npm warnings look like
   failures and aren't.
+- **`lessons.recurrence_type` does NOT accept `'oneoff'`.** That string is
+  only ever a UI selector value (`lPattern` in the Add Lesson / Clone
+  modals) — the `lessons_recurrence_type_check` constraint only allows
+  `'indefinite'`, `'occurrences'`, or `'date_range'`. A single dated lesson
+  (a trial, a makeup, a clone) is stored as `recurrence_type: 'occurrences'`
+  with `recurrence_count: 1`, same as `saveLesson()` already does. Got this
+  wrong once (Sep 2026) writing the clone-lesson feature — insert failed
+  with the check-constraint error, not a silent no-op, so at least it's
+  loud.
 
 ## Known limitations & open decisions
 

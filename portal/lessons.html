@@ -655,6 +655,9 @@
       <!-- Cancel this occurrence -->
       <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:0.5rem;">
         <div class="form-label" style="margin-bottom:0.65rem;">Edit or cancel</div>
+        <div class="flex gap-1" style="flex-wrap:wrap;margin-bottom:0.65rem;">
+          <button class="btn btn-secondary btn-sm" onclick="openCloneModal()">📋 Clone to new timeslot</button>
+        </div>
         <div class="flex gap-1" style="flex-wrap:wrap;">
           <button class="btn btn-secondary btn-sm" onclick="editSeries()">Edit series</button>
           <button class="btn btn-danger btn-sm" onclick="cancelOccurrence('single')">Cancel this lesson only</button>
@@ -666,6 +669,45 @@
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeOccModal()">Close</button>
       <button class="btn btn-primary" onclick="saveOccurrence()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     CLONE OCCURRENCE MODAL — copy this lesson to a new day/time.
+     Teacher, studio, instrument, lesson type and roster all carry
+     over unchanged; only the date/time differ and notes start blank.
+     ============================================================ -->
+<div class="modal-overlay hidden" id="cloneModal">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-header">
+      <span class="modal-title">Clone Lesson to New Timeslot</span>
+      <button class="modal-close" onclick="closeCloneModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="cloneSummary" style="background:var(--off-white);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.85rem;margin-bottom:1rem;font-size:0.875rem;line-height:1.65;"></div>
+      <div class="form-hint" style="margin-bottom:0.85rem;">
+        Teacher, student(s), instrument and studio carry over unchanged — only the day and
+        time are different. The new lesson starts with blank occurrence notes and no
+        attendance marked, ready to edit as usual.
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">New date *</label>
+          <input class="form-input" type="date" id="cloneDate">
+        </div>
+        <div class="form-group">
+          <label class="form-label">New time *</label>
+          <select class="form-select" id="cloneTime"></select>
+        </div>
+      </div>
+      <div class="clash-error" id="cloneClashError">
+        <span>🚫</span><span id="cloneClashMsg"></span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeCloneModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveClone()">Clone Lesson</button>
     </div>
   </div>
 </div>
@@ -2518,6 +2560,228 @@ async function openOccurrenceModal(occId) {
 }
 
 function closeOccModal() { document.getElementById('occurrenceModal').classList.add('hidden'); }
+
+// ============================================================
+// CLONE OCCURRENCE — copy a lesson to a new day/time. Implemented as
+// a brand-new one-off lesson (recurrence_type 'oneoff'), the same
+// shape saveLesson() already uses for a single-date booking, with the
+// original's teacher/studio/instrument/type/duration and full roster
+// (permanent + any ad-hoc guests on THIS occurrence) carried over.
+// Attendance and occurrence notes are deliberately not copied — the
+// clone is a fresh, unmarked occurrence for the admin to fill in.
+// ============================================================
+let cloneSourceOccId = null;
+
+function openCloneModal() {
+  const occId = document.getElementById('occId').value;
+  const occ   = allOccurrences.find(o => o.id === occId);
+  if (!occ) { showToast('Could not find this lesson to clone.', 'error'); return; }
+
+  cloneSourceOccId = occId;
+
+  const l       = occ.lessons ?? {};
+  const teacher = allTeachers.find(t => t.id === l.teacher_id);
+  const studio  = allStudios.find(s => s.id === l.studio_id);
+  const tName   = teacher ? `${teacher.profile?.first_name ?? ''} ${teacher.profile?.last_name ?? ''}`.trim() : '—';
+
+  const sIds   = occ.lessonStudents ?? [];
+  const sNames = sIds.map(sid => {
+    const s = allStudents.find(s => s.id === sid);
+    return s ? `${s.profile?.first_name ?? ''} ${s.profile?.last_name ?? ''}`.trim() : '—';
+  });
+  const isNonTeaching = sIds.length === 0 && l.lesson_type !== 'group';
+
+  document.getElementById('cloneSummary').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+      <div><span class="text-muted text-sm">Teacher</span><div class="font-bold">${tName}</div></div>
+      <div><span class="text-muted text-sm">${isNonTeaching ? "What's this for" : 'Instrument'}</span><div class="font-bold">${l.instrument ?? '—'}</div></div>
+      <div><span class="text-muted text-sm">Studio</span><div class="font-bold">${studio?.name ?? '—'}</div></div>
+      <div><span class="text-muted text-sm">Duration</span><div class="font-bold">${formatDuration(l.duration_mins ?? 30)}</div></div>
+      <div style="grid-column:1/-1;"><span class="text-muted text-sm">${sIds.length ? 'Student(s)' : 'Students'}</span><div class="font-bold">${sNames.length ? sNames.join(', ') : '— none —'}</div></div>
+    </div>`;
+
+  // Default the picker to the source occurrence's own day/time — the
+  // admin only has to change what's actually different.
+  document.getElementById('cloneDate').value = (occ.date ?? '').slice(0, 10);
+  const timeSel = document.getElementById('cloneTime');
+  timeSel.innerHTML = ALL_TIME_SLOTS.map(t => `<option value="${t}">${formatTime(t + ':00')}</option>`).join('');
+  if (l.start_time) timeSel.value = l.start_time.slice(0, 5);
+
+  document.getElementById('cloneClashError').classList.remove('show');
+  document.getElementById('cloneModal').classList.remove('hidden');
+}
+
+function closeCloneModal() {
+  document.getElementById('cloneModal').classList.add('hidden');
+  cloneSourceOccId = null;
+}
+
+function showCloneClashError(msg) {
+  const el = document.getElementById('cloneClashError');
+  document.getElementById('cloneClashMsg').textContent = msg;
+  el.classList.add('show');
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// Checks whether the teacher or any student in `studentIds` already has
+// a non-freed lesson overlapping [newStart,newEnd) on `date`. Mirrors
+// the "freed slot" logic in saveLesson()'s clash detection, but scoped
+// to a single date instead of a whole recurrence pattern, since a
+// clone is always exactly one occurrence.
+async function checkCloneClash(date, teacherId, startTime, duration, studentIds, excludeLessonId) {
+  const newStart = timeToMins(startTime);
+  const newEnd   = newStart + duration;
+
+  const { data: occs } = await db.from('lesson_occurrences')
+    .select('id,lesson_id,date,status')
+    .eq('date', date)
+    .neq('status', 'cancelled');
+
+  const candidateOccs = (occs ?? []).filter(o => o.lesson_id !== excludeLessonId);
+  if (candidateOccs.length === 0) return null;
+
+  const lessonIds = [...new Set(candidateOccs.map(o => o.lesson_id))];
+  const { data: lessons } = await db.from('lessons')
+    .select('id,teacher_id,start_time,duration_mins,lesson_type,max_students')
+    .in('id', lessonIds).eq('status', 'active');
+  const lessonById = {};
+  (lessons ?? []).forEach(l => { lessonById[l.id] = l; });
+
+  const overlapping = candidateOccs.filter(o => {
+    const l = lessonById[o.lesson_id];
+    if (!l) return false;
+    const s = timeToMins(l.start_time);
+    const e = s + (l.duration_mins ?? 30);
+    return newStart < e && newEnd > s;
+  });
+  if (overlapping.length === 0) return null;
+
+  const overlappingOccIds    = overlapping.map(o => o.id);
+  const overlappingLessonIds = [...new Set(overlapping.map(o => o.lesson_id))];
+
+  const { data: perm } = await db.from('lesson_students')
+    .select('lesson_id,student_id').in('lesson_id', overlappingLessonIds).is('added_for_occurrence_id', null);
+  const { data: guests } = await db.from('lesson_students')
+    .select('lesson_id,student_id,added_for_occurrence_id').in('added_for_occurrence_id', overlappingOccIds);
+  const { data: att } = await db.from('attendance')
+    .select('lesson_occurrence_id,status').in('lesson_occurrence_id', overlappingOccIds);
+
+  const NO_LESSON = new Set(['absent_no_credit', 'absent_notice', 'teacher_cancelled']);
+  const marksByOcc = {};
+  (att ?? []).forEach(a => { (marksByOcc[a.lesson_occurrence_id] ??= []).push(a.status); });
+  const permByLesson = {};
+  (perm ?? []).forEach(p => { (permByLesson[p.lesson_id] ??= new Set()).add(p.student_id); });
+  const guestsByOcc = {};
+  (guests ?? []).forEach(g => { (guestsByOcc[g.added_for_occurrence_id] ??= new Set()).add(g.student_id); });
+
+  for (const o of overlapping) {
+    const l = lessonById[o.lesson_id];
+    const roster = new Set(permByLesson[o.lesson_id] ?? []);
+    (guestsByOcc[o.id] ?? []).forEach(sid => roster.add(sid));
+    const marks = marksByOcc[o.id] ?? [];
+    const freed = roster.size > 0 && marks.length >= roster.size && marks.every(s => NO_LESSON.has(s));
+    if (freed) continue; // fully absent/cancelled — slot is open
+
+    if (l.teacher_id === teacherId) {
+      return 'The teacher is already teaching another lesson at this time on this date.';
+    }
+    const clashSid = [...roster].find(sid => studentIds.includes(sid));
+    if (clashSid) {
+      const student = allStudents.find(s => s.id === clashSid);
+      const name = student ? `${student.profile?.first_name ?? ''} ${student.profile?.last_name ?? ''}`.trim() : 'A student';
+      return `${name} already has a lesson at this time on this date.`;
+    }
+    if (l.lesson_type === 'group' && l.teacher_id === teacherId && roster.size >= (l.max_students ?? 6)) {
+      return `This group lesson is already at full capacity (${l.max_students ?? 6} students).`;
+    }
+  }
+  return null;
+}
+
+async function saveClone() {
+  const occ = allOccurrences.find(o => o.id === cloneSourceOccId);
+  if (!occ) { showToast('Could not find this lesson to clone.', 'error'); return; }
+
+  const l      = occ.lessons ?? {};
+  const date   = document.getElementById('cloneDate').value;
+  const time   = document.getElementById('cloneTime').value;
+  const errEl  = document.getElementById('cloneClashError');
+  errEl.classList.remove('show');
+
+  if (!date || !time) {
+    showToast('Please choose a new date and time.', 'error'); return;
+  }
+
+  const teacher    = allTeachers.find(t => t.id === l.teacher_id);
+  const duration   = l.duration_mins ?? 30;
+  const studentIds = occ.lessonStudents ?? [];
+  const newDow     = parseLocalDate(date).getDay();
+
+  // ---- HARD BLOCK: teacher must be available at this studio + day + time ----
+  if (teacher) {
+    const lessonMins = timeToMins(time);
+    const avail = (teacher.teacher_availability ?? []).filter(
+      a => a.day_of_week === newDow && a.studio_id === l.studio_id
+    );
+    if (avail.length === 0) {
+      const studio = allStudios.find(s => s.id === l.studio_id);
+      const tName  = `${teacher.profile?.first_name ?? ''} ${teacher.profile?.last_name ?? ''}`.trim();
+      showCloneClashError(`${tName || 'The teacher'} has no availability at ${studio?.name ?? 'this studio'} on ${DAY_NAMES[newDow]}.`);
+      return;
+    }
+    const inSlot = avail.some(a => {
+      const start = timeToMins(a.start_time), end = timeToMins(a.end_time);
+      return lessonMins >= start && lessonMins < end;
+    });
+    if (!inSlot) {
+      const tName = `${teacher.profile?.first_name ?? ''} ${teacher.profile?.last_name ?? ''}`.trim();
+      showCloneClashError(`${tName || 'The teacher'} is not available at ${formatTime(time + ':00')} on ${DAY_NAMES[newDow]}.`);
+      return;
+    }
+  }
+
+  // ---- CLASH DETECTION ----
+  const clashMsg = await checkCloneClash(date, l.teacher_id, time, duration, studentIds, l.id);
+  if (clashMsg) { showCloneClashError(clashMsg); return; }
+
+  // ---- SAVE: a new one-off lesson + its single occurrence + roster ----
+  try {
+    const { data: lessonData, error: lErr } = await db.from('lessons').insert({
+      teacher_id: l.teacher_id, studio_id: l.studio_id, instrument: l.instrument,
+      lesson_type: l.lesson_type, max_students: l.max_students ?? (l.lesson_type === 'group' ? 6 : 1),
+      day_of_week: newDow, start_time: time + ':00', duration_mins: duration,
+      // A single dated occurrence is stored the same way saveLesson()
+      // stores any one-off: recurrence_type 'occurrences' with a count
+      // of 1. 'oneoff' is only ever a UI selector value (lPattern) —
+      // the lessons_recurrence_type_check constraint doesn't allow it.
+      recurrence_type: 'occurrences', recurrence_start: date, recurrence_count: 1, recurrence_end: null,
+      frequency: 'weekly',
+      series_notes: `Cloned from ${formatShortDate(parseLocalDate((occ.date ?? '').slice(0, 10)))}`,
+      status: 'active',
+    }).select('id').single();
+
+    if (lErr) throw new Error(lErr.message);
+    const newLessonId = lessonData.id;
+
+    if (studentIds.length > 0) {
+      await db.from('lesson_students').insert(
+        studentIds.map(sid => ({ lesson_id: newLessonId, student_id: sid, added_for_occurrence_id: null }))
+      );
+    }
+
+    const { error: oErr } = await db.from('lesson_occurrences').insert({
+      lesson_id: newLessonId, date, status: 'scheduled',
+    });
+    if (oErr) throw new Error(oErr.message);
+
+    showToast('Lesson cloned to the new timeslot.', 'success');
+    closeCloneModal();
+    closeOccModal();
+    loadView();
+  } catch (err) {
+    showCloneClashError('Could not clone this lesson: ' + err.message);
+  }
+}
 
 async function addStudentToOccurrence() {
   const lessonId = document.getElementById('occurrenceModal').dataset.lessonId;
