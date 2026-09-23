@@ -139,8 +139,14 @@ remember production will lag behind `main` until you deploy manually.
 │   └── send-email.js      resolves recipients server-side, sends via Resend
 └── portal/
     ├── login.html, change-password.html
-    ├── dashboard-admin.html    dashboard-teacher.html    dashboard-student.html
-    ├── students.html  teachers.html  lessons.html  notifications.html
+    ├── tasks.html              post-login landing page for admin/superuser
+    ├── enquiries.html  notifications.html
+    ├── lessons.html    students.html    teachers.html    teacher-detail.html
+    ├── attendance-report.html
+    ├── bok-artefacts.html      (Guitar-only artefact library — see Skill grading below)
+    ├── dashboard-teacher.html    dashboard-student.html
+    ├── dashboard-admin.html    NOT in the sidebar any more (Sep 2026 nav reorg) —
+    │                             still on disk, reachable by direct URL only
     ├── studios.html   admins.html      (super user only)
     ├── my-students.html            (teacher's roster + skill grading)
     ├── css/portal.css
@@ -149,6 +155,13 @@ remember production will lag behind `main` until you deploy manually.
 
 No build step. Static HTML with vanilla JS talking directly to Supabase.
 The Functions use plain `fetch` — no npm dependencies, nothing to bundle.
+
+**Sidebar order (Sep 2026 reorg):** Front desk (Tasks, Enquiries, Notifications)
+→ Teaching (Lessons, Students, Teachers) → Curriculum (Artefact Library) →
+Reports (Attendance) → Super User (hidden unless superuser). `tasks.html` and
+`enquiries.html` build it dynamically via `renderSidebar()`; every other
+admin-facing page duplicates the same static markup — a page added to one
+has to be added to the other 10 by hand, there's no shared include.
 
 ### Why the Functions exist
 
@@ -280,6 +293,12 @@ studio as the only record of what went out (it lands in Inbox, not Sent).
   considers active lessons.
 - **Teacher detail page is read-only**; Edit bounces back to the Teachers page
   rather than duplicating the edit modal's validation logic.
+- **Tasks is the post-login landing page for admin and superuser (Sep 2026),
+  not the Schedule dashboard.** `login.html`'s `redirectByRole()` sends both
+  roles to `tasks.html`. The Schedule link was dropped from every sidebar at
+  the same time — `dashboard-admin.html` itself was left on disk rather than
+  deleted (nothing has ever needed it gone, and history/links pointing at it
+  shouldn't 404), but it's now reachable only by typing the URL directly.
 - **Cloning a lesson occurrence (Sep 2026) is a new one-off lesson, not a copy
   of `lesson_occurrences` alone.** `lessons.html`'s occurrence modal has a
   "Clone to new timeslot" button that inserts a fresh `lessons` row (teacher,
@@ -736,6 +755,53 @@ it.
 forced open-only, so choosing Done returned nothing. They now cooperate: picking
 a date bucket resets the status filter, and vice versa.
 
+## Skill grading (Tier/Grade) — universal, but the artefact library stays Guitar-only
+
+Two separate things share the word "grading" and are easy to conflate:
+
+- **`bok_grade_levels` / `student_grade_milestones` / `student_current_grades`**
+  — the Tier/Grade ladder (Foundation → Grade 0, Beginner → Grades 1-3,
+  Intermediate → Grades 4-6, Advanced → Grades 7-8). These tables were
+  always instrument-agnostic; nothing about their schema is Guitar-specific.
+  `student_current_grades` is a view returning each student's latest
+  `achieved_on` grade per instrument. `student_grade_milestones` is
+  history-preserving — always INSERT, never UPDATE, so a student's grading
+  history stays intact even as they progress.
+- **`bok_artefacts`** — the Body of Knowledge content library (exercises,
+  pieces, resources tied to a grade level). This one genuinely *is*
+  Guitar-only content and stays that way deliberately — it isn't gated by
+  the same instrument list, and generalising it would mean writing a whole
+  curriculum for ten more instruments, not a code change.
+
+**What changed (Sep 2026):** the Tier/Grade ladder itself was extended from
+Guitar-only to all instruments. It needed no schema change — `bok_grade_levels`
+already had no Guitar-specific column — only widening the UI-layer
+`GRADED_INSTRUMENTS` gate from `['Guitar']` to the full instrument list, in
+five files: `dashboard-student.html`, `dashboard-teacher.html`,
+`my-students.html`, `teacher-detail.html` (aliased to `INSTRUMENTS` in
+`students.html`, which uses the same canonical array as everywhere else).
+`my-students.html` and `students.html` also now print `Instrument (Tier — Grade)`
+next to the instrument name wherever it was previously shown bare.
+
+`GRADED_INSTRUMENTS` is kept as an **explicit list, not "always graded."**
+An unrecognised or mistyped instrument string (most likely from a CSV import)
+falls back to the old `student_instruments.skill_level` 0-8 bar instead of
+silently showing "Not yet graded" for something that was never meant to be
+tracked this way. `skill_level` stays in the DB untouched and un-migrated —
+it's just no longer displayed once a grade milestone exists for that
+student/instrument, the same non-destructive pattern used for Guitar from
+the start. `skillBandColour()` in `supabase-client.js` gives the fallback bar
+the same colour banding the grade pill already used.
+
+**How it was found:** teachers noticed only Guitar students showed a grade
+(e.g. "Beginner — Grade 2") on the teacher dashboard's My Schedule view,
+because `attachCurrentGrades()` in `dashboard-teacher.html` only computed
+`currentGrade` for instruments in `GRADED_INSTRUMENTS`, which was still
+`['Guitar']` at the time — everyone else silently got nothing rather than
+falling back to the skill bar. That was the first fix; widening
+`GRADED_INSTRUMENTS` everywhere else followed the same day once the pattern
+was confirmed.
+
 ## Traps that have already cost time
 
 - **Check which environment you're looking at.** Local dev runs against the same
@@ -750,6 +816,31 @@ a date bucket resets the status filter, and vice versa.
   it's silently ignored and Supabase falls back to the Site URL.
 - **PowerShell prints stderr in red.** Git progress and npm warnings look like
   failures and aren't.
+- **A filter dropdown has to trigger every view that reads it, not just the
+  obvious one.** `tasks.html`'s studio filter (Sep 2026) changed the table
+  rows but the summary tiles (Overdue / Due today / Unassigned / …) stayed
+  at the studio-wide total, because `bucketCounts()` never read the filter
+  and nothing recomputed it on change — only the table's own `render()` was
+  wired to `onchange`. Fixed with a dedicated `onStudioFilterChange()` that
+  calls both `renderBuckets()` and `render()`. Worth checking for the same
+  shape anywhere a page has more than one thing reading a shared filter
+  control: each one needs its own path back from that control's `onchange`,
+  not just the one a change happened to be tested against.
+- **A studio summary email can fail with nothing to show for it in Resend.**
+  `netlify/functions/send-email.js`'s bulk-send summary (5b) called a
+  `summaryTemplate()` that didn't exist in the file — a `ReferenceError`
+  thrown while building the request, before `fetch()` to Resend ever ran.
+  Caught by the surrounding `try/catch` so the student batch still sent fine
+  and the function returned normally, but the studio never got its "record"
+  email and nothing shows in the Resend dashboard either, because the
+  request was never actually sent. The toast still correctly said "summary
+  copy failed" (`email_log.summary_error` had the real reason), but there
+  was no Resend log entry to point at, which is what made this look like a
+  Resend-side problem rather than a code one. Fixed Sep 2026 — check
+  `email_log.summary_error` first whenever "sent to students but not to
+  the studio" comes up again; if it's non-null but Resend shows no attempt
+  at all, the summary send is throwing before the network call, not being
+  rejected by Resend.
 - **`lessons.recurrence_type` does NOT accept `'oneoff'`.** That string is
   only ever a UI selector value (`lPattern` in the Add Lesson / Clone
   modals) — the `lessons_recurrence_type_check` constraint only allows

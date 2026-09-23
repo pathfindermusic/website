@@ -22,6 +22,7 @@
 // ============================================================
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails/batch';
+const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -64,10 +65,12 @@ exports.handler = async (event) => {
     // ============================================================
     const mode = body.mode;
     let studentIds = [];
-    let lessonContext = null; // for occurrence-driven emails
+    let lessonContext  = null; // for occurrence-driven emails
+    let audienceLabel  = null; // human-readable "who this went to", for the studio summary
 
     if (mode === 'students') {
       studentIds = body.studentIds ?? [];
+      audienceLabel = 'Selected students';
 
     } else if (mode === 'studios') {
       const ids = body.studioIds ?? [];
@@ -76,6 +79,7 @@ exports.handler = async (event) => {
       const rows = await get(
         `students?studio_id=in.(${list})&status=in.(active,trial)&select=id`);
       studentIds = rows.map(r => r.id);
+      audienceLabel = await studioNamesLabel(ids);
 
     } else if (mode === 'teacher') {
       if (!body.teacherId) return json(400, { error: 'No teacher selected.' });
@@ -83,6 +87,7 @@ exports.handler = async (event) => {
         `lessons?teacher_id=eq.${body.teacherId}&status=eq.active&select=id`
       );
       studentIds = await studentsForLessons(lessons.map(l => l.id));
+      audienceLabel = await teacherLabel(body.teacherId);
 
     } else if (mode === 'day') {
       if (body.dayOfWeek === undefined || body.dayOfWeek === null) {
@@ -94,6 +99,8 @@ exports.handler = async (event) => {
       }
       const lessons = await get(q);
       studentIds = await studentsForLessons(lessons.map(l => l.id));
+      audienceLabel = `${DAY_NAMES[body.dayOfWeek] ?? 'Selected day'} lessons` +
+        (body.studioIds?.length ? ` — ${await studioNamesLabel(body.studioIds)}` : '');
 
     } else if (mode === 'teacher_date') {
       if (!body.teacherId || !body.date) {
@@ -111,6 +118,7 @@ exports.handler = async (event) => {
         );
         studentIds = await studentsForLessons([...new Set(occs.map(o => o.lesson_id))]);
       }
+      audienceLabel = `${await teacherLabel(body.teacherId)} — ${formatDateLong(body.date)}`;
 
     } else if (mode === 'occurrence') {
       if (!body.occurrenceId) return json(400, { error: 'occurrenceId is required.' });
@@ -143,6 +151,7 @@ exports.handler = async (event) => {
         studioEmail: sRows?.[0]?.email ?? null,
         zoomLink:    tRows?.[0]?.virtual_room_link ?? '',
       };
+      audienceLabel = `${lessonContext.instrument || 'Lesson'} with ${teacherName || 'the teacher'} — ${lessonContext.lesson_day}`;
 
     } else {
       return json(400, { error: `Unknown recipient mode: ${mode}` });
@@ -345,7 +354,7 @@ exports.handler = async (event) => {
               subject, bodyText, fromEmail,
               recipients, sent,
               unreachable, invalidAddresses,
-              mode, spec: body,
+              mode, spec: body, audienceLabel,
             }),
           }),
         });
@@ -412,6 +421,27 @@ exports.handler = async (event) => {
       return rows.map(r => r.student_id);
     }
 
+    // Human-readable "who this went to" for the studio summary email —
+    // resolved once here rather than leaving the summary showing a raw
+    // teacher/studio UUID, which would be useless as a record.
+    async function teacherLabel(teacherId) {
+      if (!teacherId) return 'Selected teacher';
+      const t = await get(`teachers?id=eq.${teacherId}&select=user_id`);
+      const uid = t?.[0]?.user_id;
+      if (!uid) return 'Selected teacher';
+      const p = await get(`profiles?id=eq.${uid}&select=first_name,last_name`);
+      const name = `${p?.[0]?.first_name ?? ''} ${p?.[0]?.last_name ?? ''}`.trim();
+      return name ? `${name}'s students` : 'Selected teacher';
+    }
+
+    async function studioNamesLabel(ids) {
+      if (!ids?.length) return 'Selected studios';
+      const list = ids.map(i => `"${i}"`).join(',');
+      const rows = await get(`studios?id=in.(${list})&select=name`);
+      const names = rows.map(r => r.name).filter(Boolean);
+      return names.length ? names.join(', ') : 'Selected studios';
+    }
+
   } catch (err) {
     return json(500, { error: err.message });
   }
@@ -426,6 +456,76 @@ function json(statusCode, obj) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(obj),
   };
+}
+
+// Studio-facing "record" email for a bulk send — one summary instead of
+// one BCC per student (500 BCCs would bury the studio inbox; see README
+// "Bulk sends get one studio summary, not one BCC per student"). Reuses
+// the same visual shell as emailTemplate() but the content is a record
+// of what went out — subject, message, audience and full recipient list —
+// not the message itself re-sent.
+//
+// This function was called (5b, above) but never actually defined here
+// until Sep 2026 — a ReferenceError thrown while building the summary
+// request, before fetch() ever ran, so the summary silently never
+// reached Resend at all (never even showed as a failed attempt on the
+// Resend dashboard) while the student batch, using emailTemplate(),
+// sent fine. Caught via email_log.summary_error / a studio reporting no
+// summary ever arrived despite the "sent successfully" toast.
+function summaryTemplate({ subject, bodyText, fromEmail, recipients, sent, unreachable, invalidAddresses, mode, spec, audienceLabel }) {
+  const rows = (recipients ?? []).map(r =>
+    `<tr>
+       <td style="padding:6px 10px;border-bottom:1px solid #eee;font-size:13px;">${escapeHtml(r.name)}</td>
+       <td style="padding:6px 10px;border-bottom:1px solid #eee;font-size:13px;color:#555;">${escapeHtml(r.addresses.join(', '))}</td>
+     </tr>`
+  ).join('');
+
+  const skippedBlock = ((unreachable?.length ?? 0) || (invalidAddresses?.length ?? 0))
+    ? `<div style="margin:0 0 16px;padding:12px 14px;background:#fef3c7;border:1px solid #fcd34d;
+        border-radius:4px;font-size:13px;color:#92400e;line-height:1.6;">
+        ${unreachable?.length ? `<div><strong>${unreachable.length}</strong> skipped — no email on file: ${escapeHtml(unreachable.join(', '))}</div>` : ''}
+        ${invalidAddresses?.length ? `<div style="margin-top:${unreachable?.length ? '6px' : '0'};"><strong>${invalidAddresses.length}</strong> skipped — invalid address: ${escapeHtml(invalidAddresses.join('; '))}</div>` : ''}
+      </div>`
+    : '';
+
+  const label = (t) => `<p style="margin:0 0 4px;font-size:12px;font-weight:bold;letter-spacing:0.08em;text-transform:uppercase;color:#E8491E;">${t}</p>`;
+
+  return `<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f5f5f7;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f7;padding:24px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+             style="max-width:560px;background:#ffffff;border-radius:8px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;">
+        <tr><td style="background:#1c1c1e;padding:18px 24px;border-bottom:3px solid #E8491E;">
+          <div style="color:#E8491E;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;font-weight:bold;">
+            Pathfinder Music Lessons — send record
+          </div>
+        </td></tr>
+        <tr><td style="padding:24px;color:#1c1c1e;font-size:15px;line-height:1.6;">
+          ${label('Sent to')}
+          <p style="margin:0 0 16px;font-weight:bold;">${sent} student${sent !== 1 ? 's' : ''} — ${escapeHtml(audienceLabel ?? mode ?? '')}</p>
+
+          ${label('Subject')}
+          <p style="margin:0 0 16px;">${escapeHtml(subject ?? '')}</p>
+
+          ${label('Message')}
+          <div style="margin:0 0 16px;padding:12px 14px;background:#f5f5f7;border-radius:4px;white-space:pre-wrap;font-size:14px;">${escapeHtml(bodyText ?? '')}</div>
+
+          ${skippedBlock}
+
+          ${label(`Recipients (${recipients?.length ?? 0})`)}
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+            ${rows}
+          </table>
+        </td></tr>
+        <tr><td style="padding:16px 24px;border-top:1px solid #eeeeee;color:#999999;font-size:12px;line-height:1.6;">
+          Pathfinder Music Lessons · <a href="mailto:${fromEmail}" style="color:#E8491E;text-decoration:none;">${fromEmail}</a><br>
+          Automated record of a bulk notification sent via the Student Portal — not a message to act on.
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
 }
 
 // Replace {{placeholder}} tokens
