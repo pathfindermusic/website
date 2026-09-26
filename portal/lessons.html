@@ -171,6 +171,26 @@
     .lesson-block-meta { font-size: 0.65rem; opacity: 0.8; }
     .lesson-cancel-icon { position: absolute; top: 3px; right: 4px; font-size: 0.7rem; color: #dc2626; }
 
+    /* Online/Zoom lessons get their own badge rather than a colour swap,
+       so the private/group/makeup border colour — which carries real
+       meaning — stays intact. Violet matches the "Online" pill used
+       elsewhere in the app (weekly view, occurrence modal). */
+    .lesson-online-icon {
+      position: absolute;
+      top: 2px;
+      right: 3px;
+      width: 15px;
+      height: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: #7c3aed;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+      z-index: 3;
+    }
+    .lesson-online-icon svg { width: 9px; height: 9px; }
+
     /* A fortnightly series is still just a private/group lesson — this
        only ever adds information, never replaces the type colour. */
     .pill-fortnightly { background: #e0e7ff; color: #4338ca; }
@@ -314,6 +334,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
       Attendance
     </a>
+    <a class="nav-item" href="distribution-lists.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      Distribution Lists
+    </a>
     <div class="sidebar-section hidden" id="superuserSection">Super User</div>
     <a class="nav-item hidden" href="studios.html" id="studiosLink">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
@@ -322,6 +346,11 @@
     <a class="nav-item hidden" href="admins.html" id="adminsLink">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
       Admins
+    </a>
+    <div class="sidebar-section">Manuals</div>
+    <a class="nav-item" href="manuals/index.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      How-To Guide
     </a>
   </aside>
 
@@ -468,7 +497,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">First lesson date *</label>
-          <input class="form-input" type="date" id="lStartDate" onchange="autoPopulateSeriesNotes()">
+          <input class="form-input" type="date" id="lStartDate" onchange="onStartDateChange()">
         </div>
       </div>
 
@@ -1206,7 +1235,11 @@ async function loadMonthlyView() {
                        background:${tone.bg};
                        border-left:2px solid ${tone.bar};
                        ${cancelled ? 'opacity:0.55;text-decoration:line-through;' : ''}">
-                <div style="font-weight:600;color:var(--charcoal);">${formatTime(r.start_time)}</div>
+                <div style="font-weight:600;color:var(--charcoal);display:flex;align-items:center;gap:0.25rem;">${formatTime(r.start_time)}${
+                  r.is_online ? `<span title="Online lesson" style="display:inline-flex;width:12px;height:12px;border-radius:50%;background:#7c3aed;align-items:center;justify-content:center;flex-shrink:0;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" style="width:7px;height:7px;"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                  </span>` : ''
+                }</div>
                 <div style="color:var(--dark-grey);">${
                   studentId
                     ? nameWithAttendance(r.instrument, r.attendance_status)
@@ -1530,6 +1563,7 @@ async function loadDailyView() {
             return `<div class="lesson-block ${cls}"
               onclick="event.stopPropagation();openOccurrenceModal('${o.id}')"
               style="flex:1 1 auto;min-height:24px;overflow:hidden;cursor:pointer;">
+              ${o.is_online ? onlineIconBadge() : ''}
               <div class="lesson-block-name">${nameOf(o)}</div>
               <div class="lesson-block-meta">${o.is_makeup ? 'Makeup · ' : ''}${o.lessons?.frequency === 'fortnightly' ? 'Fortnightly · ' : ''}${isBlock ? 'Non-teaching event' : `${lType === 'group' ? 'Group' : 'Private'} · ${o.lessons?.instrument}`}</div>
               ${substituteLabel(o)}
@@ -1759,7 +1793,9 @@ async function loadWeeklyView() {
             : isBlock
               ? `<span class="pill pill-scheduled">Non-teaching</span>`
               : `<span class="pill pill-${lType === 'group' ? 'active' : 'scheduled'}">${lType === 'private' ? 'Private' : 'Group'}</span>`}
-          ${o.is_online ? `<div class="mt-1"><span class="pill pill-online">Online</span></div>` : ''}
+          ${o.is_online ? `<div class="mt-1"><span class="pill pill-online" style="display:inline-flex;align-items:center;gap:0.3rem;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.5" style="width:11px;height:11px;flex-shrink:0;"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+            Online</span></div>` : ''}
           ${l.frequency === 'fortnightly' ? `<div class="mt-1"><span class="pill pill-fortnightly">Fortnightly</span></div>` : ''}
         </div>
       </div>`;
@@ -1820,8 +1856,14 @@ function openLessonModal(lesson = null) {
       const el = document.getElementById(id); if (el) el.disabled = false;
     });
     onPatternChange();
-    // Default start date to the current date shown on the grid
+    // Default start date to the current date shown on the grid, and
+    // keep Day matching it — otherwise Day is whatever was left over
+    // from the last lesson this form was used for, e.g. still showing
+    // Wednesday after the grid has moved on to Thursday, which is
+    // exactly the mismatch that let a one-off's date get silently
+    // rolled forward onto some other day (see onPatternChange, above).
     document.getElementById('lStartDate').value = toISODate(currentDate);
+    syncDayFromStartDate();
   }
   document.getElementById('lessonModal').classList.remove('hidden');
 }
@@ -1986,6 +2028,27 @@ function checkAvailability() {
   // The avail-warning div is kept in HTML but no longer used
 }
 
+// A one-off's "day of week" isn't independently meaningful — it's just
+// whichever weekday its one exact date happens to fall on. Deriving it
+// here stops a stale Day dropdown (left over from whatever the form
+// last had it set to) from silently sending the booking to a different
+// date: plannedDates() trusts the Day field over the date typed in,
+// walking forward to the next date that matches it. That is exactly
+// how a one-off aimed at a specific freed slot — a cancelled lesson's
+// slot, or a non-teaching event booked into it — ended up landing on,
+// and clashing on, a different date than the one actually chosen.
+// Reported 26 Sep 2026: a non-teaching event couldn't be booked into a
+// slot a cancelled lesson had freed, even though a regular lesson
+// could — because that regular lesson was added via Clone (which
+// always derives the day from the date), while the non-teaching event
+// was added via Add Lesson, where Day and Start date are separate
+// fields that can silently disagree.
+function syncDayFromStartDate() {
+  const dateStr = document.getElementById('lStartDate').value;
+  if (!dateStr) return;
+  document.getElementById('lDay').value = String(parseLocalDate(dateStr).getDay());
+}
+
 // A one-off needs no recurrence at all — it is one lesson on one date.
 function onPatternChange() {
   const oneOff = document.getElementById('lPattern').value === 'oneoff';
@@ -1998,7 +2061,17 @@ function onPatternChange() {
     // Stored as a single occurrence, which is what it is
     document.getElementById('lRecurrence').value = 'occurrences';
     document.getElementById('lCount').value = 1;
+    // Only for a brand-new one-off. Editing an existing one already
+    // has the real day loaded from the lesson itself (editSeriesInner,
+    // below) — lStartDate at this point is just today's date, since a
+    // one-off edit doesn't use it, and syncing from it here would stomp
+    // the correct value with today's weekday.
+    if (!document.getElementById('editLessonId').value) syncDayFromStartDate();
   }
+  // The day is derived above, not independently meaningful, while a
+  // one-off is selected — editing it here couldn't move the lesson off
+  // its one fixed date, only make the two disagree again.
+  document.getElementById('lDay').disabled = oneOff;
   toggleRecurrenceFields();
   autoPopulateSeriesNotes();
 
@@ -2007,6 +2080,14 @@ function onPatternChange() {
     ?? [...document.querySelectorAll('.form-label')]
          .find(l => l.textContent.trim().startsWith('First lesson date'));
   if (dateLabel) dateLabel.textContent = oneOff ? 'Lesson date *' : 'First lesson date *';
+}
+
+// While a one-off is selected, changing the date has to re-derive the
+// day too — otherwise picking "One-off", then changing your mind about
+// the date, leaves Day pointing at the first date instead of the new one.
+function onStartDateChange() {
+  if (document.getElementById('lPattern').value === 'oneoff') syncDayFromStartDate();
+  autoPopulateSeriesNotes();
 }
 
 function toggleRecurrenceFields() {
@@ -2188,6 +2269,7 @@ async function saveLesson() {
   // for ever, even once its single occurrence had passed — which is
   // exactly the slot the ongoing series usually wants.
   const newDates = new Set(plannedDates(day, startDate, recurrence, count, endDate, frequency));
+  const newDatesSorted = [...newDates].sort();
 
   const overlappingIds = (existingLessons ?? [])
     .filter(el => {
@@ -2197,9 +2279,20 @@ async function saveLesson() {
     })
     .map(el => el.id);
 
-  const { data: existingOcc } = overlappingIds.length
+  // Bounded to the new booking's own date window (a single date for a
+  // one-off) rather than fetching an overlapping lesson's entire history.
+  // An indefinite series runs ~150 occurrences a year (see
+  // INDEFINITE_YEARS above) — fetching every one of them for every
+  // teacher who happens to have a lesson at the same weekly time slot
+  // can run past Supabase's default 1000-row response cap, which is
+  // silently truncated rather than erroring. Reported 30 Sep 2026: a
+  // one-off trial couldn't be booked into a slot a lesson's occurrence
+  // had freed by being marked Absent — No Credit, because that specific
+  // occurrence's row never made it back from a query this wide.
+  const { data: existingOcc } = (overlappingIds.length && newDatesSorted.length)
     ? await db.from('lesson_occurrences')
         .select('id,lesson_id,date').in('lesson_id', overlappingIds)
+        .gte('date', newDatesSorted[0]).lte('date', newDatesSorted[newDatesSorted.length - 1])
         .neq('status','cancelled')
     : { data: [] };
 
@@ -3013,6 +3106,16 @@ function substituteLabel(o) {
   if (!o.substitute_teacher_id && !o.substitute_name) return '';
   return `<div class="lesson-block-meta" style="color:var(--orange);font-weight:600;">${
     substituteName(o)}</div>`;
+}
+
+// Small violet camera badge for an online/Zoom lesson. Kept separate from
+// the private/group/makeup colour coding (which stays meaningful on its
+// own) rather than overriding it — this just needs to be noticed at a
+// glance on the daily grid, weekly list and monthly tiles alike.
+function onlineIconBadge() {
+  return `<span class="lesson-online-icon" title="Online lesson">
+    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+  </span>`;
 }
 
 function onSubTeacherChange() {

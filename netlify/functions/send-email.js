@@ -67,10 +67,40 @@ exports.handler = async (event) => {
     let studentIds = [];
     let lessonContext  = null; // for occurrence-driven emails
     let audienceLabel  = null; // human-readable "who this went to", for the studio summary
+    // Which student statuses count as "in audience" for THIS mode. Broad
+    // audience modes default to active+trial (a trial student is still
+    // current, just not long-term enrolled yet). 'all' is the one
+    // exception — distribution-list mode #1 is explicitly active-only,
+    // matching what was actually asked for rather than the broader
+    // default every other mode uses.
+    let desiredStatuses = ['active', 'trial'];
 
     if (mode === 'students') {
       studentIds = body.studentIds ?? [];
       audienceLabel = 'Selected students';
+
+    } else if (mode === 'all') {
+      const rows = await get(`students?status=in.(active)&select=id`);
+      studentIds = rows.map(r => r.id);
+      audienceLabel = 'All active students (all studios)';
+      desiredStatuses = ['active'];
+
+    } else if (mode === 'instrument') {
+      // Deliberately NOT derived from active lesson bookings (unlike
+      // 'teacher', below) — student_instruments is the actual enrolment
+      // record of what a student takes, the same one students.html reads
+      // to show instrument tags on a profile. A student can be a genuine,
+      // active Saxophone student with no currently-booked lesson series
+      // in that exact shape (between terms, paused, a fresh enrolment not
+      // yet scheduled) and still belong on this list. Querying lessons
+      // instead returned 0 for a real active Saxophone student — caught
+      // Sep 2026 during admin testing.
+      if (!body.instrument) return json(400, { error: 'No instrument selected.' });
+      const rows = await get(
+        `student_instruments?instrument=eq.${encodeURIComponent(body.instrument)}&select=student_id`
+      );
+      studentIds = [...new Set(rows.map(r => r.student_id))];
+      audienceLabel = `${body.instrument} students`;
 
     } else if (mode === 'studios') {
       const ids = body.studioIds ?? [];
@@ -174,7 +204,7 @@ exports.handler = async (event) => {
     const explicitRecipients = (mode === 'students' || mode === 'occurrence');
     const statusFilter = explicitRecipients
       ? '&status=in.(active,trial,prospective)'
-      : '&status=in.(active,trial)';
+      : `&status=in.(${desiredStatuses.join(',')})`;
 
     const students = await get(
       `students?id=in.(${idList})${statusFilter}` +
@@ -251,16 +281,21 @@ exports.handler = async (event) => {
     // 4. Preview stops here
     // ============================================================
     if (action === 'preview') {
-      const SAMPLE = 8;
+      // A normal preview (Notifications' own "who will get this") only
+      // needs a taste of the list. A distribution list needs every name
+      // and address, since the whole point is copying it into Gmail's
+      // Bcc field — body.full=true skips the truncation for that case.
+      const SAMPLE = body.full ? recipients.length : 8;
       return json(200, {
         count:       recipients.length,
         recipients:  recipients.slice(0, SAMPLE)
                                .map(r => ({ name: r.name, addresses: r.addresses })),
         truncated:   Math.max(0, recipients.length - SAMPLE),
         unreachable: unreachable.length,
-        unreachableNames: unreachable.slice(0, SAMPLE),
+        unreachableNames: body.full ? unreachable : unreachable.slice(0, SAMPLE),
         invalid: invalidAddresses.length,
-        invalidNames: invalidAddresses.slice(0, SAMPLE),
+        invalidNames: body.full ? invalidAddresses : invalidAddresses.slice(0, SAMPLE),
+        audienceLabel,
         bcc,
       });
     }
@@ -275,6 +310,21 @@ exports.handler = async (event) => {
 
     if (!fromEmail) return json(400, { error: 'Sender studio email is required.' });
     if (!subject || !bodyText) return json(400, { error: 'Subject and message are both required.' });
+
+    // The footer used to hardcode both studios' postal addresses, so a
+    // Ringwood email showed Kilsyth's address too, and vice versa —
+    // and neither followed what's actually entered on the Studios page.
+    // Resolved once here (same address for the whole batch, since a send
+    // has exactly one sending studio) rather than baking studio text into
+    // this file a second time. Best-effort: a lookup failure just omits
+    // the address line rather than failing the whole send over a footer.
+    let fromStudioAddress = null;
+    try {
+      const fromStudioRows = await get(`studios?email=eq.${encodeURIComponent(fromEmail)}&select=address`);
+      fromStudioAddress = fromStudioRows?.[0]?.address ?? null;
+    } catch (err) {
+      console.error('[send-email] Could not resolve studio address for footer:', err.message);
+    }
 
     const messages = recipients.map(r => {
       const vars = {
@@ -295,7 +345,7 @@ exports.handler = async (event) => {
         to:       r.addresses,
         reply_to: fromEmail,
         subject:  filledSubject,
-        html:     emailTemplate(filledBody, fromEmail),
+        html:     emailTemplate(filledBody, fromEmail, fromStudioAddress),
       };
       // BCC the studio only on single-recipient sends. For bulk sends
       // one summary email is sent instead — 500 BCC copies would bury
@@ -554,7 +604,14 @@ function escapeHtml(s) {
 // [label](url) works inline anywhere, same syntax as markdown links; a
 // paragraph where every line starts with "- " becomes a real bullet list
 // (each line may itself contain a [label](url)).
-function emailTemplate(bodyText, studioEmail) {
+//
+// `studioAddress` is the sending studio's own postal address, resolved
+// by the caller from the `studios` table — the same field admins edit on
+// the Studios page. It used to be a hardcoded line naming both studios'
+// addresses regardless of which one actually sent the email. When no
+// address is on file for this studio, the line is left out rather than
+// printed blank.
+function emailTemplate(bodyText, studioEmail, studioAddress) {
   const inlineBold = (s) => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   const inlineLink = (s) => s.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
     '<a href="$2" style="color:#E8491E;text-decoration:none;">$1</a>');
@@ -638,7 +695,7 @@ function emailTemplate(bodyText, studioEmail) {
         </td></tr>
         <tr><td style="padding:16px 24px;border-top:1px solid #eeeeee;color:#999999;font-size:12px;line-height:1.6;">
           Pathfinder Music Lessons · <a href="mailto:${studioEmail}" style="color:#E8491E;text-decoration:none;">${studioEmail}</a><br>
-          20 Collins Place, Kilsyth VIC 3137 &nbsp;·&nbsp; G3 / 93a Heatherdale Rd, Ringwood VIC 3134<br>
+          ${studioAddress ? `${escapeHtml(studioAddress)}<br>` : ''}
           <a href="https://www.pathfindermusiclessons.com.au" style="color:#999999;">pathfindermusiclessons.com.au</a>
         </td></tr>
       </table>

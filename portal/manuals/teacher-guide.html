@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teacher Guide — Pathfinder Portal How-To Guide</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/portal.css">
+  <link rel="stylesheet" href="manuals.css">
+</head>
+<body>
+
+<div class="portal-shell">
+
+  <!-- TOP NAV -->
+  <nav class="topnav">
+    <a href="../dashboard-teacher.html" id="logoLink" class="topnav-logo">
+      <img src="../../Logo_-_long.png" alt="Pathfinder Music Lessons">
+    </a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">–</span>
+        </div>
+      </div>
+      <a href="../dashboard-teacher.html" id="backToPortal" class="btn-logout" style="text-decoration:none;">← Back to Portal</a>
+      <a href="../change-password.html" class="btn-logout" style="text-decoration:none;">🔑 Password</a>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Manuals</div>
+    <a class="nav-item" href="index.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Overview &amp; contents
+    </a>
+    <a class="nav-item" href="system-overview.html" id="navSystemOverview">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+      System overview
+    </a>
+    <a class="nav-item" href="admin-guide.html" id="navAdminGuide">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Admin guide
+    </a>
+    <a class="nav-item active" href="teacher-guide.html" id="navTeacherGuide">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+      Teacher guide
+    </a>
+    <a class="nav-item" href="student-guide.html" id="navStudentGuide">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      Student guide
+    </a>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Teacher Guide</div>
+        <div class="page-sub">My Schedule, My Students and My Tasks — what you can see and do as a teacher.</div>
+      </div>
+    </div>
+
+    <div class="doc-toc">
+      <div class="doc-toc-title">On this page</div>
+      <ul>
+        <li><a href="#getting-started">Getting started</a></li>
+        <li><a href="#schedule">My Schedule</a></li>
+        <li><a href="#students">My Students</a></li>
+        <li><a href="#tasks">My Tasks</a></li>
+        <li><a href="#password">Changing your password</a></li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-body doc-content">
+
+        <h2 id="getting-started">Getting started</h2>
+        <p>
+          Sign in at <code>pathfindermusiclessons.com.au/portal/login.html</code> with
+          the email and password your studio set up for you. If this is your first
+          time logging in, you'll be asked to set your own password before you can go
+          any further.
+        </p>
+        <p>
+          As a teacher your sidebar has just three items: <strong>My Schedule</strong>
+          (your landing page), <strong>My Students</strong> and <strong>My
+          Tasks</strong>. You won't see the Front Desk, Curriculum, Reports or Super
+          User sections admins use — those aren't hidden by accident, they simply
+          aren't part of the teacher role.
+        </p>
+
+        <h2 id="schedule">My Schedule</h2>
+        <p>
+          Your personal weekly lesson calendar. At the top, a stats row shows Today's
+          lessons, This week, My students, Unmarked (lessons that have ended but
+          still need attendance recorded), and My tasks. If you have open tasks, an
+          "Outstanding tasks" strip appears above your calendar listing the nearest
+          ones.
+        </p>
+        <p>
+          The schedule shows one week at a time — use <code>‹ Today ›</code> to move
+          between weeks. Each lesson card shows the time, student (or the group's
+          members), instrument, and either a grade pill or a skill-level pill for
+          that student.
+        </p>
+        <h3>Marking attendance</h3>
+        <ul>
+          <li>For a <strong>private lesson</strong>, use the inline dropdown on the
+            lesson card: Present, Absent — No Credit, Absent — Notice Given, or
+            Teacher Cancelled.</li>
+          <li>For a <strong>group lesson</strong>, click "Mark attendance" to open a
+            modal listing every student — mark each one the same way. A student left
+            unmarked is simply skipped, so double-check everyone's been set before you
+            close the modal.</li>
+          <li>Once every student on a lesson is marked, it's automatically finalised —
+            there's no separate save step for that.</li>
+        </ul>
+        <h3>Writing a lesson note</h3>
+        <p>
+          Click <strong>+ Add Note</strong> (or "Edit Note" if one already exists) on
+          a lesson to write practice notes for the student, optionally attach a
+          Google Drive link, and pick teaching materials from the Artefact Library —
+          filterable by grade, and you can select more than one. If the library is
+          missing something you used, <strong>+ Add your own</strong> lets you add it
+          on the spot; it's attached to this lesson right away, but stays invisible to
+          other teachers until an admin reviews and approves it.
+        </p>
+        <div class="callout callout-tip">
+          <strong>Saving a note emails the student automatically</strong>
+          <p>
+            As soon as you save, the student (and their parent, where applicable)
+            receives an email with your note and any materials you picked — there's
+            no extra "send" step, so make sure the note reads the way you want a
+            family to see it before saving.
+          </p>
+        </div>
+        <p>
+          Clicking anywhere else on a lesson opens a read-only view showing the
+          previous lesson's note for context, plus the full details of the current
+          one.
+        </p>
+        <div class="callout callout-tip">
+          <strong>Covering for another teacher</strong>
+          <p>
+            If you're covering someone else's lesson, it will show on your schedule
+            as "Covering for [teacher]," and on their own schedule as covered by you.
+            You can view notes from earlier weeks and mark attendance for it exactly
+            like your own lessons.
+          </p>
+        </div>
+        <p>
+          There's no day view or list view — only the week view — and you can't
+          reschedule, cancel, or edit a lesson's time, duration or roster from here.
+          If a lesson needs to move, contact your studio admin.
+        </p>
+
+        <h2 id="students">My Students</h2>
+        <p>
+          Your own roster, drawn from your active lesson bookings. Each student
+          shows their enrolment status, a grade or skill-level pill per instrument
+          they take with you, and a preview of your most recent lesson note for
+          them.
+        </p>
+        <ul>
+          <li><strong>Record grade</strong> (for graded instruments) opens a modal to
+            log a new Body-of-Knowledge grade with an achieved date and an optional
+            note. This always adds to the student's grade history rather than
+            overwriting it, so nothing is lost by recording progress regularly.</li>
+          <li><strong>Edit skill level</strong> (for the rare instrument outside the
+            graded list) adjusts a 0–8 slider instead.</li>
+          <li><strong>Message Student</strong> lets you email a student directly —
+            pick which of your studios to send from, write a subject and message.
+            The reply goes to that studio's inbox, not to you personally.</li>
+        </ul>
+        <div class="callout callout-tip">
+          <strong>You won't see contact details here</strong>
+          <p>
+            Phone numbers, emails and guardian details aren't shown on this page by
+            design — reaching a student is done entirely through "Message Student,"
+            which handles the address for you.
+          </p>
+        </div>
+        <p>
+          This page only shows students from your <em>current, active</em> lesson
+          bookings — a one-off guest who sat in on a single lesson of yours won't
+          appear here, even though they'll still show on that lesson in My Schedule.
+        </p>
+
+        <h2 id="tasks">My Tasks</h2>
+        <p>
+          A read-only list of things the studio has raised about you — it's not a
+          general to-do list, and you can't create tasks here.
+        </p>
+        <ul>
+          <li>Tiles at the top let you jump to Overdue, Due today, Next 7 days, or
+            All open.</li>
+          <li>Opening a task shows its full detail, but the fields themselves are
+            read-only for you.</li>
+          <li>The only action available is <strong>Reply to the studio</strong> — type
+            a message and send it. This flags the task as "replied" on the admin
+            side, letting them know you've responded, and adds your message to the
+            task's log.</li>
+        </ul>
+        <div class="callout callout-tip">
+          <strong>You can reply, but only an admin can close a task</strong>
+          <p>
+            Marking a task done, cancelling it, or reassigning it is deliberately kept
+            with the studio — your reply is how you let them know where things
+            stand, and they take it from there.
+          </p>
+        </div>
+
+        <h2 id="password">Changing your password</h2>
+        <p>
+          Use the <strong>🔑 Password</strong> link in the top bar at any time. If
+          you're logging in with a temporary password for the first time, you'll be
+          taken here automatically and can't skip it.
+        </p>
+      </div>
+    </div>
+  </main>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/supabase-client.js"></script>
+<script>
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+const MANUAL_HOME_BY_ROLE = {
+  superuser: '../tasks.html',
+  admin:     '../tasks.html',
+  teacher:   '../dashboard-teacher.html',
+  student:   '../dashboard-student.html',
+};
+
+// Which guide a role can open. Superuser/admin get everything; a teacher
+// gets the System Overview + Teacher Guide; a student gets only their own
+// guide. This only controls what's shown here — the actual gate is each
+// guide page's own requireAuth() call, so a direct link to a page someone
+// isn't meant to see still bounces them home.
+function applyManualVisibility(role) {
+  const showOverview = ['superuser','admin','teacher'].includes(role);
+  const showAdmin    = ['superuser','admin'].includes(role);
+  const showTeacher  = ['superuser','admin','teacher'].includes(role);
+  const showStudent  = ['superuser','admin','student'].includes(role);
+  document.getElementById('navSystemOverview')?.classList.toggle('hidden', !showOverview);
+  document.getElementById('navAdminGuide')?.classList.toggle('hidden', !showAdmin);
+  document.getElementById('navTeacherGuide')?.classList.toggle('hidden', !showTeacher);
+  document.getElementById('navStudentGuide')?.classList.toggle('hidden', !showStudent);
+}
+
+(async () => {
+  const profile = await requireAuth(['superuser','admin','teacher']);
+  if (!profile) return;
+  renderTopNavUser(profile);
+  const home = MANUAL_HOME_BY_ROLE[profile.role] ?? '../login.html';
+  document.getElementById('logoLink').href = home;
+  document.getElementById('backToPortal').href = home;
+  applyManualVisibility(profile.role);
+  if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
+})();
+</script>
+
+</body>
+</html>

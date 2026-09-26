@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Guide — Pathfinder Portal How-To Guide</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/portal.css">
+  <link rel="stylesheet" href="manuals.css">
+</head>
+<body>
+
+<div class="portal-shell">
+
+  <!-- TOP NAV -->
+  <nav class="topnav">
+    <a href="../tasks.html" id="logoLink" class="topnav-logo">
+      <img src="../../Logo_-_long.png" alt="Pathfinder Music Lessons">
+    </a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">–</span>
+        </div>
+      </div>
+      <a href="../tasks.html" id="backToPortal" class="btn-logout" style="text-decoration:none;">← Back to Portal</a>
+      <a href="../change-password.html" class="btn-logout" style="text-decoration:none;">🔑 Password</a>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Manuals</div>
+    <a class="nav-item" href="index.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Overview &amp; contents
+    </a>
+    <a class="nav-item" href="system-overview.html" id="navSystemOverview">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+      System overview
+    </a>
+    <a class="nav-item active" href="admin-guide.html" id="navAdminGuide">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Admin guide
+    </a>
+    <a class="nav-item" href="teacher-guide.html" id="navTeacherGuide">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+      Teacher guide
+    </a>
+    <a class="nav-item" href="student-guide.html" id="navStudentGuide">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      Student guide
+    </a>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Admin Guide</div>
+        <div class="page-sub">Front Desk, Teaching, Curriculum and Reports — everything on your sidebar, step by step.</div>
+      </div>
+    </div>
+
+    <div class="doc-toc">
+      <div class="doc-toc-title">On this page</div>
+      <ul>
+        <li>
+          <a href="#getting-started">Getting started</a>
+        </li>
+        <li>
+          <a href="#front-desk">Front Desk</a>
+          <ul>
+            <li><a href="#tasks">Tasks</a></li>
+            <li><a href="#enquiries">Enquiries</a></li>
+            <li><a href="#notifications">Notifications</a></li>
+          </ul>
+        </li>
+        <li>
+          <a href="#teaching">Teaching</a>
+          <ul>
+            <li><a href="#lessons">Lessons</a></li>
+            <li><a href="#students">Students</a></li>
+            <li><a href="#teachers">Teachers</a></li>
+          </ul>
+        </li>
+        <li>
+          <a href="#curriculum">Curriculum</a>
+          <ul>
+            <li><a href="#artefact-library">Artefact Library</a></li>
+          </ul>
+        </li>
+        <li>
+          <a href="#reports">Reports</a>
+          <ul>
+            <li><a href="#attendance">Attendance</a></li>
+            <li><a href="#distribution-lists">Distribution Lists</a></li>
+          </ul>
+        </li>
+        <li>
+          <a href="#superuser">Super User (if you have access)</a>
+          <ul>
+            <li><a href="#studios">Studios</a></li>
+            <li><a href="#admins">Admins</a></li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-body doc-content">
+
+        <h2 id="getting-started">Getting started</h2>
+        <p>
+          Sign in at <code>pathfindermusiclessons.com.au/portal/login.html</code> with
+          the email and password your superuser set up for you. If it's your first
+          time in, you'll be taken straight to a "set your password" screen before you
+          can do anything else — you can't skip this step on a temporary password.
+          After that, every login lands you on <strong>Tasks</strong>, which is the
+          admin landing page.
+        </p>
+        <p>
+          Your sidebar is organised into four groups — <strong>Front Desk</strong>,
+          <strong>Teaching</strong>, <strong>Curriculum</strong> and
+          <strong>Reports</strong> — and this guide follows that same order. If you're
+          a superuser you'll also see a <strong>Super User</strong> group at the
+          bottom, covered at the end of this guide.
+        </p>
+        <div class="callout callout-tip">
+          <strong>Studio filters are a default, not a restriction</strong>
+          <p>
+            Most pages pre-select your own studio in a filter dropdown so your day
+            starts with your own work. That's a convenience, not a lock — every studio
+            is one dropdown selection away, and you can see and work on the other
+            studio's records whenever you need to.
+          </p>
+        </div>
+
+        <h2 id="front-desk">Front Desk</h2>
+        <p>
+          Front Desk is where enquiries and day-to-day admin work gets tracked and
+          chased. It's the first thing you see when you log in.
+        </p>
+
+        <h3 id="tasks">Tasks</h3>
+        <p>
+          A shared to-do list for the whole studio — enquiry follow-ups, waitlist
+          entries, and anything else that needs doing on a given day.
+        </p>
+        <ul>
+          <li><strong>Quick-add:</strong> type into "What needs doing?" at the top and
+            press Enter to create a bare task, assigned to you, in whichever studio
+            you have selected.</li>
+          <li><strong>Jump to a day</strong> with the <code>‹ Today ›</code> controls
+            or the date picker. The page always shows everything overdue plus whatever
+            is due on the day you're looking at.</li>
+          <li><strong>Bucket tiles</strong> narrow the list to one purpose: Overdue,
+            Due today, Unassigned, Next 7 days, Teacher replied, or Waiting list.
+            Clicking an already-active tile returns you to the default view.</li>
+          <li><strong>Filters:</strong> Studio, Assignee (anyone / assigned to me /
+            unassigned / a named admin), and Status (Open / Done &amp; cancelled /
+            Everything).</li>
+          <li>Click any row to open it. Required: a <strong>Title</strong>. You can
+            also set what/who it's <strong>About</strong>, its Studio, who it's
+            <strong>Assigned to</strong>, and a <strong>Due date</strong> (with
+            one-click "Due tomorrow" / "Due next week" / "Due today" shortcuts).</li>
+          <li>If the task is about a prospective enquiry, the enquiry's own notes and
+            a link straight to that enquiry appear at the top of the task.</li>
+          <li><strong>Contact log:</strong> record how you reached someone (phone /
+            SMS / email / in person), the outcome, and a note. This is also how you
+            clear a "Teacher replied" flag — logging a response marks it handled.</li>
+          <li><strong>Recurring tasks</strong> (🔁 button): set up a rule — daily,
+            weekly on a chosen day, or monthly on a date or a weekday like "1st
+            Monday" — and a real task is generated automatically each time it's due.</li>
+        </ul>
+        <div class="callout callout-warning">
+          <strong>Three ways to close a task mean three different things</strong>
+          <p>
+            <strong>Cancel</strong> is for a task that turned out not to be needed —
+            it's blocked on enquiry follow-ups, because every enquiry genuinely needs
+            chasing. <strong>Discard as spam</strong> permanently deletes the enquiry,
+            its record and its task(s) — use it only for fake/spam enquiries, never
+            for a real person who simply didn't proceed. <strong>Mark done</strong> on
+            a real enquiry or trial opens a "How did it go?" prompt (Booked a trial /
+            Enrolling / Not proceeding) that updates the student's status correctly —
+            this is almost always the right button for a genuine enquiry or trial.
+          </p>
+        </div>
+        <div class="callout callout-tip">
+          <strong>Waiting list entries are easy to forget</strong>
+          <p>
+            Waitlist tasks don't have a due date and are deliberately left out of
+            Overdue/Due today/Next 7 days, so they don't clutter those counts — but
+            that also means they're invisible unless you click "Waiting list" or
+            switch Status to "Everything."
+          </p>
+        </div>
+
+        <h3 id="enquiries">Enquiries</h3>
+        <p>
+          A register of every prospective student — from the website form or logged
+          manually here — so you can see who's been contacted and what happened to
+          each lead.
+        </p>
+        <ul>
+          <li>Website enquiries arrive automatically; use
+            <strong>+ Add enquiry</strong> only for a phone call or walk-in. Required:
+            first/last name, phone, email, studio, instrument, how they got in touch,
+            and the enquiry date.</li>
+          <li>Adding an enquiry always creates a follow-up task automatically and
+            attempts to send the same acknowledgement email a website enquiry gets.</li>
+          <li><strong>Filters:</strong> Studio and Status (Open enquiries / Converted /
+            Lapsed / All).</li>
+          <li>The table shows how many contact attempts have been logged and when the
+            next follow-up is due — "Overdue," "Today," or the actual date. "Needs a
+            task" in amber means the enquiry has no open task chasing it — add one from
+            Tasks, or mark it lapsed.</li>
+          <li>Click a row for the full detail, including a "possible match" warning if
+            another student record shares the same email, phone or name.</li>
+        </ul>
+        <div class="callout callout-caution">
+          <strong>Delete vs. Mark lapsed</strong>
+          <p>
+            <strong>Delete</strong> (only available on prospective/lapsed enquiries)
+            permanently removes the enquiry, its task and its login record — it cannot
+            be undone, and is meant for spam or fake enquiries only. For a genuine
+            person who simply didn't go ahead, use <strong>Mark lapsed</strong>
+            instead, which keeps them as history and closes the open task for you.
+          </p>
+        </div>
+
+        <h3 id="notifications">Notifications</h3>
+        <p>
+          Send a one-way, personalised bulk email straight from the Portal — each
+          recipient gets their own individually addressed email.
+        </p>
+        <ol>
+          <li><strong>Pick an audience:</strong> all students at one or more studios,
+            all students of one teacher, everyone with a lesson on a given weekday, or
+            one teacher's students on a specific date.</li>
+          <li><strong>Compose:</strong> choose the studio to send from (only studios
+            with an email address on file can be selected), then a Subject and
+            Message. Use <code>{{first_name}}</code> or <code>{{student_name}}</code>
+            to personalise the message. You can paste an image directly into the
+            message box to include it.</li>
+          <li><strong>Refresh recipients</strong> before sending — this is required,
+            and shows you the exact list, plus anyone who'll be skipped for having no
+            email on file or an invalid-looking address.</li>
+          <li><strong>Send</strong> after confirming the recipient count and sending
+            studio in the pop-up.</li>
+        </ol>
+        <p>
+          A copy always goes to the sending studio's inbox afterwards — a direct Bcc
+          if there was exactly one recipient, or a single summary listing everyone
+          else it went to.
+        </p>
+        <div class="callout callout-warning">
+          <strong>Pasted images stay public</strong>
+          <p>
+            An image pasted into a Notification is hosted at a public web address
+            indefinitely, even after you delete the email. It's fine for a flyer or a
+            map — never paste anything showing other families' names or payment
+            details.
+          </p>
+        </div>
+
+        <h2 id="teaching">Teaching</h2>
+        <p>
+          Teaching covers the actual timetable: scheduling lessons, managing the
+          student roster, and maintaining the teacher directory.
+        </p>
+
+        <h3 id="lessons">Lessons</h3>
+        <p>
+          The lesson timetable, with Daily, Weekly and Monthly views. Use
+          <code>‹ Today ›</code>, the date picker, or the Studio / Status / Student
+          filters above the grid to find what you need — picking a specific student
+          automatically switches you to Monthly view.
+        </p>
+        <h4>Adding a lesson</h4>
+        <ul>
+          <li>Click <strong>+ Add Lesson</strong>, or click directly on an empty slot
+            on the grid to prefill the teacher, studio, day and time.</li>
+          <li>Choose <strong>Private</strong> (one student) or <strong>Group</strong>
+            (up to six) — picking the "Band" instrument switches this to Group
+            automatically. Tick <strong>No student</strong> instead for a
+            non-teaching block like supervision or admin time.</li>
+          <li>Pick the Teacher, Studio, Instrument, Day, Start time and Duration, then
+            add students.</li>
+          <li>Choose the pattern: a <strong>Repeating lesson</strong> (weekly or
+            fortnightly, running indefinitely, for a fixed number of lessons, or until
+            a chosen end date) or a <strong>One-off lesson</strong> (Makeup lesson,
+            Trial lesson, or a one-off request). Adding a trial student to the roster
+            locks the pattern to a one-off trial automatically.</li>
+        </ul>
+        <p>
+          On Save, the Portal checks — in order — that the roster fits the lesson
+          type, the teacher actually teaches that instrument, the teacher has an
+          <strong>availability window</strong> covering that studio/day/time, and that
+          nothing else clashes for that teacher or any of the students. All of these
+          are hard blocks: the lesson won't save until they're resolved.
+        </p>
+        <h4>Editing a lesson occurrence</h4>
+        <p>
+          Click any lesson on the grid to open it. From here you can:
+        </p>
+        <ul>
+          <li>Mark it as a <strong>makeup lesson</strong>, or record it as
+            <strong>covered</strong> by another staff member (which also moves it onto
+            their own schedule) or by someone external (name only, no login).</li>
+          <li>Mark <strong>attendance</strong> per student: Present, Absent — No
+            Credit, Absent — Notice Given, or Teacher Cancelled.</li>
+          <li>Add a one-lesson-only guest, or toggle <strong>Online lesson</strong>
+            (which offers to email students the teacher's Zoom link).</li>
+          <li><strong>Clone to new timeslot</strong> — creates a brand-new one-off
+            lesson with the same roster at a different date/time. Great for a quick
+            makeup slot.</li>
+          <li><strong>Cancel this lesson only</strong>, <strong>this + all future</strong>,
+            or <strong>the entire series</strong> — all of these keep past history
+            intact and free the slot for rebooking; only future, unmarked occurrences
+            are actually removed. You'll always be asked whether to email the
+            student(s).</li>
+          <li><strong>Edit series</strong> to change the recurring pattern itself —
+            this rebuilds future, unmarked occurrences only; anything already marked
+            or in the past is left untouched.</li>
+        </ul>
+        <div class="callout callout-tip">
+          <strong>Trial and makeup lessons are "one-off," not a mini-series</strong>
+          <p>
+            A trial, makeup, or one-off request lesson is stored as a single-occurrence
+            lesson, not a repeating one — so cloning or editing it never accidentally
+            turns it into a recurring series.
+          </p>
+        </div>
+        <p>
+          <strong>Agenda PDF:</strong> pick a teacher and date to preview and print a
+          one-page agenda for that teacher's day.
+        </p>
+
+        <h3 id="students">Students</h3>
+        <p>
+          The student roster — Trial, Active and Inactive students (prospective and
+          lapsed enquiries live on the Enquiries page instead).
+        </p>
+        <ul>
+          <li><strong>Add/Edit Student:</strong> first/last name, an email (optional —
+            leave it blank for a sibling sharing a family login), phone, studio,
+            status, and up to five instruments with a skill grade each. You need
+            either a student email or a parent email so the family stays reachable.</li>
+          <li><strong>Instruments &amp; grade:</strong> add or remove an instrument
+            row and pick a <strong>Grade</strong> from the dropdown (Foundation /
+            Beginner / Intermediate / Advanced tiers) — this is the only place to
+            change a student's instruments or grade; there's no separate grading
+            screen. Saving records the change in the student's permanent grade
+            history, so re-saving without changing the grade never creates a
+            duplicate entry.</li>
+          <li><strong>Enrolment:</strong> a Trial student gets an "Enrol…" action to
+            start ongoing lessons; an Active student gets "End enrolment" instead,
+            which can be planned for a future date or started immediately — either way
+            it walks through a short checklist rather than just flipping a status.</li>
+          <li><strong>Reset PW</strong> sends a password-reset email (only if the
+            student has their own login); <strong>Add login</strong> creates one for a
+            student who doesn't have one yet.</li>
+          <li><strong>CSV Import</strong> lets you bulk-load students from a
+            spreadsheet (a template is provided) — up to 1000 rows at a time, matched
+            to existing records by email.</li>
+        </ul>
+        <div class="callout callout-tip">
+          <strong>There's no delete button — and that's deliberate</strong>
+          <p>
+            Removing a student would break their lesson and attendance history, so
+            the supported path is always <strong>End enrolment</strong> (for a real
+            student) or handling it on the Enquiries page (for a prospect). If you
+            think a record genuinely needs to be removed, talk to your superuser.
+          </p>
+        </div>
+        <div class="callout callout-warning">
+          <strong>"End enrolment" doesn't flip the status instantly</strong>
+          <p>
+            A student only becomes Inactive once their last booked lesson has passed —
+            until then they may show "Leaving after [date]" while their status column
+            still reads Active. That's expected, not a bug.
+          </p>
+        </div>
+
+        <h3 id="teachers">Teachers</h3>
+        <p>
+          The teacher directory — profile, instruments taught, studios, and weekly
+          availability.
+        </p>
+        <ul>
+          <li><strong>Add/Edit Teacher:</strong> name, email (this creates their
+            login — a one-time temporary password is shown for a new teacher), phone,
+            Zoom link, teaching room, instruments taught, and studios.</li>
+          <li><strong>Availability</strong> is a list of Day / Studio / Start time /
+            End time rows. The Portal blocks any two rows that overlap for the same
+            teacher, whether at the same studio or a different one. Saving replaces
+            the teacher's entire availability, so review the full list before saving,
+            not just the row you changed.</li>
+          <li><strong>View</strong> opens a read-only detail page for that teacher —
+            their profile, availability, upcoming schedule, and current student
+            roster with grades. To change anything, come back to this page and use
+            Edit.</li>
+          <li><strong>Deactivate</strong>, not Delete, is how you remove a teacher from
+            active duty — it keeps their history intact and lets them come back later.
+            Deleting a teacher isn't offered in the Portal at all.</li>
+        </ul>
+        <div class="callout callout-warning">
+          <strong>Deactivating a teacher doesn't touch their lessons</strong>
+          <p>
+            Their existing lesson series keep running until you separately edit or
+            cancel them — deactivating only changes their login status.
+          </p>
+        </div>
+        <div class="callout callout-tip">
+          <strong>An untagged teacher can be booked for anything</strong>
+          <p>
+            The "must teach this instrument" check on Lessons only applies once a
+            teacher has at least one instrument selected here. Leaving Instruments
+            taught empty for a teacher means the scheduling check for them is
+            effectively switched off.
+          </p>
+        </div>
+
+        <h2 id="curriculum">Curriculum</h2>
+        <h3 id="artefact-library">Artefact Library</h3>
+        <p>
+          A catalogue of teaching materials — chord charts, songs, backing tracks and
+          other resources kept on the studio's Google Drive — organised by
+          instrument, grade and skill component (Repertoire, Technique, or Musical
+          Knowledge), so teachers can pick from it when writing up a lesson note.
+        </p>
+        <ul>
+          <li><strong>+ Add Artefact:</strong> Title, Instrument, Grade, Component, an
+            optional description, the Google Drive share link, and tags. The file
+            itself stays on Drive — the Portal only stores the link.</li>
+          <li><strong>Search and filter</strong> by title/description/tag, instrument,
+            grade or component. Tick <strong>Show retired</strong> to see items taken
+            out of rotation, or <strong>Teacher-added only</strong> to see what
+            teachers have contributed themselves.</li>
+          <li><strong>Retire / Reactivate</strong> toggles whether an item is offered
+            to teachers — nothing is ever hard-deleted, since a past lesson may still
+            reference it.</li>
+        </ul>
+        <p>
+          Teachers can add their own artefacts on the fly from their lesson-note
+          screen. These arrive here as <strong>Pending review</strong> (shown with a
+          count in the page header) — use <strong>Approve</strong> to make one
+          available to every teacher, or <strong>Discard</strong> if it's not worth
+          keeping (this doesn't delete it — a discarded item can still be restored
+          from under "Show retired").
+        </p>
+        <div class="callout callout-tip">
+          <strong>The Grade ladder is universal — the library itself is Guitar-only</strong>
+          <p>
+            The Foundation → Beginner → Intermediate → Advanced grade ladder used here
+            is the same one used everywhere else in the Portal, for every instrument.
+            The Artefact Library's actual content, however, has only ever been built
+            out for Guitar — the Instrument dropdown lists every instrument, but don't
+            expect a matching library of materials for anything other than Guitar yet.
+          </p>
+        </div>
+
+        <h2 id="reports">Reports</h2>
+        <h3 id="attendance">Attendance</h3>
+        <p>
+          A per-student rollup of lessons, presence, absence types and attendance
+          rate over a date range.
+        </p>
+        <ul>
+          <li><strong>Filters:</strong> Studio, Teacher, Instrument, and a From/To
+            date range (defaults to the last 90 days).</li>
+          <li><strong>Search</strong> by student name, and tick <strong>Only below
+            80%</strong> to focus on students whose attendance needs attention.</li>
+          <li>Click any column header to sort — the report opens sorted by Rate,
+            worst first.</li>
+          <li>Click a student's row to see every lesson counted in the range, with
+            date, teacher, instrument and status.</li>
+          <li><strong>⬇ Export CSV</strong> downloads the full underlying dataset for
+            the current filters and date range (it isn't limited by the "Only below
+            80%" checkbox or the search box, so the file may contain more rows than
+            you currently see on screen).</li>
+        </ul>
+        <div class="callout callout-tip">
+          <strong>How the rate is calculated</strong>
+          <p>
+            Only lessons that have actually <strong>ended</strong> are counted — a
+            lesson still to come, or in progress, is never counted as missed. An
+            <strong>unmarked</strong> lesson counts against the student, which is
+            deliberate: it's the incentive for marking attendance promptly.
+            Teacher-cancelled lessons are tracked (visible in the CSV export) but
+            don't count for or against the student's rate, since the lesson not
+            happening wasn't their doing.
+          </p>
+        </div>
+
+        <h3 id="distribution-lists">Distribution Lists</h3>
+        <p>
+          Distribution Lists don't send anything themselves — they generate a
+          ready-to-paste list of email addresses for a message you send yourself from
+          Gmail. Use this instead of Notifications whenever you expect a reply, need
+          to attach a file, or want the message to come from your own studio Gmail
+          address.
+        </p>
+        <ul>
+          <li><strong>All active students — all studios</strong> — active students
+            only, loads automatically.</li>
+          <li><strong>By studio</strong> — active and trial students at the studio you
+            pick.</li>
+          <li><strong>By teacher</strong> — active and trial students currently having
+            lessons with the teacher you pick.</li>
+          <li><strong>By instrument</strong> — active and trial students currently
+            enrolled to learn the instrument you pick.</li>
+        </ul>
+        <p>
+          Each list shows the address count, a click-to-copy button, and warnings for
+          any student skipped for having no email on file or an invalid-looking
+          address. Each student contributes exactly one address (their own login
+          email if they have one, otherwise their own contact email, otherwise a
+          parent's) — unlike Notifications, which emails every valid address it finds
+          for a student.
+        </p>
+        <div class="callout callout-caution">
+          <strong>Always paste the list into Bcc — never To or Cc</strong>
+          <p>
+            Put your own studio address in the To field and paste the copied list
+            into <strong>Bcc</strong>. This keeps every family's address private from
+            every other family and avoids a reply-all storm — it's the entire reason
+            to use Gmail for this instead of Notifications.
+          </p>
+        </div>
+        <div class="callout callout-warning">
+          <strong>Gmail has a recipient limit</strong>
+          <p>
+            Gmail caps a single email at roughly 500 combined recipients. The page
+            warns you as a list approaches or passes that number, but it won't split
+            the list for you — if you're over the limit, send it in two batches.
+          </p>
+        </div>
+
+        <h2 id="superuser">Super User (if you have access)</h2>
+        <p>
+          The Super User section only appears for superuser accounts. It's where the
+          studios themselves and the admin accounts that manage them are configured.
+        </p>
+
+        <h3 id="studios">Studios</h3>
+        <ul>
+          <li><strong>+ Add Studio:</strong> name, address, and the studio's own
+            Gmail address (used to send notifications and as the reply-to for
+            Portal emails).</li>
+          <li>Each studio card shows how many admins have access to it — an admin
+            with no studios explicitly ticked on their account has access to
+            <em>every</em> studio, not none.</li>
+          <li><strong>Deactivate</strong> is the safe, reversible way to take a studio
+            out of use.</li>
+        </ul>
+        <div class="callout callout-caution">
+          <strong>Delete is permanent</strong>
+          <p>
+            Deleting a studio is blocked while it still has active lessons, but once
+            that check passes, the delete cannot be undone. Use Deactivate unless you
+            are certain the studio should be permanently removed.
+          </p>
+        </div>
+
+        <h3 id="admins">Admins</h3>
+        <ul>
+          <li><strong>+ Add Admin:</strong> name, email (their login), phone, and
+            <strong>Studio Access</strong> — tick the studio(s) this admin should be
+            limited to, or leave every box unchecked for access to all studios.</li>
+          <li>Creating an admin shows a one-time password screen with their temporary
+            login details to pass on — they'll be asked to set their own password on
+            first login.</li>
+          <li><strong>Reset PW</strong> sends a password-reset email to an existing
+            admin.</li>
+          <li><strong>Deactivate</strong> is the reversible option for an admin who's
+            left or is on leave.</li>
+        </ul>
+        <div class="callout callout-caution">
+          <strong>Delete here is permanent — and unlike other parts of the Portal,
+            there's no history check</strong>
+          <p>
+            Deleting an admin permanently removes their account and login, with no
+            check for existing history referencing them. Prefer Deactivate unless
+            you're certain permanent removal is what you want.
+          </p>
+        </div>
+        <div class="callout callout-tip">
+          <strong>"Leave all unchecked" means all studios, not none</strong>
+          <p>
+            The same convention as Studios: an admin with no Studio Access boxes
+            ticked can see and manage every studio, which is easy to get backwards
+            when setting up someone meant to be limited to just one.
+          </p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/supabase-client.js"></script>
+<script>
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+const MANUAL_HOME_BY_ROLE = {
+  superuser: '../tasks.html',
+  admin:     '../tasks.html',
+  teacher:   '../dashboard-teacher.html',
+  student:   '../dashboard-student.html',
+};
+
+// Which guide a role can open. Superuser/admin get everything; a teacher
+// gets the System Overview + Teacher Guide; a student gets only their own
+// guide. This only controls what's shown here — the actual gate is each
+// guide page's own requireAuth() call, so a direct link to a page someone
+// isn't meant to see still bounces them home.
+function applyManualVisibility(role) {
+  const showOverview = ['superuser','admin','teacher'].includes(role);
+  const showAdmin    = ['superuser','admin'].includes(role);
+  const showTeacher  = ['superuser','admin','teacher'].includes(role);
+  const showStudent  = ['superuser','admin','student'].includes(role);
+  document.getElementById('navSystemOverview')?.classList.toggle('hidden', !showOverview);
+  document.getElementById('navAdminGuide')?.classList.toggle('hidden', !showAdmin);
+  document.getElementById('navTeacherGuide')?.classList.toggle('hidden', !showTeacher);
+  document.getElementById('navStudentGuide')?.classList.toggle('hidden', !showStudent);
+}
+
+(async () => {
+  const profile = await requireAuth(['superuser','admin']);
+  if (!profile) return;
+  renderTopNavUser(profile);
+  const home = MANUAL_HOME_BY_ROLE[profile.role] ?? '../login.html';
+  document.getElementById('logoLink').href = home;
+  document.getElementById('backToPortal').href = home;
+  applyManualVisibility(profile.role);
+  if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
+})();
+</script>
+
+</body>
+</html>

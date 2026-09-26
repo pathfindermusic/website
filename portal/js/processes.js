@@ -197,6 +197,7 @@ function processProgress(items, checks) {
 // ------------------------------------------------------------
 
 const PAYMENT_URL = 'https://www.pathfindermusiclessons.com.au/payments';
+const STUDENT_GUIDE_URL = 'https://www.pathfindermusiclessons.com.au/portal/manuals/student-guide.html';
 
 const SIGNATURE =
   'Talk to you soon!\n' +
@@ -363,6 +364,10 @@ async function maybeSendConfirmation(studentId, sentBy) {
         `you'd rather not proceed, no problem — just tell us at least 24 hours before ` +
         `your first lesson and we'll cancel your lessons.\n\n` +
         `${POLICIES}\n\n` +
+        `PORTAL HOW-TO GUIDE\n\n` +
+        `Once you're signed in to the Student Portal, our how-to guide walks you ` +
+        `through checking your lesson schedule, reading practice notes and ` +
+        `tracking your progress: ${STUDENT_GUIDE_URL}\n\n` +
         `${SIGNATURE}`;
 
     try {

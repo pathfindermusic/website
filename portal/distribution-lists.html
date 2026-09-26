@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Distribution Lists — Pathfinder Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/portal.css">
+  <style>
+    .dl-card { padding: 1.1rem 1.25rem; margin-bottom: 1.1rem; }
+    .dl-card-head {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 1rem; flex-wrap: wrap; margin-bottom: 0.85rem;
+    }
+    .dl-card-title { font-size: 1rem; font-weight: 700; color: var(--charcoal); }
+    .dl-card-sub { font-size: 0.78rem; color: var(--mid-grey); margin-top: 0.15rem; }
+    .dl-picker { min-width: 220px; }
+
+    .dl-count-row {
+      display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.6rem;
+    }
+    .dl-count { font-size: 1.5rem; font-weight: 800; color: var(--orange); line-height: 1; }
+    .dl-count-label { font-size: 0.8rem; color: var(--dark-grey); }
+    .dl-count-warn { font-size: 0.74rem; color: #d97706; font-weight: 600; }
+
+    .dl-textarea {
+      width: 100%; min-height: 76px; resize: vertical;
+      font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.78rem;
+      line-height: 1.5; padding: 0.65rem 0.75rem; border: 1px solid var(--border);
+      border-radius: var(--r-sm); background: var(--off-white); color: var(--charcoal);
+    }
+    .dl-actions { display: flex; gap: 0.6rem; margin-top: 0.6rem; align-items: center; flex-wrap: wrap; }
+    .dl-copied { font-size: 0.78rem; color: #16a34a; font-weight: 600; }
+
+    .dl-skip {
+      margin-top: 0.75rem; padding: 0.6rem 0.7rem; border-radius: var(--r-sm);
+      font-size: 0.76rem; line-height: 1.55;
+    }
+    .dl-skip.unreachable { background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; }
+    .dl-skip.invalid     { background: #fee2e2; border: 1px solid #fca5a5; color: #dc2626; margin-top: 0.5rem; }
+
+    .dl-bcc-note {
+      font-size: 0.76rem; color: var(--mid-grey); line-height: 1.6;
+      background: var(--off-white); border-radius: var(--r-sm);
+      padding: 0.65rem 0.8rem; margin-bottom: 1.1rem;
+    }
+    .dl-bcc-note strong { color: var(--charcoal); }
+
+    .dl-placeholder { font-size: 0.82rem; color: var(--mid-grey); padding: 0.4rem 0; }
+  </style>
+</head>
+<body>
+<div class="portal-shell">
+
+  <nav class="topnav">
+    <a href="#" class="topnav-logo"><img src="../Logo_-_long.png" alt="Pathfinder Music Lessons"></a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">–</span>
+        </div>
+      </div>
+      <a href="change-password.html" class="btn-logout" style="text-decoration:none;">🔑 Password</a>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Front desk</div>
+    <a class="nav-item" href="tasks.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Tasks
+    </a>
+    <a class="nav-item" href="enquiries.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+      Enquiries
+    </a>
+    <a class="nav-item" href="notifications.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/></svg>
+      Notifications
+    </a>
+    <div class="sidebar-section">Teaching</div>
+    <a class="nav-item" href="lessons.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Lessons
+    </a>
+    <a class="nav-item" href="students.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      Students
+    </a>
+    <a class="nav-item" href="teachers.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+      Teachers
+    </a>
+    <div class="sidebar-section">Curriculum</div>
+    <a class="nav-item" href="bok-artefacts.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Artefact Library
+    </a>
+    <div class="sidebar-section">Reports</div>
+    <a class="nav-item" href="attendance-report.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Attendance
+    </a>
+    <a class="nav-item active" href="distribution-lists.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      Distribution Lists
+    </a>
+    <div class="sidebar-section hidden" id="superuserSection">Super User</div>
+    <a class="nav-item hidden" href="studios.html" id="studiosLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Studios
+    </a>
+    <a class="nav-item hidden" href="admins.html" id="adminsLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Admins
+    </a>
+    <div class="sidebar-section">Manuals</div>
+    <a class="nav-item" href="manuals/index.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      How-To Guide
+    </a>
+  </aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Distribution Lists</div>
+        <div class="page-sub">Bcc-ready address lists to copy into Gmail — for threads that need real back-and-forth or an attachment, not the one-way Notifications sends</div>
+      </div>
+    </div>
+
+    <div class="dl-bcc-note">
+      <strong>Paste these into Gmail's Bcc field, not To or Cc.</strong> Put your own studio
+      address in To. Bcc keeps every family's email address private from every other
+      family, and stops a "reply all" from blasting the whole list — replies land only
+      with you, which is the point of using Gmail for this instead of Notifications.
+      One address per student (their login email, else their own contact email, else a
+      parent's — whichever is on file first).
+    </div>
+
+    <!-- 1. All students -->
+    <div class="card dl-card" id="dlAll">
+      <div class="dl-card-head">
+        <div>
+          <div class="dl-card-title">All active students — all studios</div>
+          <div class="dl-card-sub">Active students only (not trial or prospective)</div>
+        </div>
+      </div>
+      <div class="dl-body" id="dlAllBody"><div class="dl-placeholder">Loading…</div></div>
+    </div>
+
+    <!-- 2. By studio -->
+    <div class="card dl-card" id="dlStudio">
+      <div class="dl-card-head">
+        <div>
+          <div class="dl-card-title">By studio</div>
+          <div class="dl-card-sub">Active + trial students at the chosen studio</div>
+        </div>
+        <select class="filter-select dl-picker" id="dlStudioPicker" onchange="loadList('studio')">
+          <option value="">— Select a studio —</option>
+        </select>
+      </div>
+      <div class="dl-body" id="dlStudioBody"><div class="dl-placeholder">Choose a studio to generate its list.</div></div>
+    </div>
+
+    <!-- 3. By teacher -->
+    <div class="card dl-card" id="dlTeacher">
+      <div class="dl-card-head">
+        <div>
+          <div class="dl-card-title">By teacher</div>
+          <div class="dl-card-sub">Active + trial students currently taking lessons with them</div>
+        </div>
+        <select class="filter-select dl-picker" id="dlTeacherPicker" onchange="loadList('teacher')">
+          <option value="">— Select a teacher —</option>
+        </select>
+      </div>
+      <div class="dl-body" id="dlTeacherBody"><div class="dl-placeholder">Choose a teacher to generate their list.</div></div>
+    </div>
+
+    <!-- 4. By instrument -->
+    <div class="card dl-card" id="dlInstrument">
+      <div class="dl-card-head">
+        <div>
+          <div class="dl-card-title">By instrument</div>
+          <div class="dl-card-sub">Active + trial students currently learning it</div>
+        </div>
+        <select class="filter-select dl-picker" id="dlInstrumentPicker" onchange="loadList('instrument')">
+          <option value="">— Select an instrument —</option>
+        </select>
+      </div>
+      <div class="dl-body" id="dlInstrumentBody"><div class="dl-placeholder">Choose an instrument to generate its list.</div></div>
+    </div>
+
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script>
+
+// Canonical instrument list — must stay identical to lessons.html / students.html / teachers.html / attendance-report.html
+const INSTRUMENTS = ['Guitar','Bass','Drums','Piano / Keyboard','Voice / Singing','Violin','Ukulele','Music Theory','Saxophone','Band','Other'];
+
+// Gmail's own Bcc/recipient cap: 500 combined (To+Cc+Bcc) for a personal
+// account, and — for Google Workspace — 500 EXTERNAL recipients per
+// message even though the combined cap is 2,000. Every address on these
+// lists is external, so 500 is the number that actually applies here
+// either way. https://support.google.com/mail/answer/22839 /
+// https://knowledge.workspace.google.com/admin/gmail/gmail-sending-limits-in-google-workspace
+const GMAIL_RECIPIENT_CAP = 500;
+
+let currentProfile = null;
+
+(async () => {
+  currentProfile = await requireAuth(['superuser','admin']);
+  if (!currentProfile) return;
+
+  renderTopNavUser(currentProfile);
+
+  if (currentProfile.role === 'superuser') {
+    document.getElementById('superuserSection').classList.remove('hidden');
+    document.getElementById('studiosLink').classList.remove('hidden');
+    document.getElementById('adminsLink').classList.remove('hidden');
+  }
+
+  if (window.innerWidth < 900) {
+    document.getElementById('menuToggle').style.display = '';
+  }
+
+  document.getElementById('dlInstrumentPicker').innerHTML =
+    '<option value="">— Select an instrument —</option>' +
+    INSTRUMENTS.map(i => `<option value="${i}">${i}</option>`).join('');
+
+  await loadPickers();
+  loadList('all');
+})();
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+async function loadPickers() {
+  const { data: studios } = await db.from('studios').select('id,name').eq('status','active').order('name');
+  const studioSel = document.getElementById('dlStudioPicker');
+  (studios ?? []).forEach(s => { studioSel.innerHTML += `<option value="${s.id}">${s.name}</option>`; });
+
+  const { data: teachers } = await db.from('teachers')
+    .select('id, profiles(first_name, last_name)').order('profiles(last_name)');
+  const teacherSel = document.getElementById('dlTeacherPicker');
+  (teachers ?? []).forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = `${t.profiles?.first_name ?? ''} ${t.profiles?.last_name ?? ''}`.trim();
+    teacherSel.appendChild(opt);
+  });
+}
+
+// which={ 'all' | 'studio' | 'teacher' | 'instrument' }
+async function loadList(which) {
+  const bodyId = {
+    all: 'dlAllBody', studio: 'dlStudioBody',
+    teacher: 'dlTeacherBody', instrument: 'dlInstrumentBody',
+  }[which];
+  const body = document.getElementById(bodyId);
+
+  const spec = { action: 'preview', full: true };
+  if (which === 'all') {
+    spec.mode = 'all';
+  } else if (which === 'studio') {
+    const id = document.getElementById('dlStudioPicker').value;
+    if (!id) { body.innerHTML = `<div class="dl-placeholder">Choose a studio to generate its list.</div>`; return; }
+    spec.mode = 'studios'; spec.studioIds = [id];
+  } else if (which === 'teacher') {
+    const id = document.getElementById('dlTeacherPicker').value;
+    if (!id) { body.innerHTML = `<div class="dl-placeholder">Choose a teacher to generate their list.</div>`; return; }
+    spec.mode = 'teacher'; spec.teacherId = id;
+  } else if (which === 'instrument') {
+    const inst = document.getElementById('dlInstrumentPicker').value;
+    if (!inst) { body.innerHTML = `<div class="dl-placeholder">Choose an instrument to generate its list.</div>`; return; }
+    spec.mode = 'instrument'; spec.instrument = inst;
+  }
+
+  body.innerHTML = `<div class="dl-placeholder"><div class="spinner" style="display:inline-block;width:14px;height:14px;vertical-align:-2px;margin-right:0.4rem;"></div>Looking up recipients…</div>`;
+
+  try {
+    const res = await fetch('/.netlify/functions/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(spec),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      body.innerHTML = `<div class="dl-placeholder">${escapeHTML(data.error ?? 'Could not resolve recipients.')}</div>`;
+      return;
+    }
+    renderList(body, data);
+  } catch (err) {
+    body.innerHTML = `<div class="dl-placeholder">Error: ${escapeHTML(err.message)}</div>`;
+  }
+}
+
+// One best address per student — the first entry in `addresses` is
+// always the highest-priority one that resolved as valid (login email,
+// else the student's own email, else a parent's — same order send-email.js
+// resolves for every other portal email). A distribution list deliberately
+// uses just this one per student, unlike a targeted notification which
+// mails every valid address it finds for that student.
+function renderList(body, data) {
+  const recipients = data.recipients ?? [];
+  const addresses  = recipients.map(r => r.addresses?.[0]).filter(Boolean);
+  const count      = addresses.length;
+
+  const capWarning = count > GMAIL_RECIPIENT_CAP
+    ? `<div class="dl-count-warn">⚠️ Over Gmail's ~${GMAIL_RECIPIENT_CAP}-recipient limit per email — split this into two sends.</div>`
+    : (count > GMAIL_RECIPIENT_CAP * 0.9
+        ? `<div class="dl-count-warn">Approaching Gmail's ~${GMAIL_RECIPIENT_CAP}-recipient limit per email.</div>`
+        : '');
+
+  const unreachableBlock = (data.unreachable ?? 0) > 0
+    ? `<div class="dl-skip unreachable">⚠️ <strong>${data.unreachable}</strong> student${data.unreachable !== 1 ? 's have' : ' has'}
+        no email on file and ${data.unreachable !== 1 ? "aren't" : "isn't"} included:
+        ${(data.unreachableNames ?? []).map(escapeHTML).join(', ')}.
+        Add an email on their student record to include them.</div>`
+    : '';
+
+  const invalidBlock = (data.invalid ?? 0) > 0
+    ? `<div class="dl-skip invalid">🚫 <strong>${data.invalid}</strong> address${data.invalid !== 1 ? 'es look' : ' looks'}
+        invalid and ${data.invalid !== 1 ? "aren't" : "isn't"} included:
+        ${(data.invalidNames ?? []).map(escapeHTML).join('; ')}. Fix these on the student record.</div>`
+    : '';
+
+  body.innerHTML = `
+    <div class="dl-count-row">
+      <span class="dl-count">${count}</span>
+      <span class="dl-count-label">address${count !== 1 ? 'es' : ''}${data.audienceLabel ? ' — ' + escapeHTML(data.audienceLabel) : ''}</span>
+    </div>
+    ${capWarning}
+    <textarea class="dl-textarea" id="ta-${body.id}" readonly onclick="this.select()">${addresses.join(', ')}</textarea>
+    <div class="dl-actions">
+      <button class="btn btn-secondary btn-sm" onclick="copyList('${body.id}')" ${count === 0 ? 'disabled' : ''}>📋 Copy to clipboard</button>
+      <span class="dl-copied hidden" id="copied-${body.id}">Copied!</span>
+    </div>
+    ${unreachableBlock}
+    ${invalidBlock}
+  `;
+}
+
+async function copyList(bodyId) {
+  const ta = document.getElementById(`ta-${bodyId}`);
+  const copiedEl = document.getElementById(`copied-${bodyId}`);
+  try {
+    await navigator.clipboard.writeText(ta.value);
+  } catch (_) {
+    // Clipboard API blocked (older browser, non-HTTPS, no permission) —
+    // fall back to select-and-let-the-admin-Ctrl+C, which always works.
+    ta.select();
+    showToast('Could not copy automatically — the list is selected, press Ctrl+C (Cmd+C on Mac).', 'warning');
+    return;
+  }
+  copiedEl.classList.remove('hidden');
+  setTimeout(() => copiedEl.classList.add('hidden'), 2500);
+  showToast('Address list copied to clipboard.', 'success');
+}
+
+function escapeHTML(str) {
+  const div = document.createElement('div');
+  div.textContent = str ?? '';
+  return div.innerHTML;
+}
+
+</script>
+</body>
+</html>

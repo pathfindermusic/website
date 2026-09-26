@@ -143,12 +143,17 @@ remember production will lag behind `main` until you deploy manually.
     ├── enquiries.html  notifications.html
     ├── lessons.html    students.html    teachers.html    teacher-detail.html
     ├── attendance-report.html
+    ├── distribution-lists.html (Bcc-ready address lists for Gmail — see below)
     ├── bok-artefacts.html      (Guitar-only artefact library — see Skill grading below)
     ├── dashboard-teacher.html    dashboard-student.html
     ├── dashboard-admin.html    NOT in the sidebar any more (Sep 2026 nav reorg) —
     │                             still on disk, reachable by direct URL only
     ├── studios.html   admins.html      (super user only)
     ├── my-students.html            (teacher's roster + skill grading)
+    ├── manuals/                     How-To Guide (Sep 2026) — see below
+    │   ├── index.html    system-overview.html
+    │   ├── admin-guide.html    teacher-guide.html    student-guide.html
+    │   └── manuals.css
     ├── css/portal.css
     └── js/supabase-client.js       shared helpers + anon key
 ```
@@ -158,10 +163,17 @@ The Functions use plain `fetch` — no npm dependencies, nothing to bundle.
 
 **Sidebar order (Sep 2026 reorg):** Front desk (Tasks, Enquiries, Notifications)
 → Teaching (Lessons, Students, Teachers) → Curriculum (Artefact Library) →
-Reports (Attendance) → Super User (hidden unless superuser). `tasks.html` and
-`enquiries.html` build it dynamically via `renderSidebar()`; every other
-admin-facing page duplicates the same static markup — a page added to one
-has to be added to the other 10 by hand, there's no shared include.
+Reports (Attendance, Distribution Lists) → Super User (hidden unless
+superuser) → **Manuals (How-To Guide)**, added to the bottom of every role's
+sidebar — admin, teacher and student alike. `tasks.html` and `enquiries.html`
+build it dynamically via `renderSidebar()`; every other admin-facing page
+(11 of them, plus the 2 teacher pages and the student dashboard) duplicates
+the same static markup — a page added to one has to be added to all the
+others by hand, there's no shared include. This bit dashboard-admin.html once
+already: it kept its own full copy of the sidebar from before the Sep 2026
+nav reorg and was still missing the later Distribution Lists entry until the
+How-To Guide pass added both that and Manuals in the same edit — a reminder
+to check *every* duplicate, including pages nothing currently links to.
 
 ### Why the Functions exist
 
@@ -273,6 +285,18 @@ Every recipient gets an individual email — no shared To lists. Where a student
 has `parent_email`, both addresses receive it. A BCC copy goes to the sending
 studio as the only record of what went out (it lands in Inbox, not Sent).
 
+**The footer's postal address is looked up per send, not hardcoded (Sep
+2026).** `emailTemplate()` in `netlify/functions/send-email.js` used to have
+both studios' addresses baked into the footer as a literal string, so a
+Ringwood email's footer showed Kilsyth's address too, and vice versa — and
+neither followed what was actually entered on the Studios page (`studios.
+address`, the same field the Studios admin screen edits). It now resolves
+the *sending* studio's own `address` by matching `studios.email` against
+`fromEmail` once per send, and passes it into `emailTemplate()`; a studio
+with no address on file simply gets no address line, rather than a blank or
+wrong one. The lookup is best-effort — a failure logs a warning and omits
+the line rather than failing the whole send over a footer.
+
 ---
 
 ## Decisions already made (don't relitigate without reason)
@@ -310,6 +334,63 @@ studio as the only record of what went out (it lands in Inbox, not Sent).
   unmarked lesson. It reuses the same teacher-availability hard-block and
   "freed slot" clash detection (absent/teacher-cancelled occurrences don't
   block) that `saveLesson()` uses, scoped to the one target date.
+- **A one-off's Day field is derived from its date, not independently set
+  (Sep 2026).** Reported 26 Sep 2026: a non-teaching event couldn't be booked
+  into a slot a cancelled lesson had freed, even though a regular lesson
+  could be booked into the same slot. The freed-slot clash detection itself
+  was never the problem — it doesn't distinguish a non-teaching event from
+  any other lesson. The actual cause: Add Lesson has separate Day and Start
+  date fields, and nothing kept them in sync. Booking a real replacement
+  lesson into a freed slot was normally done via **Clone**, which always
+  derives the day from the date chosen, so it never hit this. Booking a
+  non-teaching event has to go through Add Lesson instead (Clone has no
+  blank non-teaching option), and Day defaults to whatever the form was
+  last left showing — e.g. still Wednesday after the grid had moved on to
+  Thursday — while Start date resets to today. `plannedDates()` trusts Day
+  over the typed date and walks forward to the next date that matches it,
+  so the one-off silently landed on, and clashed on, a different date than
+  the one actually chosen. Fixed by deriving Day from Start date automatically
+  whenever "One-off lesson" is selected (`syncDayFromStartDate()` in
+  `lessons.html`), re-deriving it if the date is then changed, disabling the
+  Day dropdown while a one-off is selected (it isn't independently
+  meaningful any more), and defaulting Day to match Start date's weekday
+  every time Add Lesson opens fresh, closing the same gap for a brand-new
+  series too. Editing an existing one-off is untouched — it already loads
+  the real day from the lesson record, not from this derivation.
+- **Freed-slot clash detection now fetches only the new booking's own date
+  window, not an overlapping lesson's entire history (Sep 2026).** Reported
+  30 Sep 2026: a one-off trial couldn't be booked into a slot a lesson's
+  occurrence had freed by being marked Absent — No Credit, even though the
+  freed-slot logic itself (an occurrence where every student in the roster
+  has an Absent/Teacher Cancelled mark doesn't block a new booking) is
+  correct and unchanged. `saveLesson()`'s clash check used to fetch every
+  occurrence — past and future, three years of them for an indefinite
+  series — for every lesson sharing that weekly time slot, with no date
+  filter at all, then work out which were freed in JS. An indefinite series
+  is ~150 occurrences a year; multiply that by every teacher who happens to
+  have a lesson at the same time of day, and the fetch can run past
+  Supabase's default 1000-row response cap, which truncates silently rather
+  than erroring — so the exact occurrence that mattered could simply not
+  come back. `checkCloneClash()` never had this problem, since a clone is
+  always for one specific date and already queried only that date. Fixed by
+  bounding `saveLesson()`'s occurrence fetch to the new booking's planned
+  dates (a single date for a one-off; the same date-range logic scales down
+  naturally for a bounded series) — `lesson_occurrences.select(...).gte(
+  'date', ...).lte('date', ...)` alongside the existing `.in('lesson_id',
+  overlappingIds)`, rather than every date the lesson has ever had.
+- **Online lessons get a violet camera badge, not a colour change (Sep
+  2026).** `is_online` used to be invisible on the Daily grid and Monthly
+  view entirely — the only place it showed at all was a small "Online" text
+  pill on the Weekly list. Admins asked for it to be obvious at a glance
+  everywhere. The private/group/makeup border colour on a lesson block
+  already carries real meaning, so rather than repurposing or fighting that
+  colour coding, online lessons get an additional small violet circular
+  badge (a camera icon, `onlineIconBadge()` in `lessons.html`) — top-right
+  corner on the Daily grid block, next to the time on a Monthly tile, and
+  as an icon inside the existing pill on the Weekly list. Same violet
+  (`#7c3aed`) as the pre-existing `.pill-online` elsewhere in the app, so
+  it reads as one consistent "online" signal across every view and the
+  occurrence modal.
 
 ## Row Level Security — read this before touching a policy
 
@@ -737,6 +818,20 @@ notice, a recorded video lesson as the default for a missed lesson, school and
 public holiday rules, photography. An earlier drafted version had two of these
 materially wrong. Do not paraphrase it.
 
+**"You're enrolled" carries a Portal how-to guide link (Sep 2026).** After
+the policies and before the sign-off, this email now has a "PORTAL HOW-TO
+GUIDE" section pointing to `STUDENT_GUIDE_URL`
+(`.../portal/manuals/student-guide.html`) — added specifically for new
+students, since the How-To Guide's role gate (see "How-To Guide" below) means
+the guide can no longer be handed out as a bare link to someone without an
+account yet. The link isn't deep — signing in from it lands on the student's
+dashboard, not the guide itself, because `requireAuth()` has no return-path
+support — but a student who isn't logged in yet simply sees the login page,
+and once their account exists they can always reach the guide from there or
+the Portal sidebar. This only touches the enrolment email; "Your trial is
+booked" is unchanged, since a trial student doesn't have Portal access yet
+either way.
+
 **Confirmations send when the lesson is added**, not at conversion — that is
 when the details they carry come into existence. `process_items.sent_at`
 guards against sending twice.
@@ -802,6 +897,129 @@ falling back to the skill bar. That was the first fix; widening
 `GRADED_INSTRUMENTS` everywhere else followed the same day once the pattern
 was confirmed.
 
+## Distribution lists (Sep 2026) — Gmail Bcc, not another sending path
+
+Admins asked for a way to reach students via their own Gmail rather than
+Notifications, specifically when they expect replies or need to attach a
+file — Notifications is one-way (no reply-to thread) and can't attach
+anything. Rather than build file attachments and threaded replies into the
+portal's own sender, `distribution-lists.html` (Reports → Distribution
+Lists) generates a **Bcc-ready comma-separated address list** for an admin
+to copy into a normal Gmail compose window. The portal never sends these —
+it only resolves who should be on the list, live, at the moment someone
+asks for it.
+
+Four lists, matching what was actually asked for:
+1. All active students, all studios (deliberately active-only, not trial —
+   the one list where that was explicit)
+2. Per studio
+3. Per teacher
+4. Per instrument — the one genuinely new server-side capability; lists 1-3
+   reuse `send-email.js` recipient modes that already existed for
+   Notifications (`studios`, `teacher`), plus a new `all` mode
+
+**Backend:** all four go through `send-email.js`'s existing `action:
+'preview'` — the same server-side recipient resolution Notifications' own
+preview panel uses (service_role, because student login email lives in
+`auth.users` and the browser can't read that table) — with a new
+`body.full: true` flag that returns the complete recipient list instead of
+preview's normal 8-item sample. Two new recipient modes were added:
+`all` (every active student, no studio scoping) and `instrument` (active +
+trial students of one instrument, mirroring the `teacher` mode's shape).
+Which statuses count as "in audience" is now a per-mode `desiredStatuses`
+array rather than one hardcoded active+trial filter, specifically so `all`
+could be active-only without changing every other mode's behaviour.
+
+**One address per student, deliberately different from Notifications.**
+A targeted notification already mails every valid address it can find for
+a student (login email AND parent email, if both are on file and distinct)
+— more reach for a message going to one family. A distribution list uses
+only the highest-priority one (`recipients[i].addresses[0]`, following the
+existing login → student email → parent email order) — one address per
+student in the count, no near-duplicate sends to the same family, smaller
+lists that stay further under Gmail's recipient cap.
+
+**Paste into Bcc, never To/Cc.** The page says so directly, and the reason
+matters: pasting a class list into To exposes every family's email address
+to every other family, and turns a "reply" into a reply-all blast — the
+opposite of what admins asked this for (threads they can actually manage).
+Convention is: admin's own studio address in To, the generated list in Bcc.
+
+**Gmail's recipient cap is real and was checked, not assumed:** a personal
+Gmail account caps at 500 combined recipients (To+Cc+Bcc) per message
+([Google's support page](https://support.google.com/mail/answer/22839));
+Google Workspace raises the combined cap to 2,000 but caps *external*
+recipients specifically at 500 per message
+([Workspace sending limits](https://knowledge.workspace.google.com/admin/gmail/gmail-sending-limits-in-google-workspace))
+— and every address on one of these lists is external, so 500 is the
+number that actually applies regardless of which kind of account is
+sending. The page shows a live count and warns above ~450; if a studio
+ever approaches 500 active students, the "all students" list will need
+splitting into two sends, which isn't automated — it's just a warning.
+
+## How-To Guide (Sep 2026) — documentation for the parallel run with Zoho/MMS
+
+The Portal is being trialled **alongside** the existing setup — the public
+website, Zoho CRM (enquiries/tasks) and MyMusicStaff (students/lessons) —
+rather than replacing them outright. To get admins, teachers and students up
+to speed quickly during that trial, `portal/manuals/` is a small set of HTML
+pages styled to match the rest of the Portal:
+
+- `index.html` — the landing page ("How-To Guide"), linked from a new
+  **Manuals** sidebar section on every role's sidebar (admin, teacher,
+  student alike) via `manuals/index.html`.
+- `system-overview.html` — what the Portal does functionally, how it maps
+  onto Zoho/MyMusicStaff/the website, and a short technical overview
+  (Supabase, Netlify, roles, RLS, email) for anyone curious.
+- `admin-guide.html` — one page per sidebar group (Front Desk, Teaching,
+  Curriculum, Reports, plus a Super User section for those with access),
+  each function explained with the traps that matter to a front-desk user
+  (Cancel vs Discard vs Mark lapsed, Notifications vs Distribution Lists,
+  studio-scoping as a default not a boundary, hard-delete warnings on
+  Studios/Admins, etc.) — condensed from the same ground truth as the
+  sections above, in plain "how do I…" language rather than developer notes.
+- `teacher-guide.html` / `student-guide.html` — the same treatment for the
+  two simplified dashboards.
+
+**Access is role-gated (Sep 2026), the same way the rest of the Portal is.**
+Each guide page calls `requireAuth([...])` exactly like any other page —
+superuser and admin are allowed on all four guides; a teacher is allowed on
+`system-overview.html` and `teacher-guide.html` only; a student is allowed
+on `student-guide.html` only. `index.html` itself allows all four roles (it's
+just the launcher) but calls `applyManualVisibility(role)` to hide the
+sidebar links and guide-cards for anything that role can't open — so a
+teacher simply never sees an Admin Guide card rather than seeing one that
+403s. That visibility function is duplicated at the bottom of **every**
+manual page (not just `index.html`), since each page also renders the same
+Manuals sidebar and has to hide the same links for someone who reaches it
+directly rather than through the hub. The allowed-roles list passed to
+`requireAuth()` on each page is the real gate; `applyManualVisibility()` is
+only tidying up what the sidebar/cards show — the two must be changed
+together or a link will appear that then bounces the person who clicks it.
+A rejected role lands back on `login.html`, which (already logged in)
+immediately forwards them to their own dashboard — the same bounce any
+other role-mismatched page in the Portal gives.
+
+This reverses the original design, worth remembering if the guide is ever
+revisited: it was first built with no auth at all, specifically so a new
+hire could be sent the link before their account existed. The studio asked
+for it locked down instead once the guides were reviewed, so that trade is
+gone — a manual link is only useful to someone who can already log in, and
+nothing here should assume otherwise going forward.
+
+**Kept in sync by hand, same as the sidebar itself.** There's no shared
+include (see Architecture above), so the guide content — and now the
+per-page role list and `applyManualVisibility()` copy — will drift from the
+real UI the same way the sidebar markup does whenever a page changes; worth
+a skim of the relevant manual page after any UI change of substance, and a
+check of both the `requireAuth()` list and the visibility function if a
+role's access is ever revisited.
+
+**Scope is deliberately narrow.** The guide explains the Portal only. It
+does not attempt to prescribe what should still be double-entered in Zoho
+or MyMusicStaff during the parallel run — that's a studio operating
+decision, not something to bake into a how-to page that outlives it.
+
 ## Traps that have already cost time
 
 - **Check which environment you're looking at.** Local dev runs against the same
@@ -850,6 +1068,21 @@ was confirmed.
   wrong once (Sep 2026) writing the clone-lesson feature — insert failed
   with the check-constraint error, not a silent no-op, so at least it's
   loud.
+- **"Which instrument(s) does this student play" is `student_instruments`,
+  not active lesson bookings.** The distribution-lists "by instrument" mode
+  (Sep 2026) was first written like `teacher` mode — deriving students from
+  `lessons?instrument=eq.X&status=eq.active` — and returned 0 for a real,
+  active Saxophone student because she had no currently-booked lesson series
+  in that exact shape at the moment of testing (between terms / not yet
+  scheduled). `student_instruments` (`student_id, instrument, skill_level`)
+  is the actual enrolment record — the same table `students.html` reads to
+  show a student's instrument tags — and is independent of whether a lesson
+  is currently booked. Fixed `mode === 'instrument'` in
+  `netlify/functions/send-email.js` to query `student_instruments` directly.
+  `teacher` mode is still correctly lesson-booking-derived (a teacher's
+  student list genuinely is "who currently has lessons with this teacher"),
+  so don't reflexively copy that pattern onto anything answering "what does
+  this student play" instead of "who currently has lessons with X."
 
 ## Known limitations & open decisions
 

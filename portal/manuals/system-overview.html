@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System Overview — Pathfinder Portal How-To Guide</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/portal.css">
+  <link rel="stylesheet" href="manuals.css">
+</head>
+<body>
+
+<div class="portal-shell">
+
+  <!-- TOP NAV -->
+  <nav class="topnav">
+    <a href="../tasks.html" id="logoLink" class="topnav-logo">
+      <img src="../../Logo_-_long.png" alt="Pathfinder Music Lessons">
+    </a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">–</span>
+        </div>
+      </div>
+      <a href="../tasks.html" id="backToPortal" class="btn-logout" style="text-decoration:none;">← Back to Portal</a>
+      <a href="../change-password.html" class="btn-logout" style="text-decoration:none;">🔑 Password</a>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Manuals</div>
+    <a class="nav-item" href="index.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Overview &amp; contents
+    </a>
+    <a class="nav-item active" href="system-overview.html" id="navSystemOverview">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+      System overview
+    </a>
+    <a class="nav-item" href="admin-guide.html" id="navAdminGuide">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Admin guide
+    </a>
+    <a class="nav-item" href="teacher-guide.html" id="navTeacherGuide">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+      Teacher guide
+    </a>
+    <a class="nav-item" href="student-guide.html" id="navStudentGuide">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      Student guide
+    </a>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <div class="page-title">System Overview</div>
+        <div class="page-sub">What the Portal is, how it fits alongside the website, Zoho and MyMusicStaff, and how it's built.</div>
+      </div>
+    </div>
+
+    <div class="doc-toc">
+      <div class="doc-toc-title">On this page</div>
+      <ul>
+        <li><a href="#functional">What the Portal does</a></li>
+        <li><a href="#mapping">How it relates to the website, Zoho and MyMusicStaff</a></li>
+        <li><a href="#parallel">Why we're running two systems side by side</a></li>
+        <li><a href="#roles">Roles: who sees what</a></li>
+        <li><a href="#technical">How it's built (technical)</a></li>
+        <li><a href="#email">How email works</a></li>
+        <li><a href="#help">If something looks wrong</a></li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-body doc-content">
+
+        <h2 id="functional">What the Portal does</h2>
+        <p>
+          The Portal is a purpose-built system for Pathfinder Music Lessons that brings
+          together four areas of studio work, matching the four groups on the admin
+          sidebar:
+        </p>
+        <ul>
+          <li><strong>Front Desk</strong> — tracking enquiries from first contact through
+            to trial or lapse, a shared task list so nothing gets forgotten, and two
+            different ways to send a message to a group of families.</li>
+          <li><strong>Teaching</strong> — the lesson timetable, the student roster, and
+            the teacher directory, including clash-checked scheduling and attendance.</li>
+          <li><strong>Curriculum</strong> — a Tier/Grade skill-level ladder for every
+            instrument, plus a library of teaching materials (currently built out for
+            Guitar).</li>
+          <li><strong>Reports</strong> — an attendance rollup across students, teachers
+            and studios, plus Gmail-ready distribution lists for mass email.</li>
+        </ul>
+        <p>
+          Teachers and students each get their own simplified view of the same
+          underlying data — a teacher sees their own schedule, students and a task
+          inbox; a student (or parent) sees their own lessons, notes, attendance and
+          progress.
+        </p>
+
+        <h2 id="mapping">How it relates to the website, Zoho and MyMusicStaff</h2>
+        <p>
+          Nothing about your existing tools changes because the Portal exists. The
+          website keeps working exactly as it does today, and enquiries submitted
+          through its form continue to flow through in the same way. Here's roughly how
+          the Portal's areas line up with what you already know from Zoho CRM and
+          MyMusicStaff:
+        </p>
+        <table>
+          <tr><th>Today</th><th>Portal equivalent</th></tr>
+          <tr>
+            <td>Zoho CRM — leads / enquiries</td>
+            <td>Front Desk → <strong>Enquiries</strong></td>
+          </tr>
+          <tr>
+            <td>Zoho CRM — tasks &amp; follow-ups</td>
+            <td>Front Desk → <strong>Tasks</strong></td>
+          </tr>
+          <tr>
+            <td>MyMusicStaff — student &amp; family records</td>
+            <td>Teaching → <strong>Students</strong></td>
+          </tr>
+          <tr>
+            <td>MyMusicStaff — lesson scheduling &amp; timetable</td>
+            <td>Teaching → <strong>Lessons</strong></td>
+          </tr>
+          <tr>
+            <td>MyMusicStaff — teacher availability</td>
+            <td>Teaching → <strong>Teachers</strong></td>
+          </tr>
+          <tr>
+            <td>MyMusicStaff — attendance</td>
+            <td>Reports → <strong>Attendance</strong></td>
+          </tr>
+          <tr>
+            <td><em>Not previously available</em></td>
+            <td>Curriculum (skill grading + artefact library), Distribution Lists,
+              in-app Notifications, and the teacher/student self-service dashboards</td>
+          </tr>
+        </table>
+        <p>
+          The Portal was built to fit how Pathfinder actually works — the instrument
+          list, email wording, cancellation policy and enrolment steps all match what
+          the studio already uses, rather than asking staff to adapt to generic
+          software.
+        </p>
+
+        <h2 id="parallel">Why we're running two systems side by side</h2>
+        <p>
+          The Portal is new, and the safest way to introduce a system this central to
+          day-to-day work is to run it in parallel with the tools it may eventually
+          replace, rather than switching everything over at once. During this period:
+        </p>
+        <ul>
+          <li>The website and its enquiry form are unaffected.</li>
+          <li>Zoho and MyMusicStaff keep working as they do today.</li>
+          <li>The Portal is available for the studio to trial, compare against the
+            existing workflow, and provide feedback on.</li>
+        </ul>
+        <div class="callout callout-tip">
+          <strong>Scope of this guide</strong>
+          <p>
+            This guide only covers the Portal. It doesn't set out rules for what to
+            enter where during the parallel run — that's a decision for the studio to
+            make and communicate separately. If you're unsure whether something should
+            also be recorded in Zoho or MyMusicStaff right now, check with your studio
+            admin.
+          </p>
+        </div>
+
+        <h2 id="roles">Roles: who sees what</h2>
+        <p>
+          Every Portal account has exactly one role, which decides what you see when
+          you log in:
+        </p>
+        <table>
+          <tr><th>Role</th><th>Typically</th><th>What they get</th></tr>
+          <tr>
+            <td><strong>Superuser</strong></td>
+            <td>Studio owner / senior admin</td>
+            <td>Everything an Admin has, plus Studios and Admins management, and
+              visibility across every studio without a default filter.</td>
+          </tr>
+          <tr>
+            <td><strong>Admin</strong></td>
+            <td>Front-desk staff</td>
+            <td>Front Desk, Teaching, Curriculum and Reports. See the
+              <a href="admin-guide.html">Admin Guide</a>.</td>
+          </tr>
+          <tr>
+            <td><strong>Teacher</strong></td>
+            <td>Teaching staff</td>
+            <td>My Schedule, My Students, My Tasks. See the
+              <a href="teacher-guide.html">Teacher Guide</a>.</td>
+          </tr>
+          <tr>
+            <td><strong>Student</strong></td>
+            <td>Students &amp; parents</td>
+            <td>My Lessons, Practice Notes, Attendance, My Progress. See the
+              <a href="student-guide.html">Student Guide</a>.</td>
+          </tr>
+        </table>
+        <p>
+          Only a superuser can create Admin accounts (from Super User → Admins), and
+          only a superuser can add or edit studios. A person can currently only hold
+          one role at a time — someone who both teaches and administers needs two
+          separate logins with two different email addresses.
+        </p>
+
+        <h2 id="technical">How it's built (technical)</h2>
+        <p>
+          For anyone curious about what's under the hood — this section is optional
+          reading and isn't needed to use the Portal day to day.
+        </p>
+        <ul>
+          <li><strong>No app to install.</strong> The Portal is a website
+            (<code>pathfindermusiclessons.com.au/portal</code>) that works from any
+            modern browser on a computer, tablet or phone — there's nothing to
+            download.</li>
+          <li><strong>Hosting:</strong> the site is hosted on Netlify, the same
+            platform serving the public website.</li>
+          <li><strong>Database:</strong> all Portal data — students, lessons,
+            attendance, tasks, enquiries — lives in Supabase, a hosted database
+            service. Access rules built into the database (not just the screen you're
+            looking at) control who can see or change which records.</li>
+          <li><strong>A handful of small server-side helpers</strong> handle the few
+            things that need elevated privileges the browser shouldn't have directly —
+            creating a login for a new admin, teacher or student, resetting a
+            password, and resolving/sending bulk emails.</li>
+          <li><strong>No native mobile app.</strong> The Portal is fully usable from a
+            phone's browser; it adapts its layout to a smaller screen automatically.</li>
+        </ul>
+
+        <h2 id="email">How email works</h2>
+        <p>
+          The Portal sends email in a few different ways, each suited to a different
+          purpose:
+        </p>
+        <table>
+          <tr><th>Tool</th><th>Used for</th><th>Sent from</th></tr>
+          <tr>
+            <td>Notifications (Front Desk)</td>
+            <td>One-way announcements to a targeted group, sent by the Portal itself</td>
+            <td>The chosen studio's address</td>
+          </tr>
+          <tr>
+            <td>Distribution Lists (Reports)</td>
+            <td>Generates a Bcc-ready address list for an email you send yourself from
+              Gmail — for anything needing a reply or an attachment</td>
+            <td>Your own Gmail account</td>
+          </tr>
+          <tr>
+            <td>Password reset / account emails</td>
+            <td>Automatic account emails (temporary passwords, password resets)</td>
+            <td>The studio's info@ address</td>
+          </tr>
+        </table>
+        <p>
+          See the <a href="admin-guide.html#notifications">Notifications</a> and
+          <a href="admin-guide.html#distribution-lists">Distribution Lists</a> sections
+          of the Admin Guide for exactly when to use which.
+        </p>
+
+        <h2 id="help">If something looks wrong</h2>
+        <p>
+          If a page shows data that looks incorrect, a button doesn't do what this
+          guide says it should, or something is missing, let your studio admin know
+          with a description of what you saw — that's the fastest way for it to get
+          looked at and, if needed, fixed.
+        </p>
+      </div>
+    </div>
+  </main>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/supabase-client.js"></script>
+<script>
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+const MANUAL_HOME_BY_ROLE = {
+  superuser: '../tasks.html',
+  admin:     '../tasks.html',
+  teacher:   '../dashboard-teacher.html',
+  student:   '../dashboard-student.html',
+};
+
+// Which guide a role can open. Superuser/admin get everything; a teacher
+// gets the System Overview + Teacher Guide; a student gets only their own
+// guide. This only controls what's shown here — the actual gate is each
+// guide page's own requireAuth() call, so a direct link to a page someone
+// isn't meant to see still bounces them home.
+function applyManualVisibility(role) {
+  const showOverview = ['superuser','admin','teacher'].includes(role);
+  const showAdmin    = ['superuser','admin'].includes(role);
+  const showTeacher  = ['superuser','admin','teacher'].includes(role);
+  const showStudent  = ['superuser','admin','student'].includes(role);
+  document.getElementById('navSystemOverview')?.classList.toggle('hidden', !showOverview);
+  document.getElementById('navAdminGuide')?.classList.toggle('hidden', !showAdmin);
+  document.getElementById('navTeacherGuide')?.classList.toggle('hidden', !showTeacher);
+  document.getElementById('navStudentGuide')?.classList.toggle('hidden', !showStudent);
+}
+
+(async () => {
+  const profile = await requireAuth(['superuser','admin','teacher']);
+  if (!profile) return;
+  renderTopNavUser(profile);
+  const home = MANUAL_HOME_BY_ROLE[profile.role] ?? '../login.html';
+  document.getElementById('logoLink').href = home;
+  document.getElementById('backToPortal').href = home;
+  applyManualVisibility(profile.role);
+  if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
+})();
+</script>
+
+</body>
+</html>
