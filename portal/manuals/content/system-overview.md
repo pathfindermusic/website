@@ -198,3 +198,4 @@ with a description of what you saw — that's the fastest way for it to get
 looked at and, if needed, fixed.
 </p>
 
+![Pathfinder Music Lessons](/portal/manuals/images/uploads/logo_-_long.png "Pathfinder Music Lessons")
