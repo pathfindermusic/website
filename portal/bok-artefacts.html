@@ -136,6 +136,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/></svg>
       Notifications
     </a>
+    <a class="nav-item" href="day-sheet.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
+      Day Sheet
+    </a>
     <div class="sidebar-section">Teaching</div>
     <a class="nav-item" href="lessons.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -272,7 +276,7 @@
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Instrument *</label>
-          <select class="form-select" id="aInstrument"></select>
+          <select class="form-select" id="aInstrument" onchange="onArtefactInstrumentChange()"></select>
         </div>
         <div class="form-group">
           <label class="form-label">Grade *</label>
@@ -361,9 +365,23 @@ async function loadGradeLevels() {
   gradeLevels = data ?? [];
   gradeLevels.forEach(g => { gradeLevelById[g.id] = g; });
 
-  const gradeOptions = gradeLevels.map(g => `<option value="${g.id}">${g.tier} — ${g.label}</option>`).join('');
-  document.getElementById('filterGrade').innerHTML += gradeOptions;
-  document.getElementById('aGrade').innerHTML        = gradeOptions;
+  // The filter spans every instrument at once, so it stays on the plain
+  // "Tier — Grade N" label — one animal name can't represent all of
+  // them. The Add/Edit form's Grade select, by contrast, always belongs
+  // to whichever instrument is picked next to it, so it gets that
+  // instrument's animal names via onArtefactInstrumentChange() instead.
+  document.getElementById('filterGrade').innerHTML +=
+    gradeLevels.map(g => `<option value="${g.id}">${g.tier} — ${g.label}</option>`).join('');
+}
+
+// Rebuilds the Add/Edit form's Grade options for whichever instrument
+// is currently selected, keeping the current selection when the ids
+// still line up (bok_grade_levels is the same 9 rows regardless of
+// instrument, so they always do).
+function onArtefactInstrumentChange() {
+  const instrument = document.getElementById('aInstrument').value;
+  const sel = document.getElementById('aGrade');
+  sel.innerHTML = gradeOptionsHtml(gradeLevels, instrument, sel.value);
 }
 
 // ---- Load artefacts ----
@@ -474,7 +492,7 @@ function renderArtefacts(list) {
         ${statusPill}
       </td>
       <td>${escapeHtml(a.instrument)}</td>
-      <td>${grade ? `<span class="tier-pill">${grade.tier} — ${grade.label}</span>` : '—'}</td>
+      <td>${grade ? `<span class="tier-pill">${gradeLabel(grade, a.instrument)}</span>` : '—'}</td>
       <td><span class="component-pill component-${a.component}">${COMPONENT_LABELS[a.component] ?? a.component}</span></td>
       <td>${(a.tags ?? []).map(t => `<span class="tag-chip">${escapeHtml(t)}</span>`).join('') || '—'}</td>
       <td>${a.drive_url ? `<a class="drive-link" href="${escapeAttr(a.drive_url)}" target="_blank" rel="noopener">📁 Open</a>` : '—'}</td>
@@ -504,7 +522,7 @@ function openArtefactModal(id = null) {
     document.getElementById('artefactModalTitle').textContent = 'Edit Artefact';
     document.getElementById('aTitle').value       = a.title ?? '';
     document.getElementById('aInstrument').value  = a.instrument ?? '';
-    document.getElementById('aGrade').value       = a.grade_level_id ?? '';
+    document.getElementById('aGrade').innerHTML   = gradeOptionsHtml(gradeLevels, a.instrument ?? '', a.grade_level_id ?? '');
     document.getElementById('aComponent').value   = a.component ?? 'repertoire';
     document.getElementById('aDescription').value = a.description ?? '';
     document.getElementById('aDriveUrl').value    = a.drive_url ?? '';
@@ -515,7 +533,7 @@ function openArtefactModal(id = null) {
     document.getElementById('artefactModalTitle').textContent = 'Add Artefact';
     document.getElementById('aTitle').value       = '';
     document.getElementById('aInstrument').value  = 'Guitar';
-    document.getElementById('aGrade').value       = gradeLevels[0]?.id ?? '';
+    document.getElementById('aGrade').innerHTML   = gradeOptionsHtml(gradeLevels, 'Guitar', gradeLevels[0]?.id ?? '');
     document.getElementById('aComponent').value   = 'repertoire';
     document.getElementById('aDescription').value = '';
     document.getElementById('aDriveUrl').value    = '';

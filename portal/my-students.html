@@ -336,7 +336,7 @@ async function loadStudents() {
   const [sRes, siRes, cgRes] = await Promise.all([
     db.from('students').select('id,user_id,status').in('id', studentIds),
     db.from('student_instruments').select('student_id,instrument,skill_level').in('student_id', studentIds),
-    db.from('student_current_grades').select('student_id,instrument,grade_level_id,tier,label').in('student_id', studentIds),
+    db.from('student_current_grades').select('student_id,instrument,grade_level_id,tier,label,sort_order').in('student_id', studentIds),
   ]);
 
   const gradeMap = {};
@@ -414,7 +414,7 @@ async function loadStudents() {
         return `<div class="skill-row">
           <div class="skill-instrument">${inst}</div>
           <div style="flex:1;">${g
-            ? `<span class="grade-pill">${g.tier} — ${g.label}</span>`
+            ? `<span class="grade-pill">${gradeLabel(g, inst)}</span>`
             : `<span class="grade-pill ungraded">Not yet graded</span>`}</div>
           <button class="skill-edit-btn" onclick="openGradeModal('${s.id}','${inst}')">Record grade</button>
         </div>`;
@@ -438,7 +438,7 @@ async function loadStudents() {
     const instMeta = myInsts.map(inst => {
       if (GRADED_INSTRUMENTS.includes(inst)) {
         const g = s.grades[inst];
-        return `${inst} (${g ? `${g.tier} — ${g.label}` : 'not yet graded'})`;
+        return `${inst} (${g ? gradeLabel(g, inst) : 'not yet graded'})`;
       }
       const instData = allInsts.find(i => i.instrument === inst);
       return `${inst} (${skillLabel(instData?.skill_level ?? 0)})`;
@@ -523,17 +523,18 @@ function openGradeModal(studentId, instrument) {
   activeGradeEdit = { studentId, instrument };
   document.getElementById('gradeModalTitle').textContent = 'Record Grade';
   document.getElementById('gradeModalLabel').textContent = `${instrument} — new grade`;
-  document.getElementById('gradeSelect').innerHTML =
-    bokGradeLevels.map(g => `<option value="${g.id}">${g.tier} — ${g.label}</option>`).join('');
-  document.getElementById('gradeAchievedOn').value = toISODate(new Date());
-  document.getElementById('gradeNotes').value = '';
 
   const student = allStudentsCache.find(s => s.id === studentId);
   const current = student?.grades?.[instrument];
+
+  document.getElementById('gradeSelect').innerHTML =
+    gradeOptionsHtml(bokGradeLevels, instrument, current?.grade_level_id ?? '');
+  document.getElementById('gradeAchievedOn').value = toISODate(new Date());
+  document.getElementById('gradeNotes').value = '';
+
   document.getElementById('gradeHistoryHint').textContent = current
-    ? `Currently: ${current.tier} — ${current.label}. Saving records a new milestone; it doesn't overwrite this.`
+    ? `Currently: ${gradeLabel(current, instrument)}. Saving records a new milestone; it doesn't overwrite this.`
     : 'Not yet graded — this will be their first recorded milestone.';
-  if (current?.grade_level_id) document.getElementById('gradeSelect').value = current.grade_level_id;
 
   document.getElementById('gradeModal').classList.remove('hidden');
 }

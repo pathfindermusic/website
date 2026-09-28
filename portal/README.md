@@ -308,6 +308,47 @@ with no address on file simply gets no address line, rather than a blank or
 wrong one. The lookup is best-effort — a failure logs a warning and omits
 the line rather than failing the whole send over a footer.
 
+**`{{portal_link}}` (Sep 2026) — a personal, one-time Portal sign-in link,
+not a stored password.** Added for the Portal-launch announcement to every
+active student, but it's a general-purpose token, available in any
+Notification from here on. There is no way to read back a student's actual
+password — Supabase Auth never stores it in a recoverable form — so this
+generates a fresh `type: 'recovery'` link per recipient via Supabase's
+Admin `generate_link` endpoint (`generatePortalLink()` in
+`send-email.js`), which returns a URL without sending anything itself,
+unlike the public `/auth/v1/recover` endpoint `create-user.js`'s
+`reset-password` action uses (that one sends Supabase's own bare,
+unbranded email immediately and gives nothing back to reuse — the two look
+similar but solve different problems). The link redirects to
+`change-password.html` after verifying, same as every other password flow
+in this app; same `redirect_to`-must-also-be-a-query-param defensiveness
+as the existing `/recover` call, since GoTrue's handling of that field has
+already bitten this project once.
+
+Deliberately **does not create accounts.** "Add login" on the Students
+page is an interactive, admin-judgment flow (`students.html`'s `addLogin`)
+because it prompts the admin to pick a login email by hand — siblings
+often share one family address, so there's no safe way to guess a correct
+one automatically. A student with no `user_id` yet is therefore left out
+of that particular send rather than mailed a dead link, and named in both
+the function's JSON response (`skippedNoLogin`) and the studio summary
+email, so an admin can use Add Login for them individually and follow up
+separately.
+
+Only resolved when a message actually contains the token (`needsPortalLink`
+in `send-email.js`) — one Supabase Admin API call per recipient is real
+cost, so every other Notification (the overwhelming majority) is
+completely unaffected and exactly as fast as before. When needed, lookups
+run with bounded concurrency (`mapLimit`, 15 at a time) rather than one at
+a time, to keep a few hundred recipients from approaching the function's
+execution time limit.
+
+The **"All active students — every studio"** audience in Notifications
+(`mode: 'all'`) already existed server-side — `distribution-lists.html`
+has used it for a while — it just wasn't offered as a Notifications radio
+option until this was added. Active only, not trial, matching what
+"active student" means everywhere else on Reports/Distribution Lists.
+
 ---
 
 ## Decisions already made (don't relitigate without reason)
@@ -581,8 +622,30 @@ If a fourth view is ever added, it must attach `lessonStudents` to
 
 **A slot can hold more than one lesson.** Cancelling frees a slot for
 rebooking, so the daily grid may need to show a cancelled lesson and its
-replacement together — `.find()` showed whichever came back first. Live lessons
-get the space; cancelled ones collapse to one line each.
+replacement together — `.find()` showed whichever came back first.
+
+Occurrences that overlap in time (a real double-booking, or a cancelled
+lesson sharing its old start time with whatever replaced it) are grouped
+into one clustering pass per teacher, so the render loop only ever emits one
+`<td>` per teacher per row no matter how messy the underlying booking is —
+letting each overlapping occurrence get its own `<td>` was what pushed a
+different, unrelated teacher's lesson block sideways out of the grid
+(reported 14 Sep 2026).
+
+Inside that one cell, each occurrence is drawn at its own true start time
+and duration — absolutely positioned within the cell (`top`/`height` scaled
+from its real start/duration, not from reading order) and given its own
+side-by-side column when it genuinely overlaps another occurrence, via a
+plain interval-graph greedy column assignment (walk occurrences in
+start-time order, give each the first column whose last occupant already
+ended). Earlier this just stacked whichever occurrences shared the slot in
+a flex column, live first — which meant a 60-minute lesson that replaced a
+cancelled 30-minute one at the same start time visually read as if it only
+ran the second half hour, because nothing in the display reflected where
+each occurrence actually sat in time (reported 28 Sep 2026). A cluster with
+only cancelled occurrences and nothing live still uses the old simple
+stacked list — there's no real duration being misrepresented when nothing
+is actually on.
 
 ### A guard that returns quietly turns a bug into a non-event
 
@@ -649,6 +712,50 @@ BEGIN;
   -- then the actual query or update that is failing
 ROLLBACK;
 ```
+
+### A plain subquery inside a policy pays for every policy on the table it reads
+
+(Sep 2026.) Teachers started getting `57014 canceling statement due to
+statement timeout` when marking attendance — but only some teachers, and only
+sometimes, which made it look like a permissions bug or a one-off network
+blip at first. `EXPLAIN (ANALYZE, BUFFERS)`, run impersonating the affected
+teacher (see above), showed the real shape of it:
+
+```sql
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT lo.id FROM lesson_occurrences lo
+JOIN lessons l ON l.id = lo.lesson_id
+WHERE l.teacher_id = get_my_teacher_id();
+-- Execution Time: 1333.264 ms, Buffers: shared hit=23999
+```
+
+That's the subquery the old `"Teacher marks attendance for own lessons"`
+policy used to check ownership — a correctness rule identical to the section
+above (*"A policy that subqueries another RLS-protected table inherits that
+table's visibility"*), except here it degraded performance rather than
+correctness. `lesson_occurrences` carries five permissive SELECT policies
+(teacher-own, teacher-covering-as-substitute, student, admin, plus one more).
+None of that is specific to attendance — but because the subquery reads
+`lesson_occurrences` under ordinary RLS, Postgres evaluates all five, per row,
+for every occurrence the teacher has ever had. For a teacher with a long
+private-student history that's thousands of rows and a second-plus, even
+though the actual answer only needed one column off one indexed lookup.
+
+**The fix, same pattern as `SECURITY DEFINER` above:** move the join into a
+`STABLE SECURITY DEFINER` function (`my_owned_occurrence_ids()`, alongside the
+already-existing `my_covered_occurrence_ids()` for substitutes and
+`my_lesson_ids()` for students) so it reads the underlying tables without RLS
+re-applying. Same access, no five-policy fan-out — the identical impersonated
+`EXPLAIN` dropped from 1333ms to sub-millisecond. See
+`attendance-owner-check-perf-fix.sql`.
+
+**The general lesson:** any policy subquery — not just ones that look
+recursive — inherits the *full* RLS cost of every table it touches, including
+policies that have nothing to do with the check being written. If a table has
+more than one or two permissive policies, a plain subquery into it from
+another policy is a latent performance trap, not just a latent correctness
+one. Prefer a `SECURITY DEFINER` helper by default for any RLS check that
+reads a second table, even when there's no recursion risk forcing the issue.
 
 ### Task handover
 
@@ -917,6 +1024,72 @@ falling back to the skill bar. That was the first fix; widening
 `GRADED_INSTRUMENTS` everywhere else followed the same day once the pattern
 was confirmed.
 
+### Grade animal names (Sep 2026) — a cosmetic overlay, not a data model change
+
+Admins wanted each instrument's 9 grade levels to have a fun nickname —
+young students respond a lot better to "you're a Hawk now!" than "you're
+Intermediate Grade 5" — the same idea as swimming badges (tadpole → shark
+→ marlin). Guitar's names were the pilot; Bass, Drums, Piano / Keyboard,
+Violin, Voice / Singing, Ukulele and Saxophone followed once the theme
+was approved. Music Theory, Band and Other were deliberately left out —
+they're catch-alls rather than one real instrument, and nobody asked for
+a theme for them.
+
+The names are **not stored in the database.** `bok_grade_levels` stays the
+single generic 9-row reference scale it always was — Foundation/Beginner/
+Intermediate/Advanced × Grade 0-8 — shared by every instrument, per the
+section above. The animal names are a pure display-layer lookup, keyed by
+instrument then by `sort_order` (0-8), in one constant:
+`BOK_GRADE_ANIMAL_NAMES` in `js/supabase-client.js`. This was a deliberate
+choice over a new `instrument × grade_level` table: nobody asked for these
+to be admin-editable through the UI, so a table would mean a migration,
+RLS policies, seeding, and a fetch on every page that shows a grade, for
+content that only changes when someone asks Claude to change it. A plain
+JS map is one file to edit either way.
+
+Three helpers, all in `js/supabase-client.js`, all instruments funnel
+through:
+
+- `gradeAnimalName(instrument, sortOrder)` — the bare nickname, or `''`
+  for an instrument with no theme (or an out-of-range level).
+- `gradeLabel(gradeLevel, instrument)` — the display string every screen
+  actually renders: the existing `"Tier — Grade N"`, with `" (Animal
+  Name)"` appended when the instrument has a theme. This is additive by
+  design — admins explicitly asked to keep the Tier/Grade label and
+  extend it, not replace it. `gradeLevel` needs `{tier, label,
+  sort_order}`; passed only `{tier, label}` (a query that forgot to
+  select `sort_order`) it just never shows an animal name rather than
+  throwing.
+- `gradeOptionsHtml(gradeLevels, instrument, selectedId)` — builds a
+  Grade `<select>`'s `<option>` list via `gradeLabel()`. Every grade
+  dropdown in the Portal (the student edit form, "record grade" on My
+  Students, the BoK library's Add/Edit Artefact form) now calls this
+  instead of inlining its own `${g.tier} — ${g.label}` map, so a future
+  instrument added to the theme doesn't need updating in five places.
+
+Every `student_current_grades` query that feeds a `gradeLabel()` call had
+to add `sort_order` to its `.select()` — the view already exposed it, but
+most call sites had only ever selected `tier,label` since nothing before
+this needed `sort_order` client-side. `bok_grade_levels` queries were
+already `select('*')` everywhere, so those needed no change.
+
+**One exception:** `bok-artefacts.html`'s grade *filter* (as opposed to
+its Add/Edit form's grade field) spans every instrument in the library at
+once, so it stays on the plain label — one dropdown option can't carry an
+animal name for ten different instruments simultaneously. The Add/Edit
+form's own Grade field, by contrast, always belongs to whichever
+instrument is picked right next to it, so it rebuilds its options via
+`onArtefactInstrumentChange()` whenever that instrument changes, and
+prefills correctly for both "Add" (defaults to Guitar) and "Edit" (the
+artefact's own instrument) when the modal opens.
+
+**Adding a themed instrument later, or changing one of these names,** is
+a one-file edit: extend `BOK_GRADE_ANIMAL_NAMES` in
+`js/supabase-client.js` with a 9-entry array keyed by the exact instrument
+string used in `INSTRUMENTS`. No migration, no seeding, nothing to run in
+Supabase — the change takes effect everywhere the next time the page
+loads.
+
 ## Distribution lists (Sep 2026) — Gmail Bcc, not another sending path
 
 Admins asked for a way to reach students via their own Gmail rather than
@@ -976,6 +1149,30 @@ number that actually applies regardless of which kind of account is
 sending. The page shows a live count and warns above ~450; if a studio
 ever approaches 500 active students, the "all students" list will need
 splitting into two sends, which isn't automated — it's just a warning.
+
+## Day Sheet (Sep 2026) — a Google Form embedded, not a portal feature
+
+`day-sheet.html` is a new "Front desk" nav item, admin/superuser only
+(`requireAuth(['superuser','admin'])`, same as Tasks/Enquiries/Notifications).
+It has no Supabase involvement at all — no table, no query, no RLS. The page
+is just a static iframe embed of the studio's existing Google Form
+(`?embedded=true` appended to the form's `viewform` URL, the officially
+supported way to embed one), plus an "Open in a new tab" link as a fallback
+in case the iframe gets clipped or a browser blocks the frame.
+
+The iframe height is a fixed guess (2200px) since there's no reliable way to
+auto-size a cross-origin iframe to its content without the embedded page
+cooperating, which a Google Form doesn't. If the form is edited and grows or
+shrinks a lot, adjust `.form-embed-wrap iframe { height: ... }` in
+`day-sheet.html` by eye.
+
+**The nav link had to be added in two different ways.** Most pages build the
+sidebar as static inline HTML (copy-pasted per page — see `INSTRUMENTS`
+duplication elsewhere in this file for the same pattern's downside); `tasks.html`
+and `enquiries.html` instead render it from a small `item()`/`it()` helper
+and an `ICONS`/`I` lookup object. Adding "Day Sheet" meant touching both
+shapes — 11 files got a pasted `<a class="nav-item">` block, 2 got a new
+icon-object entry plus one `item(...)` call. Any future nav item needs both.
 
 ## How-To Guide (Sep 2026) — documentation for the parallel run with Zoho/MMS
 
@@ -1183,6 +1380,93 @@ clicking into an actual entry exposed it. If entries ever go blank again,
 check the browser console first; a 404 mentioning `sha=master` means this
 setting got lost or overwritten, not that Identity/Git Gateway is broken.
 
+**A screenshot added via the CMS can render but not be visible, because
+`.doc-content img` had no size rule (Sep 2026).** The first test image
+(added to `system-overview.md` through the editor) parsed into a perfectly
+valid `<img>` tag — the Markdown and the upload both checked out fine —
+but with nothing constraining its size it rendered at its native upload
+resolution, which for anything wider than the card blows out the layout
+instead of visibly failing, so it can look like "nothing happened." Fixed
+by adding `max-width: 100%; height: auto` (plus a border, to match the
+callout/table treatment) to `.doc-content img` in `manuals.css`. Any image
+inserted through the CMS from here on is automatically capped to the card
+width — no per-image sizing needed on the editor side.
+
+**Remember the CMS commits straight to GitHub, not to anyone's local
+clone.** Git Gateway pushes directly to the repo — publishing a CMS edit
+does not touch `C:\Users\Du\pathfinder` (or any other local checkout) at
+all, so checking a CMS-made change by reading the local file, the way
+every other change in this project gets checked, will show stale content
+until someone does a `git pull` there. Confirm a CMS edit by reading the
+live site (or the deployed `.md` file directly, e.g.
+`pathfindermusiclessons.com.au/portal/manuals/content/system-overview.md`)
+instead — and pull before editing the same file locally afterward, or a
+local edit + push can stomp a CMS-made change with no warning.
+
+## Students page load (Sep 2026) — an N+1 that scaled with total student count
+
+Admins reported the Students page taking noticeably longer to load as
+studios grew to around 100 students each. The cause wasn't the 100
+students themselves — it was `loadProcesses()` in `students.html`,
+which ran once for the *whole* student list after every load, and did
+several things per student rather than per page:
+
+- **`evaluateAutoChecks(studentId, since)`** was called once per student
+  who has ever had an enrolment process (trial confirmation, ongoing
+  enrolment, or end enrolment) — in practice, most students who were
+  ever onboarded through the Portal. Each call chained ~3-4 sequential
+  Supabase round trips (student status, their lessons, an occurrence
+  count per active lesson, and a second lessons fetch for the "fully
+  ended" check). All of these per-student calls fired at once via
+  `Promise.all`, but the browser only runs a handful of requests at a
+  time — with a few hundred students in scope, most of that fan-out
+  just queued up rather than actually running in parallel.
+- The **reconciliation step** that marks a checklist `complete` once its
+  auto-items are satisfied ran one sequential `UPDATE ... eq('id', p.id)`
+  per newly-completed process, each one blocking the next.
+- The **"last lesson date" lookup** for students who'd finished their
+  end-enrolment checklist but were still teaching out their notice did
+  two more round trips per such student.
+
+None of this scales with what's shown on screen — it scales with how
+many students have *ever* had a process, which only grows over time.
+
+**The fix preserves the exact same result, computed differently.**
+`evaluateAutoChecksBulk()` (new, in `js/processes.js`, next to the
+original per-student `evaluateAutoChecks()` which is left in place and
+unused for now) fetches every student's status, lesson memberships,
+lessons, and occurrence counts in one small constant set of batched
+queries — four or five total, regardless of whether 10 students or 1000
+are in scope — then computes the identical per-student booleans in JS.
+`loadProcesses()` in `students.html` calls this once instead of
+`evaluateAutoChecks()` per student, and the reconciliation update and
+the "last lesson date" lookup were similarly rewritten from N sequential
+per-student queries to one batched query apiece. Verified against 200+
+randomised synthetic scenarios (mixed active/ended lessons, series vs.
+one-off, students with no lessons at all, null and non-null `since`
+cutoffs) comparing the batched output field-by-field against the
+original per-student function — zero mismatches — since this logic
+feeds real state changes (a checklist auto-completing, a student later
+getting marked inactive) and needed to be provably identical, not just
+"probably fine."
+
+Separately, `loadStudents()` itself had one avoidable serial hop: the
+`student_current_grades` fetch doesn't depend on anything else the
+function loads, but sat *after* the lessons → teachers → teacher
+profiles chain instead of riding along in the same initial
+`Promise.all`. Moved — a small, free win, unlike the process checks
+above which needed an actual rewrite.
+
+**What this deliberately didn't change:** `loadStudents()` still loads
+every studio's students in one go and filters client-side by the studio
+dropdown (`filterStudents()`), rather than querying only the selected
+studio. That's a separate, larger lever — it would cut the base dataset
+size proportionally to studio count, on top of the fix above — but it
+changes the loading UX (a re-fetch on studio switch, a decision on what
+a superuser or multi-studio admin sees by default) rather than being a
+pure performance fix, so it's left as a future option rather than bundled
+in here.
+
 ## Traps that have already cost time
 
 - **Check which environment you're looking at.** Local dev runs against the same
@@ -1320,6 +1604,14 @@ Run in order. All are re-runnable.
 33. `phase5-makeup-lessons.sql` — `is_makeup`, both views rebuilt
 34. `phase5-fortnightly-lessons.sql` — `lessons.frequency` (weekly/fortnightly)
 35. `phase5-require-contact-email.sql` — `students` must have email or parent_email (NOT VALID check)
+36. `attendance-owner-check-perf-fix.sql` — `my_owned_occurrence_ids()`,
+    replaces the slow inline subquery in "Teacher marks attendance for own
+    lessons" (see Row Level Security section above)
+
+*(Several migrations applied between 27 and 35 — schedule performance
+indexes, BoK grading, fortnightly lessons, recurring tasks, and others —
+aren't individually numbered above; see `portal/supabase/` for the full set
+and each file's own header for what it does.)*
 
 ---
 

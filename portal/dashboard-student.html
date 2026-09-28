@@ -811,7 +811,7 @@ async function loadProgress() {
   const [instRes, gradeRes, milestoneRes] = await Promise.all([
     db.from('student_instruments').select('instrument, skill_level')
       .eq('student_id', studentRecord.id).order('instrument'),
-    db.from('student_current_grades').select('instrument, tier, label')
+    db.from('student_current_grades').select('instrument, tier, label, sort_order')
       .eq('student_id', studentRecord.id),
     db.from('student_grade_milestones').select('instrument, grade_level_id, achieved_on, notes')
       .eq('student_id', studentRecord.id).order('achieved_on', { ascending: false }),
@@ -839,7 +839,7 @@ async function loadProgress() {
         <div class="skill-row">
           <div class="skill-instrument">${item.instrument}</div>
           <div style="flex:1;">${g
-            ? `<span class="grade-pill">${g.tier} — ${g.label}</span>`
+            ? `<span class="grade-pill">${gradeLabel(g, item.instrument)}</span>`
             : `<span class="grade-pill ungraded">Not yet graded</span>`}</div>
         </div>`;
       return;
@@ -887,7 +887,7 @@ async function loadProgress() {
           return `<div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0;border-bottom:1px solid var(--border);">
             <div>
               <span style="font-weight:600;color:var(--charcoal);">${m.instrument}</span>
-              <span class="text-muted"> — ${g ? `${g.tier} — ${g.label}` : 'Grade'}</span>
+              <span class="text-muted"> — ${g ? gradeLabel(g, m.instrument) : 'Grade'}</span>
               ${m.notes ? `<div class="text-sm text-muted" style="margin-top:0.15rem;">${m.notes}</div>` : ''}
             </div>
             <div class="text-sm text-muted">${formatLongDate(new Date(m.achieved_on))}</div>

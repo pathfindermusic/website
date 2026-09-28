@@ -311,6 +311,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/></svg>
       Notifications
     </a>
+    <a class="nav-item" href="day-sheet.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
+      Day Sheet
+    </a>
     <div class="sidebar-section">Teaching</div>
     <a class="nav-item active" href="lessons.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -1528,15 +1532,14 @@ async function loadDailyView() {
         const cluster = clustersByTeacher[t.id].find(c => c.startMin === slotMin);
 
         if (cluster) {
-          const startOccs = cluster.occs.slice()
-            .sort((a, b) => (a.status === 'cancelled' ? 1 : 0) - (b.status === 'cancelled' ? 1 : 0));
-          const rowspan = Math.max(1, (cluster.renderEnd - cluster.startMin) / 30);
+          const rowspan    = Math.max(1, (cluster.renderEnd - cluster.startMin) / 30);
+          const cellHeight = rowspan * 48;
 
           // A slot can accumulate several cancellations before something
           // sticks. Live lessons get the space; cancelled ones collapse
           // to one line each so three of them don't wreck the row.
-          const live      = startOccs.filter(o => o.status !== 'cancelled');
-          const cancelled = startOccs.filter(o => o.status === 'cancelled');
+          const live      = cluster.occs.filter(o => o.status !== 'cancelled');
+          const cancelled = cluster.occs.filter(o => o.status === 'cancelled');
 
           // A private lesson shows that student's own state. A group of
           // four with four different outcomes cannot reduce to one
@@ -1554,50 +1557,102 @@ async function loadDailyView() {
             return nameWithAttendance(sIds.map(id => spMap[id]).filter(Boolean)[0] ?? '—', att[sIds[0]]);
           };
 
-          const liveBlocks = live.map(o => {
-            const lType = o.lessons?.lesson_type ?? 'private';
-            const isBlock = lType !== 'group' && (o.lessonStudents ?? []).length === 0;
-            // A makeup overrides the private/group colour — that it is a
-            // makeup matters more than which kind of lesson it is.
-            const cls   = o.is_makeup ? 'makeup' : lType;
-            return `<div class="lesson-block ${cls}"
-              onclick="event.stopPropagation();openOccurrenceModal('${o.id}')"
-              style="flex:1 1 auto;min-height:24px;overflow:hidden;cursor:pointer;">
-              ${o.is_online ? onlineIconBadge() : ''}
-              <div class="lesson-block-name">${nameOf(o)}</div>
-              <div class="lesson-block-meta">${o.is_makeup ? 'Makeup · ' : ''}${o.lessons?.frequency === 'fortnightly' ? 'Fortnightly · ' : ''}${isBlock ? 'Non-teaching event' : `${lType === 'group' ? 'Group' : 'Private'} · ${o.lessons?.instrument}`}</div>
-              ${substituteLabel(o)}
-              ${o.occurrence_notes ? `<div class="lesson-block-meta" style="font-style:italic;">📝 ${o.occurrence_notes.slice(0,30)}…</div>` : ''}
-            </div>`;
-          }).join('');
+          let cellBody;
 
-          // One compact line per cancellation — enough to see who it was
-          // and open it, without competing with the lesson that is on.
-          const soloCancelled = live.length === 0;
-          const cancelledLines = cancelled.map(o =>
-            `<div class="lesson-block cancelled"
-               onclick="event.stopPropagation();openOccurrenceModal('${o.id}')"
-               title="Cancelled — click to view"
-               style="cursor:pointer;padding:0 4px;flex:0 0 auto;
-                      display:flex;align-items:center;gap:3px;
-                      min-height:0;line-height:1.35;overflow:hidden;">
-               <span style="font-size:0.62rem;">✕</span>
-               <span class="lesson-block-name"
-                     style="font-size:${soloCancelled ? '0.72rem' : '0.64rem'};
-                            white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nameOf(o)}</span>
-             </div>`).join('');
-
-          const blocks = liveBlocks + cancelledLines;
-
-          // Everything must fit inside the cell. Sizing by the live
-          // lesson alone pushed the cancelled lines over the row below,
-          // which is what made them unreadable.
-          html += `<td class="grid-cell" rowspan="${rowspan}"
-            style="vertical-align:top;height:${rowspan * 48}px;padding:0;">
-            <div style="height:100%;display:flex;flex-direction:column;gap:2px;
+          if (live.length === 0) {
+            // Nothing live sits here — just a history of one or more
+            // cancellations at this slot. There's no real duration being
+            // misrepresented, so keep the simple compact stacked list.
+            cellBody = `<div style="height:100%;display:flex;flex-direction:column;gap:2px;
                         padding:2px 0;overflow:hidden;box-sizing:border-box;">
-              ${blocks}
-            </div>
+              ${cancelled.map(o =>
+                `<div class="lesson-block cancelled"
+                   onclick="event.stopPropagation();openOccurrenceModal('${o.id}')"
+                   title="Cancelled — click to view"
+                   style="cursor:pointer;padding:0 4px;flex:0 0 auto;
+                          display:flex;align-items:center;gap:3px;
+                          min-height:0;line-height:1.35;overflow:hidden;">
+                   <span style="font-size:0.62rem;">✕</span>
+                   <span class="lesson-block-name"
+                         style="font-size:0.72rem;
+                                white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nameOf(o)}</span>
+                 </div>`).join('')}
+            </div>`;
+          } else {
+            // One or more live lessons occupy this slot — possibly next to
+            // a cancellation that used to be here. Position each
+            // occurrence at its OWN true start time and duration inside
+            // the cell, in its own side-by-side column when it genuinely
+            // overlaps another, instead of stacking blocks in reading
+            // order. Stacking hid a lesson's real length: a 60-minute
+            // booking that replaced a cancelled 30-minute one at the same
+            // start time read as if it only ran the second half hour
+            // (reported 28 Sep 2026) — because nothing in the display
+            // reflected where each occurrence actually sat in time, only
+            // the order they happened to be listed in. This is a plain
+            // interval-graph column assignment: walk occurrences in
+            // start-time order and give each the first column whose last
+            // occupant has already ended by the time it starts. The
+            // number of columns that ends up needing is exactly the "2 or
+            // 3" the cell should visually split into.
+            const ROWPX = 48;
+            const ordered = cluster.occs.slice().sort((a, b) =>
+              timeToMins(a.lessons?.start_time ?? '00:00') - timeToMins(b.lessons?.start_time ?? '00:00'));
+
+            const colEnds = []; // per column: end time (mins) of its last occurrence
+            const placed = ordered.map(o => {
+              const start = timeToMins(o.lessons?.start_time ?? '00:00');
+              const dur   = o.lessons?.duration_mins ?? 30;
+              const end   = start + dur;
+              let col = colEnds.findIndex(e => e <= start);
+              if (col === -1) { col = colEnds.length; colEnds.push(end); }
+              else { colEnds[col] = end; }
+              return { o, start, end, col };
+            });
+            const colCount = colEnds.length;
+
+            const blocks = placed.map(({ o, start, end, col }) => {
+              const top    = ((start - cluster.startMin) / 30) * ROWPX;
+              const height = Math.max(22, ((end - start) / 30) * ROWPX - 2);
+              const left   = (col / colCount) * 100;
+              const width  = 100 / colCount;
+              const pos    = `position:absolute;margin:0;top:${top}px;height:${height}px;
+                              left:calc(${left}% + 1px);width:calc(${width}% - 2px);box-sizing:border-box;`;
+
+              if (o.status === 'cancelled') {
+                return `<div class="lesson-block cancelled"
+                  onclick="event.stopPropagation();openOccurrenceModal('${o.id}')"
+                  title="Cancelled — click to view"
+                  style="${pos}cursor:pointer;padding:0 4px;overflow:hidden;
+                         display:flex;align-items:center;gap:3px;line-height:1.35;">
+                  <span style="font-size:0.62rem;">✕</span>
+                  <span class="lesson-block-name"
+                        style="font-size:0.64rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nameOf(o)}</span>
+                </div>`;
+              }
+
+              const lType   = o.lessons?.lesson_type ?? 'private';
+              const isBlock = lType !== 'group' && (o.lessonStudents ?? []).length === 0;
+              // A makeup overrides the private/group colour — that it is a
+              // makeup matters more than which kind of lesson it is.
+              const cls = o.is_makeup ? 'makeup' : lType;
+              return `<div class="lesson-block ${cls}"
+                onclick="event.stopPropagation();openOccurrenceModal('${o.id}')"
+                style="${pos}overflow:hidden;cursor:pointer;">
+                ${o.is_online ? onlineIconBadge() : ''}
+                <div class="lesson-block-name">${nameOf(o)}</div>
+                <div class="lesson-block-meta">${o.is_makeup ? 'Makeup · ' : ''}${o.lessons?.frequency === 'fortnightly' ? 'Fortnightly · ' : ''}${isBlock ? 'Non-teaching event' : `${lType === 'group' ? 'Group' : 'Private'} · ${o.lessons?.instrument}`}</div>
+                ${substituteLabel(o)}
+                ${o.occurrence_notes ? `<div class="lesson-block-meta" style="font-style:italic;">📝 ${o.occurrence_notes.slice(0,30)}…</div>` : ''}
+              </div>`;
+            }).join('');
+
+            cellBody = `<div style="position:relative;height:100%;box-sizing:border-box;">${blocks}</div>`;
+          }
+
+          html += `<td class="grid-cell" rowspan="${rowspan}"
+            style="vertical-align:top;height:${cellHeight}px;padding:0;">
+            ${cellBody}
           </td>`;
         } else if (!occupied[t.id]?.[slot]) {
           // Empty cell — clickable to add lesson. Grey it out if it

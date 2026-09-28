@@ -146,6 +146,100 @@ async function evaluateAutoChecks(studentId, since = null) {
   };
 }
 
+// Same exact per-student result as calling evaluateAutoChecks() once for
+// every student in the list, but from a small constant number of
+// queries instead of ~4 sequential round trips PER STUDENT. That was
+// fine when only a handful of students had ever gone through a process,
+// but once a studio built up a few hundred with process history,
+// students.html's load — one evaluateAutoChecks() call per student, all
+// fired at once via Promise.all — meant hundreds of students each
+// waiting on their own little chain of DB round trips, and the browser
+// only runs so many requests at a time, so most of them just queued up
+// (reported as "Students takes ages to load" 28 Sep 2026).
+//
+// `requests` is [{ studentId, since }] — since is that student's own
+// process start date, exactly as evaluateAutoChecks(id, since) takes it.
+async function evaluateAutoChecksBulk(requests) {
+  const out = {};
+  if (!requests?.length) return out;
+
+  const studentIds  = requests.map(r => r.studentId);
+  const sinceById    = {};
+  requests.forEach(r => { sinceById[r.studentId] = r.since; });
+
+  const [{ data: students }, { data: lsRows }] = await Promise.all([
+    db.from('students').select('id,status').in('id', studentIds),
+    db.from('lesson_students').select('student_id,lesson_id').in('student_id', studentIds),
+  ]);
+
+  const statusById = {};
+  (students ?? []).forEach(s => { statusById[s.id] = s.status; });
+
+  // Every lesson any of these students is on, fetched once — this
+  // covers both the "since" check (recently added) and the "ended"
+  // check (every lesson, regardless of when), which evaluateAutoChecks()
+  // ran as two separate per-student queries. Filtering by since happens
+  // in JS below instead of in the query, which is the same result.
+  const lessonIdsByStudent = {};
+  const allLessonIds = new Set();
+  (lsRows ?? []).forEach(r => {
+    (lessonIdsByStudent[r.student_id] ??= []).push(r.lesson_id);
+    allLessonIds.add(r.lesson_id);
+  });
+  const lessonIdList = [...allLessonIds];
+
+  const [{ data: lessonRows }, { data: occRows }] = await Promise.all([
+    lessonIdList.length
+      ? db.from('lessons').select('id,status,created_at').in('id', lessonIdList)
+      : Promise.resolve({ data: [] }),
+    // One row per occurrence, any status — matches the original's
+    // per-lesson head-count (which also counted cancelled occurrences).
+    lessonIdList.length
+      ? db.from('lesson_occurrences').select('lesson_id').in('lesson_id', lessonIdList)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const lessonById = {};
+  (lessonRows ?? []).forEach(l => { lessonById[l.id] = l; });
+
+  const occCountByLesson = {};
+  (occRows ?? []).forEach(o => {
+    occCountByLesson[o.lesson_id] = (occCountByLesson[o.lesson_id] ?? 0) + 1;
+  });
+
+  studentIds.forEach(studentId => {
+    const since      = sinceById[studentId];
+    const sinceMs    = since ? new Date(since).getTime() : null;
+    const lessonIds  = lessonIdsByStudent[studentId] ?? [];
+    const allLessons = lessonIds.map(id => lessonById[id]).filter(Boolean);
+
+    let anyActive = false, anySeries = false, anyLesson = false, allEnded = false;
+
+    if (lessonIds.length) {
+      const recentLessons = sinceMs
+        ? allLessons.filter(l => new Date(l.created_at).getTime() >= sinceMs)
+        : allLessons;
+
+      const active = recentLessons.filter(l => l.status === 'active');
+      anyActive = active.length > 0;
+      anyLesson = recentLessons.length > 0;
+      anySeries = active.some(l => (occCountByLesson[l.id] ?? 0) > 1);
+
+      allEnded = allLessons.length > 0 && !allLessons.some(l => l.status === 'active');
+    }
+
+    out[studentId] = {
+      status_trial:  statusById[studentId] === 'trial',
+      status_active: statusById[studentId] === 'active',
+      lesson_exists: anyLesson,
+      series_exists: anySeries,
+      lessons_ended: allEnded,
+    };
+  });
+
+  return out;
+}
+
 // An item counts as done when an admin ticked it, or when the portal
 // can verify it. Blocked items are neither.
 function itemIsDone(item, checks) {

@@ -237,6 +237,97 @@ function skillBandColour(level) {
   return '#16a34a';
 }
 
+// ============================================================
+// BOK GRADE ANIMAL NAMES
+// ============================================================
+// A fun, per-instrument nickname for each of the 9 shared grade levels
+// (Pre-Grade 1 through Grade 8) — sitting ALONGSIDE the official
+// "Tier — Grade N" label, never replacing it (admins voted to keep
+// both, Sep 2026). Keyed by the exact instrument string used in
+// INSTRUMENTS, then indexed by bok_grade_levels.sort_order (0-8).
+//
+// Only the instruments the admins actually asked for get a theme.
+// Music Theory, Band and Other are deliberately left out — they're
+// catch-alls rather than one real instrument, so gradeAnimalName()
+// just returns '' for them and every caller falls back to the plain
+// label. The same happens for any instrument added later that hasn't
+// been given a theme yet.
+const BOK_GRADE_ANIMAL_NAMES = {
+  'Guitar': [
+    'Tadpole Strummer', 'Cricket Chords', 'Sparrow Picker', 'Robin Riffer',
+    'Falcon Fretwork', 'Hawk Harmonics', 'Eagle Soloist', 'Phoenix Fingers',
+    'Dragon Shredder',
+  ],
+  'Bass': [
+    'Guppy', 'Tadfish', 'Catfish', 'Eel',
+    'Barracuda', 'Ray', 'Tuna Titan', 'Orca',
+    'Kraken',
+  ],
+  'Drums': [
+    'Bunny Beats', 'Woodpecker', 'Joey Thumper', 'Gorilla Groove',
+    'Rhino Rhythm', 'Elephant Stomp', 'Buffalo Boom', 'Thunderbird',
+    'Rex Rhythm',
+  ],
+  'Piano / Keyboard': [
+    'Kitten Keys', 'Fox Trot', 'Fawn Fingers', 'Swan Song',
+    'Peacock Player', 'Panther Player', 'Stallion Sonata', 'Griffin',
+    'Unicorn Virtuoso',
+  ],
+  'Violin': [
+    'Caterpillar', 'Ladybird', 'Dragonfly', 'Butterfly Bow',
+    'Hummingbird', 'Firefly Fiddler', 'Swallow Soloist', 'Phoenix Fiddler',
+    'Griffin Virtuoso',
+  ],
+  'Voice / Singing': [
+    'Chick', 'Sparrow', 'Robin', 'Canary',
+    'Lark', 'Nightingale', 'Songbird Star', 'Swan Soprano',
+    'Phoenix Voice',
+  ],
+  'Ukulele': [
+    'Sand Crab', 'Hermit Crab', 'Sea Turtle Hatchling', 'Clownfish',
+    'Dolphin', 'Flamingo', 'Toucan', 'Sea Turtle Elder',
+    'Island Phoenix',
+  ],
+  'Saxophone': [
+    'Kitten', 'Alley Cat', 'Bobcat', 'Cougar',
+    'Panther', 'Jaguar', 'Lion', 'Tiger',
+    'Sabertooth',
+  ],
+};
+
+/** The animal nickname for an instrument + bok_grade_levels.sort_order
+ *  (0-8), or '' when that instrument has no theme yet. */
+function gradeAnimalName(instrument, sortOrder) {
+  const names = BOK_GRADE_ANIMAL_NAMES[instrument];
+  return (names && names[sortOrder]) || '';
+}
+
+/** The standard "Tier — Grade N" label for a bok_grade_levels row,
+ *  with the instrument's animal nickname appended when it has one —
+ *  e.g. "Intermediate — Grade 5 (Hawk Harmonics)". `gradeLevel` needs
+ *  at least {tier, label, sort_order}; a query that only selects
+ *  tier/label (not sort_order) will just never show an animal name,
+ *  rather than error. Falls back to '' when there's no grade at all,
+ *  so callers can write `g ? gradeLabel(g, inst) : 'Not yet graded'`. */
+function gradeLabel(gradeLevel, instrument) {
+  if (!gradeLevel) return '';
+  const base   = `${gradeLevel.tier} — ${gradeLevel.label}`;
+  const animal = gradeAnimalName(instrument, gradeLevel.sort_order);
+  return animal ? `${base} (${animal})` : base;
+}
+
+/** Builds <option> HTML for a "Grade" select from the full
+ *  bok_grade_levels list, labelling each with gradeLabel() for the
+ *  given instrument. Centralised so every grade dropdown in the
+ *  Portal — student edit, teacher's "record grade", the BoK library —
+ *  shows the same animal names instead of each page inlining its own
+ *  "${g.tier} — ${g.label}" and drifting out of sync. */
+function gradeOptionsHtml(gradeLevels, instrument, selectedId = '') {
+  return (gradeLevels ?? []).map(g =>
+    `<option value="${g.id}" ${g.id === selectedId ? 'selected' : ''}>${gradeLabel(g, instrument)}</option>`
+  ).join('');
+}
+
 // ------------------------------------------------------------
 // Default a studio filter to the admin's own studio.
 //

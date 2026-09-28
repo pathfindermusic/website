@@ -168,6 +168,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/></svg>
       Notifications
     </a>
+    <a class="nav-item" href="day-sheet.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
+      Day Sheet
+    </a>
     <div class="sidebar-section">Teaching</div>
     <a class="nav-item" href="lessons.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -543,7 +547,12 @@ async function loadStudents() {
   // Fetch profiles, instruments and teacher assignments separately
   const userIds = (studentData ?? []).map(s => s.user_id);
 
-  const [profileRes, instrRes, assignRes] = await Promise.all([
+  // Current grade (all graded instruments, per GRADED_INSTRUMENTS) rides
+  // along in this same parallel batch — it doesn't depend on anything
+  // else fetched here, so it used to sit after the lessons/teachers
+  // chain below for no reason, adding a whole extra sequential round
+  // trip to every load (reported as page lag, Sep 2026).
+  const [profileRes, instrRes, assignRes, cgRes] = await Promise.all([
     userIds.length > 0
       ? db.from('profiles').select('*').in('id', userIds)
       : Promise.resolve({ data: [] }),
@@ -555,6 +564,10 @@ async function loadStudents() {
     studentIds.length > 0
       ? db.from('lesson_students').select('student_id, lesson_id')
           .in('student_id', studentIds).is('added_for_occurrence_id', null)
+      : Promise.resolve({ data: [] }),
+    studentIds.length > 0
+      ? db.from('student_current_grades')
+          .select('student_id,instrument,grade_level_id,tier,label,sort_order').in('student_id', studentIds)
       : Promise.resolve({ data: [] }),
   ]);
 
@@ -603,14 +616,11 @@ async function loadStudents() {
     if (p) teacherProfileMap[t.id] = p;
   });
 
-  // Current grade for instruments with a formal BoK framework (Guitar
-  // only, for now) — used by the edit modal to show/prefill grade.
-  const { data: cgData } = studentIds.length > 0
-    ? await db.from('student_current_grades')
-        .select('student_id,instrument,grade_level_id,tier,label').in('student_id', studentIds)
-    : { data: [] };
+  // Current grade for every graded instrument (GRADED_INSTRUMENTS) —
+  // used by the edit modal to show/prefill grade. Fetched above,
+  // alongside profiles/instruments/assignments.
   const gradeMap = {};
-  (cgData ?? []).forEach(r => { (gradeMap[r.student_id] ??= {})[r.instrument] = r; });
+  (cgRes.data ?? []).forEach(r => { (gradeMap[r.student_id] ??= {})[r.instrument] = r; });
 
   // Merge everything
   allStudents = (studentData ?? []).map(s => ({
@@ -660,7 +670,7 @@ function renderStudents(students) {
         <div class="instrument-tags">
           ${instruments.map(i => {
             const g = s.grades?.[i];
-            return `<span class="instrument-tag">${i}${g ? ` · ${g.tier} — ${g.label}` : ''}</span>`;
+            return `<span class="instrument-tag">${i}${g ? ` · ${gradeLabel(g, i)}` : ''}</span>`;
           }).join('') || '–'}
         </div>
       </td>
@@ -739,14 +749,19 @@ async function loadProcesses() {
   // Auto items are evaluated live — they become true after the process
   // starts, so a stored value would go stale immediately.
   // Measured from each process's own start, so a student's existing
-  // lessons don't satisfy a checklist begun today
+  // lessons don't satisfy a checklist begun today.
+  //
+  // Batched across every student in one pass (evaluateAutoChecksBulk)
+  // rather than one evaluateAutoChecks() call per student — see that
+  // function's comment for why: it's the same exact result, just
+  // without a per-student chain of DB round trips multiplying out to
+  // hundreds of requests on a studio with real process history.
   const newest = {};
   procs.forEach(p => { if (!newest[p.student_id]) newest[p.student_id] = p; });
 
-  const checksFor = {};
-  await Promise.all(Object.values(newest).map(async p => {
-    checksFor[p.student_id] = await evaluateAutoChecks(p.student_id, p.started_at);
-  }));
+  const checksFor = await evaluateAutoChecksBulk(
+    Object.values(newest).map(p => ({ studentId: p.student_id, since: p.started_at }))
+  );
 
   // An item deferred to a task clears when that task is done — without
   // this it stays blocked for ever and the checklist can never finish.
@@ -771,17 +786,24 @@ async function loadProcesses() {
 
   // Reconcile on load. Automatic items tick themselves, so a checklist
   // can finish without anyone touching it — completion has to be
-  // computed here, not only when an item is toggled.
-  for (const p of procs) {
-    if (p.status !== 'in_progress') continue;
-    const prog = processProgress(byProc[p.id] ?? [], checksFor[p.student_id] ?? {});
-    if (!prog.complete) continue;
+  // computed here, not only when an item is toggled. One batched update
+  // for everything that needs it, rather than one sequential await per
+  // process — the sequential version meant every newly-auto-completed
+  // process on the page added its own full round trip, one after
+  // another, before the page could finish loading.
+  const toComplete = procs.filter(p =>
+    p.status === 'in_progress' &&
+    processProgress(byProc[p.id] ?? [], checksFor[p.student_id] ?? {}).complete);
 
-    await db.from('student_processes').update({
-      status: 'complete', completed_at: new Date().toISOString(),
-    }).eq('id', p.id);
-    p.status = 'complete';
-    delete endRunning[p.student_id];
+  if (toComplete.length) {
+    const completedAt = new Date().toISOString();
+    await db.from('student_processes')
+      .update({ status: 'complete', completed_at: completedAt })
+      .in('id', toComplete.map(p => p.id));
+    toComplete.forEach(p => {
+      p.status = 'complete';
+      delete endRunning[p.student_id];
+    });
   }
 
   // A finished ending where the student is still attending. They keep
@@ -795,18 +817,43 @@ async function loadProcesses() {
   });
 
   // When does each of them actually finish? Permanent membership only —
-  // a one-off guest appearance elsewhere isn't part of their own ending series.
-  await Promise.all(Object.keys(endDone).map(async sid => {
-    const { data: ls } = await db.from('lesson_students')
-      .select('lesson_id').eq('student_id', sid).is('added_for_occurrence_id', null);
-    const lids = (ls ?? []).map(r => r.lesson_id);
-    if (!lids.length) return;
-    const { data: occ } = await db.from('lesson_occurrences')
-      .select('date').in('lesson_id', lids)
-      .neq('status', 'cancelled')
-      .order('date', { ascending: false }).limit(1);
-    if (occ?.[0]?.date) lastLessonBy[sid] = occ[0].date;
-  }));
+  // a one-off guest appearance elsewhere isn't part of their own ending
+  // series. Batched the same way as above: one pair of queries covering
+  // every student in endDone, instead of two round trips per student.
+  const endDoneIds = Object.keys(endDone);
+  if (endDoneIds.length) {
+    const { data: lsRows } = await db.from('lesson_students')
+      .select('student_id,lesson_id').in('student_id', endDoneIds).is('added_for_occurrence_id', null);
+
+    const lessonIdsBySid = {};
+    const allLids = new Set();
+    (lsRows ?? []).forEach(r => {
+      (lessonIdsBySid[r.student_id] ??= []).push(r.lesson_id);
+      allLids.add(r.lesson_id);
+    });
+    const lidList = [...allLids];
+
+    const { data: occRows } = lidList.length
+      ? await db.from('lesson_occurrences')
+          .select('lesson_id,date').in('lesson_id', lidList).neq('status', 'cancelled')
+      : { data: [] };
+
+    const latestDateByLesson = {};
+    (occRows ?? []).forEach(o => {
+      if (!latestDateByLesson[o.lesson_id] || o.date > latestDateByLesson[o.lesson_id]) {
+        latestDateByLesson[o.lesson_id] = o.date;
+      }
+    });
+
+    endDoneIds.forEach(sid => {
+      let latest = null;
+      (lessonIdsBySid[sid] ?? []).forEach(lid => {
+        const d = latestDateByLesson[lid];
+        if (d && (!latest || d > latest)) latest = d;
+      });
+      if (latest) lastLessonBy[sid] = latest;
+    });
+  }
 }
 
 function renderProcCell(studentId) {
@@ -1266,7 +1313,7 @@ function addInstrumentRow(instrument = '', skillLevel = 0, currentGrade = null) 
       <label class="form-label">Grade</label>
       <select class="form-select inst-grade">
         <option value="">Not yet graded</option>
-        ${bokGradeLevels.map(g => `<option value="${g.id}" ${g.id===currentGrade?.grade_level_id?'selected':''}>${g.tier} — ${g.label}</option>`).join('')}
+        ${gradeOptionsHtml(bokGradeLevels, instrument, currentGrade?.grade_level_id ?? '')}
       </select>
     </div>
     <div style="display:flex;align-items:flex-end;padding-bottom:0.1rem;">

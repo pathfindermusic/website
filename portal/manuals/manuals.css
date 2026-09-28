@@ -35,6 +35,20 @@
 .doc-content strong { color: var(--charcoal); }
 .doc-content a { color: var(--orange-dark); }
 
+/* Screenshots added via the Decap CMS editor (Sep 2026) come in at their
+   native upload size, which can easily be wider than the card — without
+   this, an oversized image blows out .doc-content's layout instead of
+   just failing to display, which is what an image with no explicit size
+   looks like at a glance. */
+.doc-content img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0.9rem 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+
 .doc-content table { width: 100%; border-collapse: collapse; margin: 0.75rem 0 1.4rem; font-size: 0.84rem; }
 .doc-content th, .doc-content td { text-align: left; padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
 .doc-content th { background: var(--off-white); font-weight: 700; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--dark-grey); }

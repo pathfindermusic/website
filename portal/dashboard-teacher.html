@@ -589,7 +589,7 @@ async function attachCurrentGrades(rows) {
   const gradedIds = [...new Set(graded.map(r => r.students[0].id))];
   if (gradedIds.length) {
     const { data } = await db.from('student_current_grades')
-      .select('student_id, instrument, tier, label')
+      .select('student_id, instrument, tier, label, sort_order')
       .in('student_id', gradedIds);
     const byKey = {};
     (data ?? []).forEach(g => { byKey[`${g.student_id}|${g.instrument}`] = g; });
@@ -692,7 +692,7 @@ async function loadSchedule() {
         <div>
           <div class="lesson-name">${displayName}</div>
           <div class="lesson-instrument">${l.instrument}${l.currentGrade
-            ? `<span class="grade-pill">${l.currentGrade.tier} — ${l.currentGrade.label}</span>`
+            ? `<span class="grade-pill">${gradeLabel(l.currentGrade, l.instrument)}</span>`
             : l.currentSkill
               ? `<span class="skill-pill" style="color:${skillBandColour(l.currentSkill.level)};border-color:${skillBandColour(l.currentSkill.level)}33;">${l.currentSkill.label}</span>`
               : ''}</div>
@@ -986,7 +986,7 @@ async function openNoteModal(occurrenceId, studentName, noteText, driveLink) {
 
     const gradeSel = document.getElementById('noteArtefactGrade');
     gradeSel.innerHTML = '<option value="">All grades</option>' +
-      bokGradeLevels.map(g => `<option value="${g.id}">${g.tier} — ${g.label}</option>`).join('');
+      gradeOptionsHtml(bokGradeLevels, instrument);
 
     // A single-student (private) lesson: default the filter to that
     // student's current grade, if they have one recorded yet. A group
@@ -1155,7 +1155,7 @@ function openCustomArtefactModal(component) {
   document.getElementById('caDriveUrl').value = '';
 
   const gradeSel = document.getElementById('caGrade');
-  gradeSel.innerHTML = bokGradeLevels.map(g => `<option value="${g.id}">${g.tier} — ${g.label}</option>`).join('');
+  gradeSel.innerHTML = gradeOptionsHtml(bokGradeLevels, noteModalInstrument);
   // Default to whatever grade the picker above is currently filtered to,
   // if any — most of the time that's exactly the grade this belongs at.
   const currentFilter = document.getElementById('noteArtefactGrade').value;

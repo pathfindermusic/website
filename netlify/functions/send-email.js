@@ -12,6 +12,15 @@
 //   preview  → resolve recipients, return count + names (no send)
 //   send     → resolve recipients and send
 //
+// Placeholders available in subject/bodyText: {{first_name}}, {{student_name}},
+// plus lesson-context ones for 'occurrence' sends. {{portal_link}} (Sep 2026)
+// is special: it costs one Supabase Admin API call per recipient (to
+// generate_link a one-time sign-in/set-password URL), so it's only resolved
+// when a message actually contains it — every other send is unaffected. It
+// only works for a student who already has a Portal login; anyone without
+// one is left out of that particular send rather than mailed a dead link,
+// and reported back as skippedNoLogin.
+//
 // Recipient modes:
 //   studios       { studioIds: [] }
 //   teacher       { teacherId }
@@ -326,7 +335,42 @@ exports.handler = async (event) => {
       console.error('[send-email] Could not resolve studio address for footer:', err.message);
     }
 
-    const messages = recipients.map(r => {
+    // {{portal_link}} needs a Supabase Admin API call per recipient, so it's
+    // only ever resolved when a message actually uses it — every other
+    // notification (the vast majority) is unaffected and just as fast as
+    // before. Only works for a student who already has a Portal login
+    // (deliberately — see "Add login" on the Students page, which asks an
+    // admin to pick a unique sign-in address by hand rather than guessing
+    // one; this function does not attempt to create accounts). A student
+    // with no login yet is left out of the send entirely rather than
+    // mailing them a broken link, and reported back so an admin can follow
+    // up individually after using Add Login.
+    const needsPortalLink =
+      /\{\{\s*portal_link\s*\}\}/.test(subject ?? '') ||
+      /\{\{\s*portal_link\s*\}\}/.test(bodyText ?? '');
+
+    const portalLinkByStudent = {};
+    const noPortalLink = [];
+
+    if (needsPortalLink) {
+      const studentById = {};
+      students.forEach(s => { studentById[s.id] = s; });
+
+      await mapLimit(recipients, 15, async (r) => {
+        const s          = studentById[r.studentId];
+        const loginEmail = s?.user_id ? emailById[s.user_id] : null;
+        if (!loginEmail) { noPortalLink.push(r.name); return; }
+        const link = await generatePortalLink(SUPABASE_URL, SUPABASE_SERVICE_KEY, loginEmail);
+        if (link) portalLinkByStudent[r.studentId] = link;
+        else noPortalLink.push(r.name);
+      });
+    }
+
+    const sendableRecipients = needsPortalLink
+      ? recipients.filter(r => portalLinkByStudent[r.studentId])
+      : recipients;
+
+    const messages = sendableRecipients.map(r => {
       const vars = {
         student_name: r.name,
         first_name:   r.firstName,
@@ -337,6 +381,7 @@ exports.handler = async (event) => {
         lesson_weekday: lessonContext?.lesson_weekday ?? '',
         studio:       lessonContext?.studio       ?? '',
         zoom_link:    lessonContext?.zoomLink     ?? '',
+        portal_link:  portalLinkByStudent[r.studentId] ?? '',
       };
       const filledSubject = fill(subject,  vars);
       const filledBody    = fill(bodyText, vars);
@@ -350,7 +395,7 @@ exports.handler = async (event) => {
       // BCC the studio only on single-recipient sends. For bulk sends
       // one summary email is sent instead — 500 BCC copies would bury
       // the studio inbox and nobody would read them.
-      if (bcc && recipients.length === 1) msg.bcc = [bcc];
+      if (bcc && sendableRecipients.length === 1) msg.bcc = [bcc];
       return msg;
     });
 
@@ -371,7 +416,7 @@ exports.handler = async (event) => {
         try {
           const okBody = await r.json();
           (okBody?.data ?? []).forEach((item, idx) => {
-            const rec = recipients[i + idx];
+            const rec = sendableRecipients[i + idx];
             if (rec && item?.id) rec.resendId = item.id;
           });
         } catch (_) { /* IDs are a nice-to-have, never fail the send */ }
@@ -387,7 +432,7 @@ exports.handler = async (event) => {
     // ============================================================
     let summarySent  = false;
     let summaryError = null; // null = no summary was expected this send
-    if (bcc && recipients.length > 1 && sent > 0) {
+    if (bcc && sendableRecipients.length > 1 && sent > 0) {
       try {
         const sr = await fetch('https://api.resend.com/emails', {
           method: 'POST',
@@ -402,8 +447,8 @@ exports.handler = async (event) => {
             subject:  `Sent to ${sent} student${sent !== 1 ? 's' : ''}: ${subject}`,
             html:     summaryTemplate({
               subject, bodyText, fromEmail,
-              recipients, sent,
-              unreachable, invalidAddresses,
+              recipients: sendableRecipients, sent,
+              unreachable, invalidAddresses, noPortalLink,
               mode, spec: body, audienceLabel,
             }),
           }),
@@ -432,7 +477,7 @@ exports.handler = async (event) => {
           body:            bodyText,
           recipient_mode:  mode,
           recipient_count: sent,
-          recipients:      recipients.map(r => ({
+          recipients:      sendableRecipients.map(r => ({
                              name:      r.name,
                              addresses: r.addresses,
                              resend_id: r.resendId ?? null,
@@ -440,7 +485,7 @@ exports.handler = async (event) => {
           bcc,
           status:          failures.length ? 'partial' : 'sent',
           error:           failures.length ? failures.join(' | ').slice(0, 2000) : null,
-          summary_sent:    (bcc && recipients.length > 1 && sent > 0) ? summarySent : null,
+          summary_sent:    (bcc && sendableRecipients.length > 1 && sent > 0) ? summarySent : null,
           summary_error:   summaryError ? summaryError.slice(0, 2000) : null,
         }),
       });
@@ -455,8 +500,10 @@ exports.handler = async (event) => {
 
     return json(200, {
       sent,
-      total:       recipients.length,
-      unreachable: unreachable.length,
+      total:          recipients.length,
+      unreachable:    unreachable.length,
+      skippedNoLogin: noPortalLink.length,
+      skippedNoLoginNames: noPortalLink,
       summarySent,
       bcc,
       partial:     failures.length > 0,
@@ -522,7 +569,7 @@ function json(statusCode, obj) {
 // Resend dashboard) while the student batch, using emailTemplate(),
 // sent fine. Caught via email_log.summary_error / a studio reporting no
 // summary ever arrived despite the "sent successfully" toast.
-function summaryTemplate({ subject, bodyText, fromEmail, recipients, sent, unreachable, invalidAddresses, mode, spec, audienceLabel }) {
+function summaryTemplate({ subject, bodyText, fromEmail, recipients, sent, unreachable, invalidAddresses, noPortalLink, mode, spec, audienceLabel }) {
   const rows = (recipients ?? []).map(r =>
     `<tr>
        <td style="padding:6px 10px;border-bottom:1px solid #eee;font-size:13px;">${escapeHtml(r.name)}</td>
@@ -530,11 +577,12 @@ function summaryTemplate({ subject, bodyText, fromEmail, recipients, sent, unrea
      </tr>`
   ).join('');
 
-  const skippedBlock = ((unreachable?.length ?? 0) || (invalidAddresses?.length ?? 0))
+  const skippedBlock = ((unreachable?.length ?? 0) || (invalidAddresses?.length ?? 0) || (noPortalLink?.length ?? 0))
     ? `<div style="margin:0 0 16px;padding:12px 14px;background:#fef3c7;border:1px solid #fcd34d;
         border-radius:4px;font-size:13px;color:#92400e;line-height:1.6;">
         ${unreachable?.length ? `<div><strong>${unreachable.length}</strong> skipped — no email on file: ${escapeHtml(unreachable.join(', '))}</div>` : ''}
         ${invalidAddresses?.length ? `<div style="margin-top:${unreachable?.length ? '6px' : '0'};"><strong>${invalidAddresses.length}</strong> skipped — invalid address: ${escapeHtml(invalidAddresses.join('; '))}</div>` : ''}
+        ${noPortalLink?.length ? `<div style="margin-top:${(unreachable?.length || invalidAddresses?.length) ? '6px' : '0'};"><strong>${noPortalLink.length}</strong> skipped — no Portal login yet (use "Add login" on Students, then message them individually): ${escapeHtml(noPortalLink.join(', '))}</div>` : ''}
       </div>`
     : '';
 
@@ -576,6 +624,60 @@ function summaryTemplate({ subject, bodyText, fromEmail, recipients, sent, unrea
     </td></tr>
   </table>
 </body></html>`;
+}
+
+// Generates a one-time "sign in and set your password" link for an
+// EXISTING auth user, via Supabase's admin generate_link endpoint. This is
+// deliberately not /auth/v1/recover (used by login.html's self-service
+// "Forgot password?") — recover sends Supabase's own bare, unbranded email
+// immediately and gives back nothing for us to reuse; generate_link just
+// returns a URL, sends nothing itself, and lets that URL travel inside our
+// own Resend-sent, branded email instead. Same redirect_to gotcha as
+// /recover bit us before (silently ignored unless it's a query param), so
+// it's passed both as a query param and in the body here defensively.
+// Returns null (never throws) on any failure — a bad link for one
+// recipient must never take down the rest of a bulk send.
+async function generatePortalLink(SUPABASE_URL, SUPABASE_SERVICE_KEY, email) {
+  const redirectTo = 'https://www.pathfindermusiclessons.com.au/portal/change-password.html';
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/auth/v1/admin/generate_link?redirect_to=${encodeURIComponent(redirectTo)}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+          'apikey':        SUPABASE_SERVICE_KEY,
+        },
+        body: JSON.stringify({ type: 'recovery', email, redirect_to: redirectTo }),
+      }
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      console.error('[send-email] generate_link failed for', email, res.status, JSON.stringify(data));
+      return null;
+    }
+    return data.action_link ?? data.properties?.action_link ?? null;
+  } catch (err) {
+    console.error('[send-email] generate_link error for', email, err.message);
+    return null;
+  }
+}
+
+// Runs `fn` over `items` with at most `limit` in flight at once. Used only
+// for portal-link lookups — one Supabase Admin API call per recipient,
+// which for "all active students" can mean hundreds of calls; sequential
+// would risk the function's execution time limit, unbounded-parallel would
+// risk hammering the Admin API, so this caps concurrency instead.
+async function mapLimit(items, limit, fn) {
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
 }
 
 // Replace {{placeholder}} tokens
