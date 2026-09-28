@@ -1155,6 +1155,34 @@ that Cloudflare's proxy mode 405s requests to `/.netlify/identity/*` — a
 known gotcha, not a misconfiguration, worked around by leaving DNS-only for
 this domain or redirecting `/admin/*` to the `.netlify.app` subdomain.
 
+**Invite/confirm/recovery emails link to the bare domain, not `/admin/`
+(hit first Sep 2026).** Netlify Identity always builds these email links as
+`{SiteURL}/#{token}=…`, never `{SiteURL}/admin/#{token}=…` — the Identity
+widget that actually reads that token only runs on `/admin/index.html`, so
+clicking the email link on the plain homepage does nothing. The proper fix
+(custom Identity email templates pointing straight at `/admin/#…`) needs a
+paid Netlify plan; the free-plan workaround, added to the very end of the
+root `index.html`, is a small script that checks `location.hash` for
+`invite_token` / `confirmation_token` / `recovery_token` /
+`email_change_token` and forwards to `/admin/` with the same hash. If a
+future invite or password-reset link still lands on the homepage and does
+nothing, check that script is still there before assuming Identity itself
+is broken — and if the homepage is ever significantly rewritten, make sure
+this snippet survives the rewrite.
+
+**Opening a guide in the CMS was a blank screen until `admin/config.yml`
+got an explicit `branch: main` (Sep 2026).** Git Gateway silently defaults
+to looking for a branch called `master` when `backend.branch` is omitted —
+this repo's branch is `main`, so every content fetch 404'd (visible in the
+browser console as `.../manuals%2Fcontent`, `....md&sha=master` and
+`.../images/uploads` all 404ing) and the entry editor failed to render
+anything. The "How-To Guides" collection *list* still showed fine even
+while this was broken, because a `files` collection's entry list comes
+straight from `config.yml` itself — it never touches the repo — so only
+clicking into an actual entry exposed it. If entries ever go blank again,
+check the browser console first; a 404 mentioning `sha=master` means this
+setting got lost or overwritten, not that Identity/Git Gateway is broken.
+
 ## Traps that have already cost time
 
 - **Check which environment you're looking at.** Local dev runs against the same

@@ -1,5 +1,9 @@
 backend:
   name: git-gateway
+  # Git Gateway defaults to looking for a branch called "master" when this
+  # isn't set — this repo's branch is "main", so every file request 404'd
+  # and entries opened to a blank screen until this was added (Sep 2026).
+  branch: main
 
 # Where uploaded screenshots/images are stored in the repo, and the URL
 # path the site serves them from (portal/manuals/*.html already load

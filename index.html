@@ -399,4 +399,19 @@ const nt=document.getElementById("nt"),nl=document.getElementById("nl");
 nt.addEventListener("click",()=>nl.classList.toggle("open"));
 document.querySelectorAll("a[href^=\"#\"]").forEach(a=>a.addEventListener("click",()=>nl.classList.remove("open")));
 </script>
+<script>
+// Netlify Identity (used only by the /admin/ content editor, Sep 2026) always
+// emails invite/confirm/recovery links pointing at the bare site URL, not
+// /admin/ where the Identity widget actually lives to catch the token — a
+// known Netlify limitation (custom email templates that fix this at the
+// source need a paid plan). This just forwards a token-bearing link on to
+// /admin/ so it still works. See "How-To Guide content is now Decap-CMS-
+// managed" in portal/README.md.
+(function () {
+  var h = window.location.hash || '';
+  if (/(invite_token|confirmation_token|recovery_token|email_change_token)=/.test(h)) {
+    window.location.replace('/admin/' + h);
+  }
+})();
+</script>
 </body></html>
