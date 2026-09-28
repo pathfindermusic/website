@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Content Manager — Pathfinder Portal Guides</title>
+  <link rel="icon" href="data:,">
+</head>
+<body>
+  <!-- Netlify Identity handles the login screen and session for this page.
+       Once Identity is enabled and Git Gateway is turned on for this site
+       (see portal/README.md), invited users can sign in here and edit the
+       How-To Guides through Decap CMS. -->
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <script>
+    if (window.netlifyIdentity) {
+      window.netlifyIdentity.on("init", user => {
+        if (!user) {
+          window.netlifyIdentity.on("login", () => {
+            document.location.href = "/admin/";
+          });
+        }
+      });
+    }
+  </script>
+  <script src="https://unpkg.com/decap-cms@^3/dist/decap-cms.js"></script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+backend:
+  name: git-gateway
+
+# Where uploaded screenshots/images are stored in the repo, and the URL
+# path the site serves them from (portal/manuals/*.html already load
+# everything else with relative/absolute paths off the site root, so this
+# keeps images alongside the guides they illustrate).
+media_folder: "portal/manuals/images/uploads"
+public_folder: "/portal/manuals/images/uploads"
+
+collections:
+  - name: "guides"
+    label: "How-To Guides"
+    files:
+      - file: "portal/manuals/content/system-overview.md"
+        label: "System Overview"
+        name: "system-overview"
+        fields:
+          - { label: "Title", name: "title", widget: "string" }
+          - { label: "Last Updated", name: "updated", widget: "datetime", format: "YYYY-MM-DD", date_format: "YYYY-MM-DD", time_format: false, picker_utc: true }
+          - { label: "Content", name: "body", widget: "markdown" }
+
+      - file: "portal/manuals/content/admin-guide.md"
+        label: "Admin Guide"
+        name: "admin-guide"
+        fields:
+          - { label: "Title", name: "title", widget: "string" }
+          - { label: "Last Updated", name: "updated", widget: "datetime", format: "YYYY-MM-DD", date_format: "YYYY-MM-DD", time_format: false, picker_utc: true }
+          - { label: "Content", name: "body", widget: "markdown" }
+
+      - file: "portal/manuals/content/teacher-guide.md"
+        label: "Teacher Guide"
+        name: "teacher-guide"
+        fields:
+          - { label: "Title", name: "title", widget: "string" }
+          - { label: "Last Updated", name: "updated", widget: "datetime", format: "YYYY-MM-DD", date_format: "YYYY-MM-DD", time_format: false, picker_utc: true }
+          - { label: "Content", name: "body", widget: "markdown" }
+
+      - file: "portal/manuals/content/student-guide.md"
+        label: "Student Guide"
+        name: "student-guide"
+        fields:
+          - { label: "Title", name: "title", widget: "string" }
+          - { label: "Last Updated", name: "updated", widget: "datetime", format: "YYYY-MM-DD", date_format: "YYYY-MM-DD", time_format: false, picker_utc: true }
+          - { label: "Content", name: "body", widget: "markdown" }

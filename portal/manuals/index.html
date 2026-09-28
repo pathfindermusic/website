@@ -68,7 +68,10 @@
       </div>
     </div>
 
-    <div class="card" style="margin-bottom:1.75rem;">
+    <!-- Parallel-run framing (Zoho/MyMusicStaff, "while we decide when it's
+         ready to take over fully") is internal context for staff, not
+         something a student needs — hidden for the student role below. -->
+    <div class="card" style="margin-bottom:1.75rem;" id="introCard">
       <div class="card-body doc-content">
         <p>
           Welcome to the Pathfinder Music Lessons Student Portal. This is a system built
@@ -170,6 +173,9 @@ function applyManualVisibility(role) {
   document.getElementById('cardAdminGuide')?.classList.toggle('hidden', !showAdmin);
   document.getElementById('cardTeacherGuide')?.classList.toggle('hidden', !showTeacher);
   document.getElementById('cardStudentGuide')?.classList.toggle('hidden', !showStudent);
+  // The parallel-run intro (Zoho/MyMusicStaff, "while we decide...") is
+  // internal framing for staff — a student just wants their own guide.
+  document.getElementById('introCard')?.classList.toggle('hidden', role === 'student');
 }
 
 (async () => {

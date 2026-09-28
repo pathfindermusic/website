@@ -1012,13 +1012,19 @@ async function quickAddTask() {
   const studioId = document.getElementById('filterStudio').value
     || (myStudios.length === 1 ? myStudios[0] : null);
 
-  const { error } = await db.from('tasks').insert({
+  const { data, error } = await db.from('tasks').insert({
     title, studio_id: studioId, created_by: me.id, assigned_to: me.id,
-  });
+  }).select('id').single();
 
   if (error) { showToast('Could not add: ' + error.message, 'error'); input.value = title; return; }
-  showToast('Task added.', 'success');
+
   await loadTasks();
+  // Straight into the Task modal — it used to just land back in the
+  // list, so a quick-added task (due date, assignee, subject, kind, all
+  // still unset) had to be found again before any of that could be
+  // filled in. Reported 28 Sep 2026. openTaskModal() reads from `tasks`,
+  // so this has to come after loadTasks() has it in there.
+  await openTaskModal(data.id);
 }
 
 // ============================================================

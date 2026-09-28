@@ -130,3 +130,5 @@
   .guide-card-grid { grid-template-columns: 1fr; }
   .doc-toc ul { columns: 1; }
 }
+
+.doc-loading { color: var(--mid-grey); font-style: italic; }

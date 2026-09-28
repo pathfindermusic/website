@@ -133,6 +133,9 @@ remember production will lag behind `main` until you deploy manually.
 /                          repo root
 ├── index.html, teachers.html, pricing.html …   public marketing site
 ├── netlify.toml
+├── admin/                  Decap CMS editor (Sep 2026) — see How-To Guide below
+│   ├── index.html          loads Netlify Identity + the Decap CMS bundle
+│   └── config.yml          git-gateway backend, guide collection, media folder
 ├── netlify/functions/
 │   ├── create-user.js     admin ops needing service_role:
 │   │                        create / get-email / reset-password / delete-user
@@ -153,7 +156,15 @@ remember production will lag behind `main` until you deploy manually.
     ├── manuals/                     How-To Guide (Sep 2026) — see below
     │   ├── index.html    system-overview.html
     │   ├── admin-guide.html    teacher-guide.html    student-guide.html
-    │   └── manuals.css
+    │   ├── manuals.css
+    │   ├── guide-content.js   shared fetch/render/TOC script — the one
+    │   │                        deliberate exception to "duplicate per page"
+    │   │                        below, since all four guides need the same
+    │   │                        logic and only the .md path differs
+    │   ├── content/            Decap-CMS-managed guide text (Sep 2026)
+    │   │   ├── system-overview.md    admin-guide.md
+    │   │   └── teacher-guide.md      student-guide.md
+    │   └── images/uploads/     screenshots added via the CMS land here
     ├── css/portal.css
     └── js/supabase-client.js       shared helpers + anon key
 ```
@@ -670,6 +681,15 @@ tasks when `studio_id` changes, leaves them **unassigned** so they land in the
 receiving studio's queue rather than being pushed at one named admin, and writes
 a handover record explaining why. Closed tasks stay put — they are history.
 
+**Quick-add opens the Task modal straight away (Sep 2026).** `quickAddTask()`
+(the "What needs doing?" bar, admin/superuser only) used to just insert the row
+and refresh the list — a title-only task with no due date, assignee, subject or
+kind, that then had to be found again among every other task before any of that
+could be set. Reported 28 Sep 2026. It now `.select('id').single()`s the insert,
+reloads `tasks` (`openTaskModal()` reads from that array, so the reload has to
+come first), and opens straight into the Task modal on the new row, already
+editable.
+
 ### Enquiries
 
 **An enquiry is a student record with status `prospective`.** No auth account —
@@ -1007,6 +1027,16 @@ for it locked down instead once the guides were reviewed, so that trade is
 gone — a manual link is only useful to someone who can already log in, and
 nothing here should assume otherwise going forward.
 
+**The parallel-run intro paragraph on `index.html` is hidden from students
+(Sep 2026).** The "this system is being trialled alongside Zoho CRM and
+MyMusicStaff while we decide when it's ready to take over" framing is
+internal context meant for staff — a student opening their guide doesn't
+need it and shouldn't be worrying about it. `applyManualVisibility(role)`
+now also toggles `#introCard` (hidden only for `student`); superuser, admin
+and teacher still see it as before. Same pattern as everything else on this
+page: purely a display toggle, not a second access gate — there was never
+anything sensitive in that paragraph, just tone aimed at the wrong reader.
+
 **Kept in sync by hand, same as the sidebar itself.** There's no shared
 include (see Architecture above), so the guide content — and now the
 per-page role list and `applyManualVisibility()` copy — will drift from the
@@ -1019,6 +1049,111 @@ role's access is ever revisited.
 does not attempt to prescribe what should still be double-entered in Zoho
 or MyMusicStaff during the parallel run — that's a studio operating
 decision, not something to bake into a how-to page that outlives it.
+
+### How-To Guide content is now Decap-CMS-managed (Sep 2026)
+
+The studio asked for a WYSIWYG way to edit the four guides themselves
+(`system-overview.html`, `admin-guide.html`, `teacher-guide.html`,
+`student-guide.html`) — mainly to add screenshots as they come up, without
+asking a developer every time. There's no build step on this site (see
+Architecture above), so a CMS can't "include" content into a page at build
+time the way it would on a static-site generator — the guide pages fetch
+their content client-side instead:
+
+- Each guide's editable text now lives in a Markdown file under
+  `portal/manuals/content/` (one per guide, matching the collection in
+  `admin/config.yml`), with a short YAML frontmatter (`title`, `updated`)
+  above the body.
+- `guide-content.js` (loaded by all four guide pages, plus `marked` from
+  `cdn.jsdelivr.net` — same CDN pattern as `@supabase/supabase-js`) fetches
+  the relevant `.md` file after `requireAuth()` succeeds, strips the
+  frontmatter, renders the body with `marked.parse()`, and injects the
+  result into the page's `.doc-content` card.
+- The **"On this page" box is now generated from whatever `<h2 id="…">` /
+  `<h3 id="…">` headings actually end up in the rendered content**, instead
+  of being hand-typed per page. A heading with no `id` (a few `<h3>`s in
+  `teacher-guide.html` are intentionally like this) is simply left out, same
+  as before. This means the TOC can never drift out of sync with the guide
+  again — editing a heading's wording in the CMS updates the TOC link text
+  automatically, but **changing or removing a heading's `id` breaks anything
+  that links to that anchor** (e.g. `system-overview.html` links to
+  `admin-guide.html#notifications` and `#distribution-lists` — check for
+  other cross-links before renaming an `id`).
+
+**The existing guide text was migrated in as raw HTML, not hand-converted to
+Markdown.** `marked` passes raw HTML straight through unchanged, so every
+guide renders exactly as it did before this change — verified by rendering
+all four `.md` files locally and diffing heading/callout counts against the
+original pages before shipping. The practical effect for editors: today's
+paragraphs and headings will show up as an opaque "raw HTML" block in
+Decap's rich-text view rather than editable text nodes — switch that field
+to **Markdown/source mode** (the toggle in the field's toolbar) to edit the
+existing wording as text, which works fine. Anything typed **fresh** in
+rich-text mode — a new paragraph, list, link, or an image dropped in via the
+toolbar's image button — becomes real Markdown and is fully WYSIWYG,
+screenshots included. Over time, as sections get rewritten by hand in the
+CMS, more of each guide will naturally become plain Markdown.
+
+**Callout boxes** (the blue/amber/red tip-warning-caution boxes) aren't a
+CMS widget — they're still the same raw HTML, now living in the Markdown
+source. To add a new one, switch to source mode and paste one of:
+
+```html
+<div class="callout callout-tip">
+  <strong>Short bold title</strong>
+  <p>The tip itself.</p>
+</div>
+
+<div class="callout callout-warning">
+  <strong>Short bold title</strong>
+  <p>The warning itself.</p>
+</div>
+
+<div class="callout callout-caution">
+  <strong>Short bold title</strong>
+  <p>The caution itself.</p>
+</div>
+```
+
+**Screenshots** upload to `portal/manuals/images/uploads/` (the
+`media_folder`/`public_folder` in `admin/config.yml`) and are committed to
+the repo like any other change — they still need the studio's own
+`git push`-equivalent, except the CMS does that commit itself via Git
+Gateway, straight to `main`, which goes live on the next Netlify deploy
+exactly like any other commit to this repo.
+
+**Manual setup still needed in the Netlify dashboard (I have no access to
+do this myself):**
+
+1. Site settings → **Identity** → Enable Identity.
+2. Identity → registration → set to **Invite only** (otherwise anyone can
+   sign up and edit the guides).
+3. Identity → Services → enable **Git Gateway**.
+4. Identity → **Invite users** → send an invite to each person who should
+   be able to edit guides (their own email — they'll set their own
+   password on accepting).
+5. Open `pathfindermusiclessons.com.au/admin/`, accept the invite / log in,
+   and the four guides appear as a "How-To Guides" collection.
+
+**Netlify Identity + Git Gateway is the simplest fit for this site today,
+but Git Gateway itself is a deprecated feature with no announced shutdown
+date** — Netlify Identity is still fully supported, but has flagged Git
+Gateway specifically as being phased out, and the Decap CMS project doesn't
+yet have an official first-party replacement. For a small, low-traffic
+internal tool like this it's a reasonable bet for now; if Netlify does
+retire it, the two live alternatives as of Sep 2026 are **DecapBridge** (a
+free-for-small-sites hosted login service built for exactly this
+situation) or switching the backend to `github` with a small OAuth-provider
+Netlify Function (more setup, but no third-party dependency). Either is a
+config-only change (`admin/config.yml`'s `backend:` block plus one script
+tag in `admin/index.html`) — the content side (the `.md` files,
+`guide-content.js`, the collection schema) doesn't need to change either
+way. Worth a re-check of Git Gateway's status if this is ever revisited.
+
+If the domain is ever proxied through Cloudflare (it isn't today), note
+that Cloudflare's proxy mode 405s requests to `/.netlify/identity/*` — a
+known gotcha, not a misconfiguration, worked around by leaving DNS-only for
+this domain or redirecting `/admin/*` to the `.netlify.app` subdomain.
 
 ## Traps that have already cost time
 
