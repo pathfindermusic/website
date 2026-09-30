@@ -168,7 +168,7 @@
     }
 
     .lesson-block-name { font-weight: 600; }
-    .lesson-block-meta { font-size: 0.65rem; opacity: 0.8; }
+    .lesson-block-meta { font-size: 0.65rem; opacity: 0.8; text-decoration: none; }
     .lesson-cancel-icon { position: absolute; top: 3px; right: 4px; font-size: 0.7rem; color: #dc2626; }
 
     /* Online/Zoom lessons get their own badge rather than a colour swap,
@@ -337,6 +337,10 @@
     <a class="nav-item" href="attendance-report.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
       Attendance
+    </a>
+    <a class="nav-item" href="credits.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/></svg>
+      Credits
     </a>
     <a class="nav-item" href="distribution-lists.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
@@ -539,7 +543,7 @@
              usual pattern. -->
         <div class="form-group hidden" id="oneOffKindWrap">
           <label class="form-label">What is it for?</label>
-          <select class="form-select" id="lOneOffKind" onchange="autoPopulateSeriesNotes()">
+          <select class="form-select" id="lOneOffKind" onchange="autoPopulateSeriesNotes(); refreshMakeupCreditPicker();">
             <option value="makeup">Makeup lesson</option>
             <option value="trial">Trial lesson</option>
             <option value="adhoc">One-off request</option>
@@ -547,6 +551,12 @@
           <div class="form-hint">
             A single lesson on the date above. Nothing repeats, and no series is created.
           </div>
+        </div>
+
+        <div class="form-group hidden" id="makeupCreditWrap">
+          <label class="form-label">Consume a lesson credit from</label>
+          <select class="form-select" id="lMakeupCreditFor"></select>
+          <div class="form-hint" id="makeupCreditHint"></div>
         </div>
 
         <div class="form-group" id="frequencyWrap">
@@ -618,9 +628,15 @@
 
         <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;
                       margin-top:0.5rem;font-size:0.875rem;color:var(--charcoal);">
-          <input type="checkbox" id="occIsMakeup" style="accent-color:#d97706;">
+          <input type="checkbox" id="occIsMakeup" style="accent-color:#d97706;" onchange="refreshOccMakeupCreditPicker()">
           This is a makeup lesson
         </label>
+
+        <div class="form-group hidden" id="occMakeupCreditWrap" style="margin-top:0.5rem;">
+          <label class="form-label">Consume a lesson credit from</label>
+          <select class="form-select" id="occMakeupCreditFor"></select>
+          <div class="form-hint" id="occMakeupCreditHint"></div>
+        </div>
 
         <!-- A substitution is one lesson, not a change of teacher, so it
              lives on the occurrence. Two cases: another member of staff,
@@ -733,6 +749,14 @@
           <label class="form-label">New time *</label>
           <select class="form-select" id="cloneTime"></select>
         </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Book as a makeup for</label>
+        <select class="form-select" id="cloneMakeupFor">
+          <option value="">— Not a makeup —</option>
+        </select>
+        <div class="form-hint">Consumes one lesson credit from that student. Leave as "Not a
+          makeup" to just relocate the lesson.</div>
       </div>
       <div class="clash-error" id="cloneClashError">
         <span>🚫</span><span id="cloneClashMsg"></span>
@@ -1552,7 +1576,16 @@ async function loadDailyView() {
             // label. (An emptied-out group lesson still reads as group.)
             if (sIds.length === 0 && o.lessons?.lesson_type !== 'group') return o.lessons?.instrument || 'Blocked';
             if (o.lessons?.lesson_type === 'group') {
-              return `${groupAttendanceSummary(att, sIds.length)}${sIds.length} student${sIds.length !== 1 ? 's' : ''}`;
+              // Show first names when there's a roster to show — falls back
+              // to the old "N students" count if names aren't resolved yet.
+              // Long lists just wrap/clip in the cell (no room-detection
+              // needed): the title tooltip on the block always has the
+              // full roster regardless of how much of this fit visually.
+              const firstNames = sIds.map(id => spMap[id]).filter(Boolean).map(n => n.split(' ')[0]);
+              const label = firstNames.length
+                ? firstNames.join(', ')
+                : `${sIds.length} student${sIds.length !== 1 ? 's' : ''}`;
+              return `${groupAttendanceSummary(att, sIds.length)}${label}`;
             }
             return nameWithAttendance(sIds.map(id => spMap[id]).filter(Boolean)[0] ?? '—', att[sIds[0]]);
           };
@@ -1570,12 +1603,15 @@ async function loadDailyView() {
                    onclick="event.stopPropagation();openOccurrenceModal('${o.id}')"
                    title="Cancelled — click to view"
                    style="cursor:pointer;padding:0 4px;flex:0 0 auto;
-                          display:flex;align-items:center;gap:3px;
                           min-height:0;line-height:1.35;overflow:hidden;">
-                   <span style="font-size:0.62rem;">✕</span>
-                   <span class="lesson-block-name"
-                         style="font-size:0.72rem;
-                                white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nameOf(o)}</span>
+                   <div style="display:flex;align-items:center;gap:3px;overflow:hidden;">
+                     <span style="font-size:0.62rem;">✕</span>
+                     <span class="lesson-block-name"
+                           style="font-size:0.72rem;
+                                  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nameOf(o)}</span>
+                   </div>
+                   ${o.occurrence_notes ? `<div class="lesson-block-meta"
+                     style="display:inline-block;width:100%;text-decoration:none;font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📝 ${o.occurrence_notes}</div>` : ''}
                  </div>`).join('')}
             </div>`;
           } else {
@@ -1623,11 +1659,14 @@ async function loadDailyView() {
                 return `<div class="lesson-block cancelled"
                   onclick="event.stopPropagation();openOccurrenceModal('${o.id}')"
                   title="Cancelled — click to view"
-                  style="${pos}cursor:pointer;padding:0 4px;overflow:hidden;
-                         display:flex;align-items:center;gap:3px;line-height:1.35;">
-                  <span style="font-size:0.62rem;">✕</span>
-                  <span class="lesson-block-name"
-                        style="font-size:0.64rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nameOf(o)}</span>
+                  style="${pos}cursor:pointer;padding:0 4px;overflow:hidden;line-height:1.35;">
+                  <div style="display:flex;align-items:center;gap:3px;overflow:hidden;">
+                    <span style="font-size:0.62rem;">✕</span>
+                    <span class="lesson-block-name"
+                          style="font-size:0.64rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nameOf(o)}</span>
+                  </div>
+                  ${o.occurrence_notes ? `<div class="lesson-block-meta"
+                    style="display:inline-block;width:100%;text-decoration:none;font-style:italic;font-size:0.58rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📝 ${o.occurrence_notes}</div>` : ''}
                 </div>`;
               }
 
@@ -1636,7 +1675,15 @@ async function loadDailyView() {
               // A makeup overrides the private/group colour — that it is a
               // makeup matters more than which kind of lesson it is.
               const cls = o.is_makeup ? 'makeup' : lType;
+              // Full roster for the hover tooltip — the cell itself only
+              // has room for first names (and only when they fit at all),
+              // so hovering is how the full list is always reachable.
+              const groupTitle = lType === 'group'
+                ? (o.lessonStudents ?? []).map(id => spMap[id]).filter(Boolean).join(', ')
+                    .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+                : '';
               return `<div class="lesson-block ${cls}"
+                ${groupTitle ? `title="${groupTitle}"` : ''}
                 onclick="event.stopPropagation();openOccurrenceModal('${o.id}')"
                 style="${pos}overflow:hidden;cursor:pointer;">
                 ${o.is_online ? onlineIconBadge() : ''}
@@ -1879,6 +1926,9 @@ function openLessonModalFromCell(teacherId, studioId, slot, dayOfWeek) {
 }
 
 function openLessonModal(lesson = null) {
+  // Overridden further down by editSeriesInner() for a lesson that was
+  // already a makeup — re-saving it must not spend a second credit.
+  document.getElementById('lessonModal').dataset.wasMakeup = 'false';
   lessonStudents = [];
   renderLessonStudents();
   updateRecurrenceForTrial();
@@ -2065,6 +2115,7 @@ function renderLessonStudents() {
   const list = document.getElementById('studentsList');
   if (!lessonStudents.length) {
     list.innerHTML = `<div class="text-sm text-muted">No students added yet.</div>`;
+    refreshMakeupCreditPicker();
     return;
   }
   list.innerHTML = lessonStudents.map(sid => {
@@ -2075,6 +2126,7 @@ function renderLessonStudents() {
       <button class="student-tag-remove" onclick="removeStudentFromLesson('${sid}')">✕</button>
     </div>`;
   }).join('');
+  refreshMakeupCreditPicker();
 }
 
 // Availability check — now informational only, hard block happens on save
@@ -2135,6 +2187,64 @@ function onPatternChange() {
     ?? [...document.querySelectorAll('.form-label')]
          .find(l => l.textContent.trim().startsWith('First lesson date'));
   if (dateLabel) dateLabel.textContent = oneOff ? 'Lesson date *' : 'First lesson date *';
+
+  refreshMakeupCreditPicker();
+}
+
+// ============================================================
+// MAKEUP CREDIT PICKER — Add Lesson / Edit lesson's own one-off
+// path to booking a makeup, alongside the Clone occurrence flow
+// (see LESSON CREDITS section further down). Shown only for a
+// one-off whose kind is "Makeup lesson".
+// ============================================================
+let lessonMakeupBalances = {}; // student_id -> current balance, for this picker
+
+async function refreshMakeupCreditPicker() {
+  const isOneOff  = document.getElementById('lPattern').value === 'oneoff';
+  const kind      = document.getElementById('lOneOffKind').value;
+  const wasMakeup = document.getElementById('lessonModal').dataset.wasMakeup === 'true';
+  const wrap      = document.getElementById('makeupCreditWrap');
+  const hint      = document.getElementById('makeupCreditHint');
+  const sel       = document.getElementById('lMakeupCreditFor');
+
+  if (!isOneOff || kind !== 'makeup') {
+    wrap.classList.add('hidden');
+    return;
+  }
+  wrap.classList.remove('hidden');
+
+  if (wasMakeup) {
+    // Already spent when this was first booked as a makeup — re-saving
+    // it (moving its time, say) must not charge a second credit.
+    sel.innerHTML = '<option value="">—</option>';
+    sel.disabled = true;
+    hint.textContent = 'This lesson already spent its credit when first booked as a makeup — ' +
+      'saving again won’t spend another. See the Credits report for its history.';
+    return;
+  }
+
+  sel.disabled = false;
+  if (!lessonStudents.length) {
+    sel.innerHTML = '<option value="">— Add a student above first —</option>';
+    hint.textContent = '';
+    lessonMakeupBalances = {};
+    return;
+  }
+
+  const { data: balRows } = await db.from('student_credit_balances')
+    .select('student_id,balance').in('student_id', lessonStudents);
+  lessonMakeupBalances = {};
+  (balRows ?? []).forEach(b => { lessonMakeupBalances[b.student_id] = b.balance; });
+
+  sel.innerHTML = lessonStudents.map(sid => {
+    const s    = allStudents.find(s => s.id === sid);
+    const name = s ? `${s.profile?.first_name ?? ''} ${s.profile?.last_name ?? ''}`.trim() : '—';
+    const bal  = lessonMakeupBalances[sid] ?? 0;
+    return `<option value="${sid}">${name} (${bal} credit${bal !== 1 ? 's' : ''})</option>`;
+  }).join('');
+  // Only one student on the lesson — pick them automatically.
+  if (lessonStudents.length === 1) sel.value = lessonStudents[0];
+  hint.textContent = 'Consumes one lesson credit from this student when saved.';
 }
 
 // While a one-off is selected, changing the date has to re-derive the
@@ -2247,6 +2357,31 @@ async function saveLesson() {
     document.getElementById('lCount').value = 1;
     updateRecurrenceForTrial();
     return;
+  }
+
+  // ---- CREDIT CHECK: a makeup can only be booked against a balance ----
+  // Only a genuinely NEW makeup booking spends anything — re-saving an
+  // already-makeup lesson (moving its time, say) must not charge the
+  // same credit a second time. wasMakeup is set by editSeriesInner()
+  // when this form was opened to edit an existing makeup; a brand-new
+  // lesson always starts false (see openLessonModal()).
+  const isOneOff       = document.getElementById('lPattern').value === 'oneoff';
+  const oneOffKind     = isOneOff ? document.getElementById('lOneOffKind').value : null;
+  const wasMakeup      = document.getElementById('lessonModal').dataset.wasMakeup === 'true';
+  const becomingMakeup = isOneOff && oneOffKind === 'makeup' && !wasMakeup;
+  const makeupCreditFor = becomingMakeup ? document.getElementById('lMakeupCreditFor').value : null;
+
+  if (becomingMakeup) {
+    if (!makeupCreditFor) {
+      showToast('Please choose which student this makeup lesson credit belongs to.', 'error'); return;
+    }
+    const bal = lessonMakeupBalances[makeupCreditFor] ?? 0;
+    if (bal <= 0) {
+      const student = allStudents.find(s => s.id === makeupCreditFor);
+      const name = student ? `${student.profile?.first_name ?? ''} ${student.profile?.last_name ?? ''}`.trim() : 'This student';
+      showToast(`${name} has no lesson credits available — cannot book a makeup.`, 'error');
+      return;
+    }
   }
 
   // ---- HARD BLOCK: Teacher must teach this instrument ----
@@ -2445,11 +2580,10 @@ async function saveLesson() {
     // Editing an existing series takes a different path: the lesson is
     // updated and only its FUTURE occurrences are rebuilt.
     if (editingId) {
-      const isOneOff = document.getElementById('lPattern').value === 'oneoff';
       await saveSeriesEdit(editingId, {
         teacherId, studioId, instrument, lType, day, time, duration, frequency,
         seriesNotes: seriesNotes || null,
-        isOneOff, oneOffKind: isOneOff ? document.getElementById('lOneOffKind').value : null,
+        isOneOff, oneOffKind, becomingMakeup, makeupCreditFor,
       });
       return;
     }
@@ -2481,11 +2615,27 @@ async function saveLesson() {
     await generateOccurrences(lessonId, day, startDate, recurrence, count, endDate, frequency);
 
     // A one-off marked as a makeup shows amber on the schedule. Set it
-    // now rather than making the admin edit the lesson afterwards.
-    if (document.getElementById('lPattern').value === 'oneoff'
-        && document.getElementById('lOneOffKind').value === 'makeup') {
+    // now rather than making the admin edit the lesson afterwards, and
+    // — since this is a brand-new lesson — spend the credit it was
+    // booked against (the gate above already confirmed one exists).
+    if (isOneOff && oneOffKind === 'makeup') {
+      const { data: newOcc } = await db.from('lesson_occurrences')
+        .select('id').eq('lesson_id', lessonId).single();
       await db.from('lesson_occurrences')
         .update({ is_makeup: true }).eq('lesson_id', lessonId);
+
+      if (newOcc && makeupCreditFor) {
+        const { error: cErr } = await db.from('lesson_credit_movements').insert({
+          student_id:        makeupCreditFor,
+          delta:             -1,
+          reason:            'makeup_booked',
+          note:              'Makeup booked via Add Lesson',
+          occurrence_id:      newOcc.id,
+          initiated_by:       currentProfile.id,
+          initiated_by_role:  currentProfile.role,
+        });
+        if (cErr) showToast('Lesson created, but the credit could not be spent: ' + cErr.message, 'warning');
+      }
     }
 
     showToast('Lesson created successfully.', 'success');
@@ -2680,6 +2830,16 @@ async function openOccurrenceModal(occId) {
   }
 
   document.getElementById('occIsMakeup').checked = !!occ.is_makeup;
+  // Read by refreshOccMakeupCreditPicker() / saveOccurrence(), the same
+  // way lessonModal's wasMakeup dataset stops Add/Edit lesson from
+  // spending a second credit on a lesson that was already a makeup —
+  // this is the third place is_makeup can be set (ticking the box
+  // right here on the occurrence itself), which had no credit check
+  // at all until an admin noticed it working via Clone and Add Lesson
+  // but not this path (2 Oct 2026).
+  document.getElementById('occurrenceModal').dataset.wasMakeup = occ.is_makeup ? 'true' : 'false';
+  occModalStudentIds = sIds;
+  await refreshOccMakeupCreditPicker();
   renderSubstitutePicker(occ, l);
   await renderOccurrenceAttendance(occId, sIds, sNames);
 
@@ -2719,8 +2879,9 @@ function closeOccModal() { document.getElementById('occurrenceModal').classList.
 // clone is a fresh, unmarked occurrence for the admin to fill in.
 // ============================================================
 let cloneSourceOccId = null;
+let cloneStudentBalances = {}; // student_id -> current lesson-credit balance, for this modal's picker
 
-function openCloneModal() {
+async function openCloneModal() {
   const occId = document.getElementById('occId').value;
   const occ   = allOccurrences.find(o => o.id === occId);
   if (!occ) { showToast('Could not find this lesson to clone.', 'error'); return; }
@@ -2738,6 +2899,20 @@ function openCloneModal() {
     return s ? `${s.profile?.first_name ?? ''} ${s.profile?.last_name ?? ''}`.trim() : '—';
   });
   const isNonTeaching = sIds.length === 0 && l.lesson_type !== 'group';
+
+  // Live balance for whoever might be booked a makeup here, shown right
+  // in the picker so the admin can see it before choosing.
+  cloneStudentBalances = {};
+  if (sIds.length) {
+    const { data: balances } = await db.from('student_credit_balances')
+      .select('student_id,balance').in('student_id', sIds);
+    (balances ?? []).forEach(b => { cloneStudentBalances[b.student_id] = b.balance; });
+  }
+  const makeupSel = document.getElementById('cloneMakeupFor');
+  makeupSel.innerHTML = '<option value="">— Not a makeup —</option>' + sIds.map((sid, i) => {
+    const bal = cloneStudentBalances[sid] ?? 0;
+    return `<option value="${sid}">${sNames[i] ?? '—'} (${bal} credit${bal !== 1 ? 's' : ''})</option>`;
+  }).join('');
 
   document.getElementById('cloneSummary').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
@@ -2762,6 +2937,7 @@ function openCloneModal() {
 function closeCloneModal() {
   document.getElementById('cloneModal').classList.add('hidden');
   cloneSourceOccId = null;
+  cloneStudentBalances = {};
 }
 
 function showCloneClashError(msg) {
@@ -2860,6 +3036,18 @@ async function saveClone() {
     showToast('Please choose a new date and time.', 'error'); return;
   }
 
+  // ---- CREDIT CHECK: a makeup can only be booked against a balance ----
+  const makeupForSid = document.getElementById('cloneMakeupFor').value;
+  if (makeupForSid) {
+    const bal = cloneStudentBalances[makeupForSid] ?? 0;
+    if (bal <= 0) {
+      const student = allStudents.find(s => s.id === makeupForSid);
+      const name = student ? `${student.profile?.first_name ?? ''} ${student.profile?.last_name ?? ''}`.trim() : 'This student';
+      showCloneClashError(`${name} has no lesson credits available — cannot book a makeup.`);
+      return;
+    }
+  }
+
   const teacher    = allTeachers.find(t => t.id === l.teacher_id);
   const duration   = l.duration_mins ?? 30;
   const studentIds = occ.lessonStudents ?? [];
@@ -2917,10 +3105,29 @@ async function saveClone() {
       );
     }
 
-    const { error: oErr } = await db.from('lesson_occurrences').insert({
+    const { data: occData, error: oErr } = await db.from('lesson_occurrences').insert({
       lesson_id: newLessonId, date, status: 'scheduled',
-    });
+      is_makeup: !!makeupForSid,
+    }).select('id').single();
     if (oErr) throw new Error(oErr.message);
+
+    // Spend the credit against the NEW occurrence — that is the lesson
+    // it's actually paying for — once the clone has fully succeeded.
+    if (makeupForSid) {
+      const origDate = formatShortDate(parseLocalDate((occ.date ?? '').slice(0, 10)));
+      const { error: cErr } = await db.from('lesson_credit_movements').insert({
+        student_id:        makeupForSid,
+        delta:             -1,
+        reason:            'makeup_booked',
+        note:              `Makeup for lesson cancelled on ${origDate}`,
+        occurrence_id:      occData.id,
+        initiated_by:       currentProfile.id,
+        initiated_by_role:  currentProfile.role,
+      });
+      if (cErr) {
+        showToast('Lesson cloned, but the credit could not be spent: ' + cErr.message, 'warning');
+      }
+    }
 
     showToast('Lesson cloned to the new timeslot.', 'success');
     closeCloneModal();
@@ -2970,12 +3177,81 @@ async function removeStudentFromOccurrence(lessonId, studentId, occId) {
   openOccurrenceModal(occId);
 }
 
+// ============================================================
+// MAKEUP CREDIT PICKER — occurrence modal's own "This is a makeup
+// lesson" checkbox. A one-off booked via Add Lesson, then later
+// flagged as a makeup right here (rather than via Edit lesson), is
+// the same credit-consuming event as the other three paths and needs
+// the same gate — see LESSON CREDITS section further down.
+// ============================================================
+let occModalStudentIds = []; // this occurrence's roster, set by openOccurrenceModal()
+let occMakeupBalances  = {}; // student_id -> current balance, for this picker
+
+async function refreshOccMakeupCreditPicker() {
+  const checked   = document.getElementById('occIsMakeup').checked;
+  const wasMakeup = document.getElementById('occurrenceModal').dataset.wasMakeup === 'true';
+  const wrap = document.getElementById('occMakeupCreditWrap');
+  const hint = document.getElementById('occMakeupCreditHint');
+  const sel  = document.getElementById('occMakeupCreditFor');
+
+  if (!checked || wasMakeup) {
+    wrap.classList.add('hidden');
+    return;
+  }
+  wrap.classList.remove('hidden');
+
+  if (!occModalStudentIds.length) {
+    sel.innerHTML = '<option value="">— No student on this lesson —</option>';
+    hint.textContent = '';
+    occMakeupBalances = {};
+    return;
+  }
+
+  const { data: balRows } = await db.from('student_credit_balances')
+    .select('student_id,balance').in('student_id', occModalStudentIds);
+  occMakeupBalances = {};
+  (balRows ?? []).forEach(b => { occMakeupBalances[b.student_id] = b.balance; });
+
+  sel.innerHTML = occModalStudentIds.map(sid => {
+    const s    = allStudents.find(s => s.id === sid);
+    const name = s ? `${s.profile?.first_name ?? ''} ${s.profile?.last_name ?? ''}`.trim() : '—';
+    const bal  = occMakeupBalances[sid] ?? 0;
+    return `<option value="${sid}">${name} (${bal} credit${bal !== 1 ? 's' : ''})</option>`;
+  }).join('');
+  // Only one student on the lesson — pick them automatically.
+  if (occModalStudentIds.length === 1) sel.value = occModalStudentIds[0];
+  hint.textContent = 'Consumes one lesson credit from this student when saved.';
+}
+
 async function saveOccurrence() {
   const occId    = document.getElementById('occId').value;
   const isOnline = document.getElementById('occIsOnline').checked;
   const notes    = document.getElementById('occNotes').value.trim();
   const occ      = allOccurrences.find(o => o.id === occId);
   const wasOnline = occ?.is_online ?? false;
+
+  // ---- CREDIT CHECK: same rule as Add/Edit lesson and Clone — a
+  // makeup can only be booked against a balance, and re-saving an
+  // already-makeup occurrence (adding a note, say) never spends a
+  // second credit.
+  const wasMakeup      = document.getElementById('occurrenceModal').dataset.wasMakeup === 'true';
+  const nowMakeup       = document.getElementById('occIsMakeup').checked;
+  const becomingMakeup  = nowMakeup && !wasMakeup;
+  const makeupCreditFor = becomingMakeup ? document.getElementById('occMakeupCreditFor').value : null;
+
+  if (becomingMakeup) {
+    if (!makeupCreditFor) {
+      showToast('Please choose which student this makeup lesson credit belongs to.', 'error');
+      return;
+    }
+    const bal = occMakeupBalances[makeupCreditFor] ?? 0;
+    if (bal <= 0) {
+      const student = allStudents.find(s => s.id === makeupCreditFor);
+      const name = student ? `${student.profile?.first_name ?? ''} ${student.profile?.last_name ?? ''}`.trim() : 'This student';
+      showToast(`${name} has no lesson credits available — cannot mark as a makeup.`, 'error');
+      return;
+    }
+  }
 
   // A substitution belongs to this occurrence alone. Staff cover moves
   // the lesson into that teacher's schedule; an external name is
@@ -2997,6 +3273,22 @@ async function saveOccurrence() {
   }).eq('id', occId);
 
   if (error) { showToast('Error saving: ' + error.message, 'error'); return; }
+
+  // Spend the credit only now that the save has actually gone through —
+  // becomingMakeup was already worked out and validated above, so this
+  // never fires for a lesson that was already a makeup.
+  if (becomingMakeup && makeupCreditFor) {
+    const { error: cErr } = await db.from('lesson_credit_movements').insert({
+      student_id:        makeupCreditFor,
+      delta:             -1,
+      reason:            'makeup_booked',
+      note:              'Makeup booked via lesson occurrence',
+      occurrence_id:      occId,
+      initiated_by:       currentProfile.id,
+      initiated_by_role:  currentProfile.role,
+    });
+    if (cErr) showToast('Lesson updated, but the credit could not be spent: ' + cErr.message, 'warning');
+  }
 
   if (subSel && subSel !== '__external') {
     const t = allTeachers.find(x => x.id === subSel);
@@ -3097,6 +3389,13 @@ const ATT_MARK = {
   absent_no_credit:  { icon: '✕', colour: '#dc2626',        label: 'Absent — no credit' },
   absent_notice:     { icon: '✕', colour: '#dc2626',        label: 'Absent — notice given' },
   teacher_cancelled: { icon: '',  colour: 'var(--mid-grey)', label: 'Teacher cancelled' },
+};
+
+// The two attendance statuses that raise the lesson-credit question,
+// and what each maps to on the ledger (see offerCreditMovements()).
+const CREDIT_TRIGGER_STATUSES = {
+  absent_notice:     { reason: 'student_notice',    defaultNote: 'Student gave notice' },
+  teacher_cancelled: { reason: 'teacher_cancelled',  defaultNote: 'Teacher unavailable' },
 };
 
 // A name with its attendance shown: tick, cross, or struck through where
@@ -3259,6 +3558,12 @@ async function markAttendanceAsAdmin(occId, studentId, status) {
     if (error) { showToast('Could not clear that: ' + error.message, 'error'); return; }
     showToast('Attendance cleared.', 'success');
   } else {
+    // Needed to tell a genuine change into a credit-worthy status from
+    // a re-save of the same value — only the former should prompt.
+    const { data: existing } = await db.from('attendance')
+      .select('status').eq('lesson_occurrence_id', occId).eq('student_id', studentId).maybeSingle();
+    const previousStatus = existing?.status ?? null;
+
     const { error } = await db.from('attendance').upsert({
       lesson_occurrence_id: occId,
       student_id:           studentId,
@@ -3268,6 +3573,11 @@ async function markAttendanceAsAdmin(occId, studentId, status) {
     }, { onConflict: 'lesson_occurrence_id,student_id' });
     if (error) { showToast('Could not save: ' + error.message, 'error'); return; }
     showToast('Attendance recorded.', 'success');
+
+    const trigger = CREDIT_TRIGGER_STATUSES[status];
+    if (trigger && status !== previousStatus) {
+      await offerCreditMovements(occId, [studentId], trigger.reason, trigger.defaultNote);
+    }
   }
 
   // Redraw the summary, and refresh the grid so the unmarked count moves
@@ -3323,6 +3633,27 @@ async function saveSeriesEdit(lessonId, f) {
     await db.from('lesson_occurrences')
       .update({ is_makeup: f.oneOffKind === 'makeup' })
       .eq('lesson_id', lessonId);
+
+    // Only when this save is what's actually turning it INTO a makeup —
+    // saveLesson() already worked that out (f.becomingMakeup is false
+    // for a lesson that was already one, so re-saving it never spends
+    // a second credit).
+    if (f.becomingMakeup && f.makeupCreditFor) {
+      const { data: occRow } = await db.from('lesson_occurrences')
+        .select('id').eq('lesson_id', lessonId).single();
+      if (occRow) {
+        const { error: cErr } = await db.from('lesson_credit_movements').insert({
+          student_id:        f.makeupCreditFor,
+          delta:             -1,
+          reason:            'makeup_booked',
+          note:              'Makeup booked via Edit lesson',
+          occurrence_id:      occRow.id,
+          initiated_by:       currentProfile.id,
+          initiated_by_role:  currentProfile.role,
+        });
+        if (cErr) showToast('Lesson updated, but the credit could not be spent: ' + cErr.message, 'warning');
+      }
+    }
 
     showToast('Lesson updated.', 'success');
     closeLessonModal();
@@ -3458,6 +3789,10 @@ async function editSeriesInner() {
   // the notes actually saved on the lesson — so it runs first, then the
   // real notes are written back over whatever it guessed.
   document.getElementById('lPattern').value = isOneOff ? 'oneoff' : 'series';
+  // Read by refreshMakeupCreditPicker() / saveLesson() so re-saving a
+  // lesson that was ALREADY a makeup never spends a second credit —
+  // openLessonModal() (already called, above) defaults this to false.
+  document.getElementById('lessonModal').dataset.wasMakeup = wasMakeup ? 'true' : 'false';
   if (isOneOff) {
     const trialStudent = lessonStudents.some(sid =>
       allStudents.find(s => s.id === sid)?.status === 'trial');
@@ -3494,6 +3829,49 @@ async function editSeriesInner() {
   document.getElementById('editSeriesNote').classList.remove('hidden');
 }
 
+// ============================================================
+// LESSON CREDITS — offering to log one
+//
+// Shared by the single-occurrence cancel flow and per-student
+// attendance marking: the two places a lesson not happening,
+// through no fault of the student, should raise the question of
+// a credit. One native prompt covers the whole group at once
+// (asking per student would be tedious for a cancelled group
+// lesson) and doubles as the note field — clear the text and
+// press Cancel to skip logging anything.
+// ============================================================
+async function offerCreditMovements(occId, studentIds, reason, defaultNote) {
+  if (!studentIds || !studentIds.length) return;
+
+  const names = studentIds.map(sid => {
+    const s = allStudents.find(s => s.id === sid);
+    return s ? `${s.profile?.first_name ?? ''} ${s.profile?.last_name ?? ''}`.trim() : '—';
+  }).join(', ');
+
+  const note = prompt(
+    `Record a lesson credit for ${names}?\n\nAdd a note below, or clear the text and press Cancel to skip.`,
+    defaultNote ?? ''
+  );
+  if (note === null) return; // Cancel — no credit logged
+
+  const rows = studentIds.map(sid => ({
+    student_id:        sid,
+    delta:             1,
+    reason,
+    note:              note || null,
+    occurrence_id:     occId,
+    initiated_by:      currentProfile.id,
+    initiated_by_role: currentProfile.role,
+  }));
+
+  const { error } = await db.from('lesson_credit_movements').insert(rows);
+  if (error) {
+    showToast('Could not log the lesson credit: ' + error.message, 'warning');
+  } else {
+    showToast(`Logged ${rows.length} lesson credit${rows.length !== 1 ? 's' : ''}.`, 'success');
+  }
+}
+
 async function cancelOccurrence(scope) {
   const occId    = document.getElementById('occId').value;
   const lessonId = document.getElementById('occLessonId').value;
@@ -3512,6 +3890,25 @@ async function cancelOccurrence(scope) {
     // One-off: the series continues, so this shows with a red ✕
     await db.from('lesson_occurrences').update({ status: 'cancelled' }).eq('id', occId);
     showToast('Lesson occurrence cancelled.', 'success');
+
+    // A single-date cancellation is exactly the "teacher unavailable /
+    // public holiday" scenario a lesson credit is meant for. "Cancel
+    // this and all future" or "cancel the series" are for stopping
+    // lessons altogether (e.g. a student leaving) — those don't touch
+    // attendance or credits at all, only this one-off scope does.
+    const creditSids = occ?.lessonStudents ?? [];
+    if (creditSids.length) {
+      const attRows = creditSids.map(sid => ({
+        lesson_occurrence_id: occId,
+        student_id:           sid,
+        status:               'teacher_cancelled',
+        marked_by:            currentProfile.id,
+        marked_at:            new Date().toISOString(),
+      }));
+      await db.from('attendance').upsert(attRows, { onConflict: 'lesson_occurrence_id,student_id' });
+      const trigger = CREDIT_TRIGGER_STATUSES.teacher_cancelled;
+      await offerCreditMovements(occId, creditSids, trigger.reason, trigger.defaultNote);
+    }
 
   } else if (scope === 'future') {
     // (errors checked below)

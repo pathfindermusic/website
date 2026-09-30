@@ -877,6 +877,20 @@ no Deactivate button — it set a status and left the lessons running, so a
 "deactivated" student still appeared on their teacher's schedule. Ending an
 enrolment is a process, not a flag.
 
+**Closing an "End enrolment — [name]" task is what starts the checklist**,
+in `tasks.html`'s `setStatus()` — not `planEndEnrolment()` itself, which only
+creates that task, due whenever the admin says the enrolment should end. The
+task's title prefix and the student's current `active` status are how
+`setStatus()` recognises it; closing it pops a `confirm()` ("Start the
+end-enrolment checklist? This sends the farewell email.") before calling
+`startProcess()`, since the farewell email goes out immediately at that
+point — not once the checklist is later completed. Declining that confirm
+leaves the task open rather than completing it: it used to fall through to
+the ordinary "mark done" path, so declining silently ticked the task with no
+checklist ever started and no email sent — indistinguishable, later, from
+never having closed it at all. Reported 30 Sep 2026: an admin testing the
+flow clicked past the popup and the task just showed as done.
+
 **Nothing with history gets deleted.** Student and teacher deletion were both
 removed — they were built as ordinary CRUD in Phase 2, before the lifecycle
 existed, and by the time it did they were stale as well as destructive. Student
@@ -1173,6 +1187,111 @@ and `enquiries.html` instead render it from a small `item()`/`it()` helper
 and an `ICONS`/`I` lookup object. Adding "Day Sheet" meant touching both
 shapes — 11 files got a pasted `<a class="nav-item">` block, 2 got a new
 icon-object entry plus one `item(...)` call. Any future nav item needs both.
+
+## Lesson credits (Sep 2026) — a ledger, not a counter
+
+A per-student record of lesson credits: a student banks one when a lesson
+doesn't happen through no fault of their own, and spends one booking a
+makeup. Requested piecemeal by the admins, one decision at a time — the
+answers baked into this build:
+
+- **1 credit = 1 missed lesson**, flat, regardless of duration or
+  private/group. No value-weighting.
+- **Only a single-date cancellation prompts for a credit.** "Cancel this and
+  all future" or "cancel the series" are for stopping lessons altogether
+  (a student leaving, say) — they don't touch attendance or credits.
+- **A makeup is always for one student**, even when cloned from a group
+  lesson's roster. The other students on the clone aren't touched.
+- **Admin/superuser visibility only**, for now — no student/parent-facing
+  balance anywhere yet.
+
+`portal/supabase/lesson-credits.sql` adds `lesson_credit_movements` — an
+append-only ledger (`student_id`, `delta`, `reason`, `note`, `occurrence_id`,
+`initiated_by`, `initiated_by_role`, `created_at`), deliberately **not** a
+running balance column on `students`. A balance is `SUM(delta)` for a
+student, exposed as the `student_credit_balances` view (balance, last
+movement date, last movement note/reason) — the same "compute state from
+history" approach `schedule_view`'s `fully_marked` already uses, rather than
+a cached counter that can drift from the events that produced it. There is
+**no UPDATE/DELETE policy** on the ledger, on purpose: a mistaken credit is
+corrected with an offsetting `manual_adjustment` row, never by editing or
+deleting the original.
+
+`my_teaching_student_ids()` (SECURITY DEFINER STABLE, same pattern as
+`my_owned_occurrence_ids()` and `my_covered_student_ids()`) is what a
+teacher's RLS policies check against — their own roster merged with
+anything they're covering as a substitute. A teacher can read and log
+movements only for those students; admin/superuser can do both for anyone.
+
+**Three trigger points**, all sharing one `offerCreditMovements()` helper
+(duplicated once per file — `lessons.html` and `dashboard-teacher.html`
+don't share a JS module) that shows a single native `prompt()` covering
+every affected student at once, doubling as the note field — clearing the
+text and pressing Cancel skips logging anything:
+
+1. **Cancelling a single occurrence** (`cancelOccurrence('single')` in
+   `lessons.html`) now also writes a `teacher_cancelled` attendance row per
+   roster student (matching what marking a whole group "Teacher Cancelled"
+   already does), then offers the credit.
+2. **Per-student attendance marking** — admin's dropdown
+   (`markAttendanceAsAdmin`), the teacher's single-lesson dropdown
+   (`markAttendance`), and the teacher's group-attendance modal
+   (`saveGroupAttendance`) — offers the credit whenever a student's status
+   is newly set (an actual change, not a re-save of the same value) to
+   `absent_notice` or `teacher_cancelled`. Correcting a status away from one
+   of these later does **not** auto-reverse the credit — that's a case for
+   a manual adjustment, not a silent behind-the-scenes reversal.
+3. **Booking a makeup** — there are four separate places a lesson gets
+   flagged `is_makeup`, and all four now carry the same gate:
+   - The "Clone occurrence" modal's "Book as a makeup for [student]"
+     picker, showing each roster student's live balance.
+   - **Add Lesson**, choosing pattern "One-off" and kind "Makeup lesson" —
+     a completely separate creation path from Clone that used to just set
+     `is_makeup` with no credit involved at all (a gap the admins caught
+     by asking "will this work the same way?" — it didn't, until this).
+     Gained the same "Consume a lesson credit from [student]" picker,
+     shown only for that kind.
+   - **Edit lesson**, changing an existing one-off's kind to "Makeup" —
+     same picker, same gate.
+   - **The occurrence modal's own "This is a makeup lesson" checkbox** —
+     opened by clicking directly on a lesson block on the schedule,
+     distinct from "Edit lesson"/"Edit series". This one had zero credit
+     awareness at all until an admin found it by testing: an ad-hoc
+     one-off booked via Add Lesson, then flagged as a makeup here instead
+     of through Edit lesson, spent no credit and showed no picker (2 Oct
+     2026). Gained the same "Consume a lesson credit from [student]"
+     picker, shown only when the checkbox is newly ticked.
+
+   All four block the save at a zero balance, and all four spend the
+   credit only once: a dataset flag named `wasMakeup` — on `lessonModal`
+   for Add/Edit lesson (set by `editSeriesInner()` when opening an
+   already-makeup lesson to edit), and on `occurrenceModal` for the
+   checkbox (set by `openOccurrenceModal()` from the occurrence's current
+   `is_makeup`) — is what stops re-saving one, moving its time or adding a
+   note, say, from silently charging a second credit. Only Clone links to
+   an *existing* roster the way a real makeup does; the other three pick
+   the credited student from whoever is already on the lesson/occurrence,
+   since they build or already show their own roster independently of any
+   cancelled lesson. None of the four auto-refunds a credit if the
+   checkbox or kind is later un-ticked — that's a manual adjustment, same
+   as correcting an attendance status (point 2, above).
+
+`credits.html` is the on-demand report (Reports section, admin/superuser
+only, same `requireAuth` as Attendance): students with a non-zero balance
+by default, a "show all" toggle, a click-through history modal per student,
+and a manual "+ Add adjustment" action for anything outside the three
+triggers above. Its nav link went into all 14 other admin-facing pages the
+same two ways Day Sheet's did — pasted `<a class="nav-item">` in the 12
+static-sidebar files, plus an `ICONS`/`I` entry and one more `item()`/`it()`
+call in `tasks.html` and `enquiries.html`.
+
+**Known gap, flagged rather than silently patched over:** makeup booking via
+"Clone" has never been structurally linked to the occurrence it replaces —
+it's a fresh one-off lesson with a note in `series_notes` ("Cloned from
+..."), same as before this feature. The credit ledger's `occurrence_id`
+records the *new* occurrence a credit was spent on, not a formal link back
+to whichever cancellation banked it in the first place. Good enough for the
+report as specified; revisit if the two ever need to be queried together.
 
 ## How-To Guide (Sep 2026) — documentation for the parallel run with Zoho/MMS
 
@@ -1607,6 +1726,8 @@ Run in order. All are re-runnable.
 36. `attendance-owner-check-perf-fix.sql` — `my_owned_occurrence_ids()`,
     replaces the slow inline subquery in "Teacher marks attendance for own
     lessons" (see Row Level Security section above)
+37. `lesson-credits.sql` — `lesson_credit_movements`, `student_credit_balances`
+    view, `my_teaching_student_ids()` (see Lesson credits section above)
 
 *(Several migrations applied between 27 and 35 — schedule performance
 indexes, BoK grading, fortnightly lessons, recurring tasks, and others —

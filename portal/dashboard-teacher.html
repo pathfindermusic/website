@@ -743,15 +743,73 @@ async function loadSchedule() {
   </div></div>`;
 }
 
+// ---- Lesson credits ----
+// The two attendance statuses that raise the lesson-credit question,
+// and what each maps to on the ledger.
+const CREDIT_TRIGGER_STATUSES = {
+  absent_notice:     { reason: 'student_notice',   defaultNote: 'Student gave notice' },
+  teacher_cancelled: { reason: 'teacher_cancelled', defaultNote: 'Teacher unavailable' },
+};
+
+// Offers to log a lesson credit for one or more students against an
+// occurrence. One native prompt covers the whole group at once and
+// doubles as the note field — clear the text and press Cancel to
+// skip logging anything. `studentsForNames` is the same {id,name}
+// list `scheduleRows[].students` already carries.
+async function offerCreditMovements(occId, studentIds, reason, defaultNote, studentsForNames) {
+  if (!studentIds || !studentIds.length) return;
+
+  const names = studentIds.map(sid => {
+    const s = (studentsForNames ?? []).find(x => x.id === sid);
+    return s?.name ?? '—';
+  }).join(', ');
+
+  const note = prompt(
+    `Record a lesson credit for ${names}?\n\nAdd a note below, or clear the text and press Cancel to skip.`,
+    defaultNote ?? ''
+  );
+  if (note === null) return; // Cancel — no credit logged
+
+  const rows = studentIds.map(sid => ({
+    student_id:        sid,
+    delta:             1,
+    reason,
+    note:              note || null,
+    occurrence_id:     occId,
+    initiated_by:      currentProfile.id,
+    initiated_by_role: currentProfile.role,
+  }));
+
+  const { error } = await db.from('lesson_credit_movements').insert(rows);
+  if (error) {
+    showToast('Could not log the lesson credit: ' + error.message, 'warning');
+  } else {
+    showToast(`Logged ${rows.length} lesson credit${rows.length !== 1 ? 's' : ''}.`, 'success');
+  }
+}
+
 // ---- Mark attendance ----
 async function markAttendance(occurrenceId, studentId, status) {
   if (!status) return;
   if (!studentId) { showToast('Could not identify the student. Please refresh.', 'error'); return; }
 
+  // Needed to tell a genuine change into a credit-worthy status from
+  // a re-save of the same value — only the former should prompt.
+  const { data: existing } = await db.from('attendance')
+    .select('status').eq('lesson_occurrence_id', occurrenceId).eq('student_id', studentId).maybeSingle();
+  const previousStatus = existing?.status ?? null;
+
   const { error } = await saveAttendanceRow(occurrenceId, studentId, status);
   if (error) { showToast('Could not save attendance. Please try again.', 'error'); return; }
 
   showToast('Attendance saved.', 'success');
+
+  const trigger = CREDIT_TRIGGER_STATUSES[status];
+  if (trigger && status !== previousStatus) {
+    const row = scheduleRows.find(r => r.occurrence_id === occurrenceId);
+    await offerCreditMovements(occurrenceId, [studentId], trigger.reason, trigger.defaultNote, row?.students);
+  }
+
   await syncOccurrenceStatus(occurrenceId);
   await Promise.all([loadSchedule(), loadStats(), loadMyTasks()]);
 }
@@ -830,7 +888,7 @@ async function openGroupAttendance(occurrenceId) {
     const cur = byStudent[s.id] ?? '';
     return `<div style="display:grid;grid-template-columns:1fr auto;gap:0.75rem;align-items:center;padding:0.55rem 0;border-bottom:1px solid var(--border);">
       <div style="font-size:0.9rem;font-weight:500;color:var(--charcoal);">${s.name}</div>
-      <select class="att-select ga-select" data-student="${s.id}">
+      <select class="att-select ga-select" data-student="${s.id}" data-original="${cur}">
         ${opts.map(([v, label]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${label}</option>`).join('')}
       </select>
     </div>`;
@@ -851,10 +909,18 @@ async function saveGroupAttendance() {
   btn.disabled = true;
 
   let saved = 0, failed = 0;
+  // Grouped by attendance status so a group lesson with several
+  // newly-cancelled students raises one credit prompt for all of
+  // them, not one per student.
+  const creditCandidates = {}; // status -> [studentIds]
   for (const sel of [...document.querySelectorAll('.ga-select')]) {
     if (!sel.value) continue;   // left unmarked
     const { error } = await saveAttendanceRow(groupAttOccurrenceId, sel.dataset.student, sel.value);
-    if (error) failed++; else saved++;
+    if (error) { failed++; continue; }
+    saved++;
+    if (CREDIT_TRIGGER_STATUSES[sel.value] && sel.value !== sel.dataset.original) {
+      (creditCandidates[sel.value] ??= []).push(sel.dataset.student);
+    }
   }
 
   btn.textContent = 'Save attendance';
@@ -870,6 +936,12 @@ async function saveGroupAttendance() {
   }
 
   const occId = groupAttOccurrenceId;
+  const row   = scheduleRows.find(r => r.occurrence_id === occId);
+  for (const [status, sids] of Object.entries(creditCandidates)) {
+    const trigger = CREDIT_TRIGGER_STATUSES[status];
+    await offerCreditMovements(occId, sids, trigger.reason, trigger.defaultNote, row?.students);
+  }
+
   closeGroupAttendance();
   await syncOccurrenceStatus(occId);
   await Promise.all([loadSchedule(), loadStats(), loadMyTasks()]);

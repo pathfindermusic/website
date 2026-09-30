@@ -566,6 +566,7 @@ function renderSidebar() {
     book:    '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
     list:    '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
     help:    '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+    ticket:  '<path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/>',
   };
 
   let html = '';
@@ -592,6 +593,7 @@ function renderSidebar() {
       ${item('bok-artefacts.html','Artefact Library',ICONS.book)}
       <div class="sidebar-section">Reports</div>
       ${item('attendance-report.html','Attendance',ICONS.check)}
+      ${item('credits.html','Credits',ICONS.ticket)}
       ${item('distribution-lists.html','Distribution Lists',ICONS.list)}`;
     if (me.role === 'superuser') {
       html += `<div class="sidebar-section">Super User</div>
@@ -1569,6 +1571,14 @@ async function setStatus(id, status) {
           return;
         }
       }
+      // Declined — leave the task open rather than silently marking it
+      // done with no checklist ever started and no farewell email sent.
+      // Falling through to the generic completion below used to do
+      // exactly that: an admin testing this out clicked Cancel on the
+      // popup, the task just ticked as done, and nothing else happened
+      // (reported 30 Sep 2026).
+      showToast('Not started — the task is still open.', 'warning');
+      return;
     }
   }
 
