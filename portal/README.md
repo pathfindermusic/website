@@ -246,11 +246,28 @@ the previous day in AEST, and silently shifts lessons a day earlier. Use
 directly. `toISODate()` builds from local date parts for the same reason.
 This caused a real bug where Wednesday lessons appeared on Thursday.
 
+**A student's name lives on `students.first_name`/`last_name`, not
+`profiles`.** (Phase 10, Oct 2026.) It used to live only on `profiles`, keyed
+by `students.user_id` — fine while every student had their own login, but
+siblings sharing one family login (see "Shared family logins" below) also
+share that one profile, so every page reading a name via the profile showed
+the same name for all of them, and editing one changed it for every sibling
+on that login. `profiles` is now the *login's* identity only (used for
+Reset PW and the one place a shared login sees itself — the top nav, which
+shows "`{{last_name}} family`" for a student role rather than one child's
+name). Every student-facing name read or write — the students list, lessons,
+teacher dashboards, notifications, task subjects, `send-email.js` — now goes
+through the student's own columns, falling back to the profile only for a
+record that somehow has neither. New student records (enquiry intake, Add
+Student, CSV import) set both columns going forward.
+
 ### Views
 
 - **`schedule_view`** — one row per occurrence. Admin and teacher dashboards.
   Exposes `student_count`, `attendance_marked_count`, `fully_marked`.
   `attendance_status` is only meaningful for single-student lessons.
+  `student_name` (private lessons only) prefers `students.first_name`/
+  `last_name` over the shared profile (phase 11, Oct 2026).
 - **`student_schedule_view`** — one row per (occurrence × student), so students
   can filter by `student_id` and group lessons appear for every member.
 
@@ -342,6 +359,83 @@ completely unaffected and exactly as fast as before. When needed, lookups
 run with bounded concurrency (`mapLimit`, 15 at a time) rather than one at
 a time, to keep a few hundred recipients from approaching the function's
 execution time limit.
+
+**`students.email` having a value is not proof a real login exists (fixed
+1 Oct 2026).** A website enquiry (`receive-enquiry.js`) writes the
+submitted address straight into `students.email` at intake — functionally
+the parent's address, for a minor — with a freshly minted `user_id` that
+was never passed to Supabase Auth at all (`profiles.id` has no foreign key
+to `auth.users`, which is what allows an enquiry to exist with no login).
+Converting that enquiry through to an active enrolment never touches
+`email`/`parent_email` — `startProcess()` only updates `status`. So a
+student can go all the way from website enquiry to fully active with
+`students.email` genuinely populated the whole time, yet no real
+`auth.users` row ever created for her.
+
+Two places assumed `students.email` truthy meant "has a login" and were
+wrong for exactly this student:
+- The Students list's Add login/Reset PW button (`renderStudents()`) —
+  showed "Reset PW" for her, which would have tried to reset a password
+  for an account that doesn't exist. Now checks `authUserIds.has(s.user_id)`
+  — a `Set` of every real `auth.users` id, bulk-fetched once per
+  `loadStudents()` via a new `list-user-ids` action on `create-user.js`
+  (ids only, no emails — one admin-API list call for the whole page,
+  instead of one per student).
+- The student modal's Email Address field (`openStudentModal()`) — used
+  to fetch from `auth.users` via `create-user.js`'s `get-email` action
+  instead of reading `students.email` directly, so it showed blank for
+  this exact student: no login existed, so the lookup found nothing,
+  while the real address sat untouched in the column underneath the whole
+  time. Now reads `student.email` directly (synchronous, no network call)
+  and shows login status as a separate, informational hint alongside it.
+  Saving this field only ever writes that one column either way — editing
+  or adding an email here, on an *existing* student, has never created or
+  touched a login; "Add login" is a fully separate, manual, admin-chosen
+  action. (The one place typing an email *does* auto-create a login is
+  the **Add Student** form, for a brand-new record — `saveStudent()`'s
+  `!editId` branch calls `create-user.js` directly when `email` is set.
+  An *existing* student's Edit form never does.)
+
+**Ongoing enrolment now creates its own portal login, and the "You're
+enrolled" email links straight to it (Oct 2026).** Previously an admin had
+to click "Add login" by hand for every converted student, then separately
+tell them their temp password — a step easy to forget precisely because
+nothing else in the flow depends on it. `ensureLoginForEnrolment()` in
+`processes.js` runs inside `maybeSendConfirmation()`, right before the
+enrolment email is built (never for a trial): if the student already has a
+real login it does nothing; otherwise it tries `students.email ||
+students.parent_email` against `create-user.js`'s `create` action, the same
+call `addLogin()` makes by hand, and on success re-points `user_id` at the
+new auth id exactly as `addLogin()` does.
+
+**No temp password is ever emailed.** The email instead carries
+`{{portal_link}}` — the one-time Supabase recovery link already built for
+the Portal-launch announcement (`generatePortalLink()` in `send-email.js`;
+see that section above) — resolved fresh at send time from the `user_id`
+`ensureLoginForEnrolment()` just set. The student clicks it, lands on
+`change-password.html`, sets their own password; nothing sensitive is
+generated, stored or transmitted in plaintext. `maybeSendConfirmation()`
+only swaps in the `{{portal_link}}` sentence when login creation actually
+succeeded (`hasPortalLink`); otherwise the email keeps today's generic "you'll
+receive a link to log in shortly" wording, so a hiccup here degrades
+gracefully instead of silently dropping the recipient — `send-email.js`
+excludes anyone it can't resolve a portal link for *entirely* from a send
+that asks for one, which is exactly right for a bulk blast but would be
+wrong for a single enrolment confirmation.
+
+**Deliberately does not touch the shared-family-login case.** ~5% of
+students share one login across siblings, set up today by leaving every
+sibling but one's `students.email` blank — that case simply has no
+candidate address here and is left alone, same as always. The rarer case —
+two siblings each entered through their own separate website enquiry,
+naming the same parent email — hits `create-user.js`'s existing "already
+registered" (`existed: true`) the moment the second one tries to
+auto-create a login; `ensureLoginForEnrolment()` treats that as the
+expected shared-login situation, not an error, and leaves that student's
+record untouched rather than guessing at a fix. Raised and decided
+explicitly (1 Oct 2026): auto-linking siblings on that collision was
+considered and rejected in favour of leaving it exactly as admins already
+handle it by hand.
 
 The **"All active students — every studio"** audience in Notifications
 (`mode: 'all'`) already existed server-side — `distribution-lists.html`
@@ -1728,6 +1822,10 @@ Run in order. All are re-runnable.
     lessons" (see Row Level Security section above)
 37. `lesson-credits.sql` — `lesson_credit_movements`, `student_credit_balances`
     view, `my_teaching_student_ids()` (see Lesson credits section above)
+38. `phase10-student-own-name.sql` — `students.first_name`/`last_name`, backfilled
+    (see "A student's name now lives on `students`, not `profiles`" below)
+39. `phase11-schedule-view-own-student-name.sql` — `schedule_view` rebuilt to use
+    the new columns
 
 *(Several migrations applied between 27 and 35 — schedule performance
 indexes, BoK grading, fortnightly lessons, recurring tasks, and others —
@@ -1838,3 +1936,39 @@ stays the main thing on a normal day.
 unmanageable there. Password reset links always point at production, because
 the redirect is hardcoded in `create-user.js` — they still work from local
 development, they just land on the production page.
+
+**Siblings sharing a login all showed the same name, and editing one renamed
+them all (fixed 1 Oct 2026).** Surfaced the day after the sibling-login
+consolidation (see "Shared family logins" above) linked several families'
+students onto one shared login each: an admin noticed a family of three all
+displaying as "Nainika Sinha" in the students list, a teacher's two students
+looking like one, and two lessons showing the same student name. Root cause:
+`students` had no name of its own — every page read `first_name`/`last_name`
+from `profiles` via `user_id`, which is also the shared login's own single
+profile row. Siblings on the same login therefore all resolved to whichever
+name happened to be on that one profile, and the edit form wrote a new name
+straight onto it, overwriting every sibling at once.
+
+Fixed by giving `students` its own `first_name`/`last_name`
+(`phase10-student-own-name.sql`), backfilled from each student's then-current
+profile — correct for everyone except the 22 students who'd just been
+relinked onto a sibling's login, whose individual name had already been
+deleted along with their old placeholder profile. Those 22 were restored from
+the relink script's own record of who was who, not from any live data (it had
+already been overwritten). Every student-facing read/write that used to go
+through `profiles` was then switched to the student's own columns: the
+students list and edit form, `lessons.html`, `dashboard-teacher.html`,
+`my-students.html`, `teacher-detail.html`, `attendance-report.html`,
+`credits.html`, `enquiries.html`, `tasks.html`, `processes.js` (automatic
+tasks and lifecycle emails), and `send-email.js` (so notifications — including
+the Sunday portal-launch send — greet the right child, not the login's).
+`schedule_view.student_name` had the same bug baked into the SQL view itself
+(`phase11-schedule-view-own-student-name.sql`). The one deliberate exception:
+the shared login's own top-nav identity (`supabase-client.js`) shows
+"`{{last_name}} family`" for a student role rather than privileging whichever
+sibling first registered.
+
+**Student creation now sets `students.first_name`/`last_name` directly** —
+`receive-enquiry.js`, the Enquiries page's manual-add form, and the Add
+Student and CSV-import paths in `students.html` all write both now, so this
+can't regress by a new student record going through the old, profile-only path.

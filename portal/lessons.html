@@ -1011,14 +1011,25 @@ async function loadTeachers() {
 
 async function loadStudents() {
   const { data: sData } = await db.from('students')
-    .select('id,user_id,status').in('status', ['active','trial']);
+    .select('id,user_id,status,first_name,last_name').in('status', ['active','trial']);
   const userIds = (sData ?? []).map(s => s.user_id);
   const { data: pData } = userIds.length > 0
     ? await db.from('profiles').select('id,first_name,last_name').in('id', userIds)
     : { data: [] };
   const pMap = {};
   (pData ?? []).forEach(p => { pMap[p.id] = p; });
-  allStudents = (sData ?? []).map(s => ({ ...s, profile: pMap[s.user_id] ?? null }));
+  // A student's own name (students.first_name/last_name) is the source of
+  // truth — siblings sharing a login would otherwise all resolve to
+  // whichever name is on the shared profiles row (phase 10, Oct 2026).
+  // Merged into `.profile` so every existing `s.profile?.first_name` read
+  // below picks it up without needing its own change.
+  allStudents = (sData ?? []).map(s => {
+    const base = pMap[s.user_id] ?? null;
+    const profile = (s.first_name || s.last_name)
+      ? { ...base, first_name: s.first_name ?? base?.first_name, last_name: s.last_name ?? base?.last_name }
+      : base;
+    return { ...s, profile };
+  });
 
   const filterSel = document.getElementById('filterStudent');
   if (filterSel) {
@@ -1353,7 +1364,7 @@ async function loadDailyView() {
   // Build student name map
   const studentIds = [...new Set((lsData ?? []).map(ls => ls.student_id))];
   const { data: spData } = studentIds.length > 0
-    ? await db.from('students').select('id,user_id').in('id', studentIds)
+    ? await db.from('students').select('id,user_id,first_name,last_name').in('id', studentIds)
     : { data: [] };
   const spUserIds = (spData ?? []).map(s => s.user_id);
   const { data: spProfiles } = spUserIds.length > 0
@@ -1361,6 +1372,12 @@ async function loadDailyView() {
     : { data: [] };
   const spMap = {};
   (spData ?? []).forEach(s => {
+    // Student's own name first — see phase 10 (Oct 2026) on why the
+    // shared login's profile can't be trusted once siblings share one.
+    if (s.first_name || s.last_name) {
+      spMap[s.id] = `${s.first_name ?? ''} ${s.last_name ?? ''}`.trim();
+      return;
+    }
     const p = (spProfiles ?? []).find(p => p.id === s.user_id);
     if (p) spMap[s.id] = `${p.first_name} ${p.last_name}`.trim();
   });
@@ -1792,7 +1809,7 @@ async function loadWeeklyView() {
   // Student name map
   const studentIds = [...new Set((lsData ?? []).map(ls => ls.student_id))];
   const { data: spData } = studentIds.length > 0
-    ? await db.from('students').select('id,user_id').in('id', studentIds)
+    ? await db.from('students').select('id,user_id,first_name,last_name').in('id', studentIds)
     : { data: [] };
   const spUserIds = (spData ?? []).map(s => s.user_id);
   const { data: spProfiles } = spUserIds.length > 0
@@ -1800,6 +1817,12 @@ async function loadWeeklyView() {
     : { data: [] };
   const spMap = {};
   (spData ?? []).forEach(s => {
+    // Student's own name first — see phase 10 (Oct 2026) on why the
+    // shared login's profile can't be trusted once siblings share one.
+    if (s.first_name || s.last_name) {
+      spMap[s.id] = `${s.first_name ?? ''} ${s.last_name ?? ''}`.trim();
+      return;
+    }
     const p = (spProfiles ?? []).find(p => p.id === s.user_id);
     if (p) spMap[s.id] = `${p.first_name} ${p.last_name}`.trim();
   });
@@ -4067,7 +4090,7 @@ async function previewAgenda() {
 
   const studentIds = [...new Set((lsData ?? []).map(ls => ls.student_id))];
   const { data: spData } = studentIds.length > 0
-    ? await db.from('students').select('id,user_id').in('id', studentIds)
+    ? await db.from('students').select('id,user_id,first_name,last_name').in('id', studentIds)
     : { data: [] };
   const spUserIds = (spData ?? []).map(s => s.user_id);
   const { data: spProfiles } = spUserIds.length > 0
@@ -4075,6 +4098,12 @@ async function previewAgenda() {
     : { data: [] };
   const spMap = {};
   (spData ?? []).forEach(s => {
+    // Student's own name first — see phase 10 (Oct 2026) on why the
+    // shared login's profile can't be trusted once siblings share one.
+    if (s.first_name || s.last_name) {
+      spMap[s.id] = `${s.first_name ?? ''} ${s.last_name ?? ''}`.trim();
+      return;
+    }
     const p = (spProfiles ?? []).find(p => p.id === s.user_id);
     if (p) spMap[s.id] = `${p.first_name} ${p.last_name}`.trim();
   });

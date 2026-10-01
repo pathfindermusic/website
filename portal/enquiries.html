@@ -322,7 +322,7 @@ async function loadEnquiries() {
   // Converted enquiries are students now, but they belong in the history
   // of this page — otherwise it only ever shows the ones that failed.
   const { data: rows, error } = await db.from('students')
-    .select('id,user_id,status,studio_id,email,parent_name,enquiry_notes,enquiry_date,enquiry_source,lapsed_reason')
+    .select('id,user_id,status,studio_id,email,parent_name,enquiry_notes,enquiry_date,enquiry_source,lapsed_reason,first_name,last_name')
     .not('enquiry_date', 'is', null)
     .order('enquiry_date', { ascending: false });
 
@@ -373,8 +373,13 @@ async function loadEnquiries() {
     const t = taskMap[r.id];
     return {
       ...r,
-      first_name: p.first_name ?? '',
-      last_name:  p.last_name  ?? '',
+      // The student's own name (students.first_name/last_name) is the
+      // source of truth once converted — a login shared with a sibling
+      // would otherwise show that sibling's name here (phase 10, Oct 2026).
+      // A still-prospective enquiry has no student-level name yet, so it
+      // falls back to the profile created at intake.
+      first_name: r.first_name ?? p.first_name ?? '',
+      last_name:  r.last_name  ?? p.last_name  ?? '',
       phone:      p.phone      ?? '',
       instruments: instMap[r.id] ?? [],
       task:        t ?? null,
@@ -506,7 +511,8 @@ async function saveEnquiry() {
 
     const { data: sData, error: sErr } = await db.from('students').insert({
       user_id: userId, status: 'prospective', studio_id: studio,
-      email, parent_name: document.getElementById('aParent').value.trim() || null,
+      email, first_name: first, last_name: last,
+      parent_name: document.getElementById('aParent').value.trim() || null,
       enquiry_notes:  document.getElementById('aNotes').value.trim() || null,
       enquiry_date:   date,
       enquiry_source: document.getElementById('aSource').value,

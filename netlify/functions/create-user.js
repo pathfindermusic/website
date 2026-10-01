@@ -48,6 +48,35 @@ exports.handler = async (event) => {
     }
   }
 
+  // ---- LIST USER IDS (bulk "does a real login exist" check) ----
+  // Returns every auth.users id and nothing else — no emails, no other
+  // PII. students.html calls this once per page load so it can decide
+  // Add login vs Reset PW for every row in one round trip, rather than
+  // one admin-API call per student. students.email is NOT proof a real
+  // login exists — a website enquiry (receive-enquiry.js) fills that
+  // column in at intake, long before anyone creates a portal account —
+  // so the row-level decision has to be checked against auth.users
+  // directly. Same single-page (per_page=1000) ceiling as the existing
+  // duplicate-check below; fine while the studio has well under 1000
+  // accounts, worth paginating if that ever changes.
+  if (action === 'list-user-ids') {
+    try {
+      const res  = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=1000`, { headers });
+      const data = await res.json();
+      if (!res.ok) {
+        return { statusCode: 400, headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: data?.message ?? 'Could not list users' }) };
+      }
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: (data?.users ?? []).map(u => u.id) }),
+      };
+    } catch (err) {
+      return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+    }
+  }
+
   // ---- DELETE USER ----
   if (action === 'delete-user') {
     const { userId } = body;

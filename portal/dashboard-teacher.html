@@ -537,7 +537,7 @@ async function attachStudentNames(rows) {
   const sIds = [...new Set((ls ?? []).map(r => r.student_id))];
   if (sIds.length === 0) return;
 
-  const { data: sData } = await db.from('students').select('id,user_id').in('id', sIds);
+  const { data: sData } = await db.from('students').select('id,user_id,first_name,last_name').in('id', sIds);
   const uIds = (sData ?? []).map(s => s.user_id).filter(Boolean);
   const { data: pData } = uIds.length
     ? await db.from('profiles').select('id,first_name,last_name').in('id', uIds)
@@ -545,8 +545,13 @@ async function attachStudentNames(rows) {
   const pMap = {};
   (pData ?? []).forEach(p => { pMap[p.id] = p; });
 
+  // A student's own name (students.first_name/last_name) is the source of
+  // truth — siblings sharing a login would otherwise all show whichever
+  // name is on the shared profiles row (phase 10, Oct 2026).
   const nameById = {};
   (sData ?? []).forEach(s => {
+    const own = `${s.first_name ?? ''} ${s.last_name ?? ''}`.trim();
+    if (own) { nameById[s.id] = own; return; }
     const p = pMap[s.user_id];
     if (p) nameById[s.id] = `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim();
   });

@@ -140,6 +140,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({
         user_id: userId, status: 'prospective', studio_id: studioId,
         email, parent_name: parent || null,
+        first_name: firstName, last_name: lastName,
         enquiry_notes: notes || null,
         enquiry_date: new Date().toISOString().slice(0, 10),
         enquiry_source: 'website',

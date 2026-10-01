@@ -334,7 +334,7 @@ async function loadStudents() {
   // Student records, profiles, recorded skill levels and (for graded
   // instruments) current grades
   const [sRes, siRes, cgRes] = await Promise.all([
-    db.from('students').select('id,user_id,status').in('id', studentIds),
+    db.from('students').select('id,user_id,status,first_name,last_name').in('id', studentIds),
     db.from('student_instruments').select('student_id,instrument,skill_level').in('student_id', studentIds),
     db.from('student_current_grades').select('student_id,instrument,grade_level_id,tier,label,sort_order').in('student_id', studentIds),
   ]);
@@ -355,14 +355,23 @@ async function loadStudents() {
     siMap[r.student_id].push(r);
   });
 
-  const students = (sRes.data ?? []).map(s => ({
-    id:                  s.id,
-    status:              s.status,
-    profiles:            pMap[s.user_id] ?? {},
-    myInstruments:       [...(instByStudent[s.id] ?? [])],
-    student_instruments: siMap[s.id] ?? [],
-    grades:              gradeMap[s.id] ?? {},
-  })).sort((a, b) =>
+  // A student's own name (students.first_name/last_name) is the source of
+  // truth — siblings sharing a login would otherwise all show whichever
+  // name is on the shared profiles row (phase 10, Oct 2026).
+  const students = (sRes.data ?? []).map(s => {
+    const base = pMap[s.user_id] ?? {};
+    const profiles = (s.first_name || s.last_name)
+      ? { ...base, first_name: s.first_name ?? base.first_name, last_name: s.last_name ?? base.last_name }
+      : base;
+    return {
+      id:                  s.id,
+      status:              s.status,
+      profiles,
+      myInstruments:       [...(instByStudent[s.id] ?? [])],
+      student_instruments: siMap[s.id] ?? [],
+      grades:              gradeMap[s.id] ?? {},
+    };
+  }).sort((a, b) =>
     (a.profiles.first_name ?? '').localeCompare(b.profiles.first_name ?? '')
   );
   allStudentsCache = students;

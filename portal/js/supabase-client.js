@@ -122,8 +122,17 @@ function renderTopNavUser(profile) {
   const avatarEl = document.getElementById('navAvatar');
   const nameEl   = document.getElementById('navName');
   const roleEl   = document.getElementById('navRole');
-  if (avatarEl) avatarEl.textContent = getInitials(profile);
-  if (nameEl)   nameEl.textContent   = `${profile.first_name} ${profile.last_name}`;
+  // A student login can be shared by several siblings (phase 10, Oct
+  // 2026) — showing one child's first name here would always privilege
+  // whichever of them first registered, so a student login shows the
+  // family instead of an individual.
+  const isStudent = profile.role === 'student';
+  if (avatarEl) avatarEl.textContent = isStudent
+    ? (profile.last_name?.[0] ?? '').toUpperCase()
+    : getInitials(profile);
+  if (nameEl)   nameEl.textContent   = isStudent
+    ? `${profile.last_name ?? ''} family`.trim()
+    : `${profile.first_name} ${profile.last_name}`;
   if (roleEl)   roleEl.textContent   = formatRole(profile.role);
 }
 

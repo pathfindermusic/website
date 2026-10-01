@@ -321,7 +321,7 @@ async function loadReport() {
   const studio = document.getElementById('filterStudio').value;
 
   let studentQuery = db.from('students')
-    .select('id, studio_id, status, profiles(first_name, last_name)')
+    .select('id, studio_id, status, first_name, last_name, profiles(first_name, last_name)')
     .eq('status', 'active');
   if (studio) studentQuery = studentQuery.eq('studio_id', studio);
   const { data: studentsData, error: sErr } = await studentQuery;
@@ -333,10 +333,14 @@ async function loadReport() {
     return;
   }
 
+  // A student's own name (students.first_name/last_name) is the source of
+  // truth — siblings sharing a login would otherwise all show whichever
+  // name is on the shared profiles row (phase 10, Oct 2026).
   allStudentsList = (studentsData ?? []).map(s => ({
     id: s.id,
     studioId: s.studio_id,
-    name: `${s.profiles?.first_name ?? ''} ${s.profiles?.last_name ?? ''}`.trim() || '(no name)',
+    name: (`${s.first_name ?? ''} ${s.last_name ?? ''}`.trim()
+        || `${s.profiles?.first_name ?? ''} ${s.profiles?.last_name ?? ''}`.trim()) || '(no name)',
   }));
 
   const ids = allStudentsList.map(s => s.id);

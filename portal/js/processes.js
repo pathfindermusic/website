@@ -395,6 +395,83 @@ async function buildLessonSummary(studentId, wantSeries = false, since = null) {
   };
 }
 
+// Makes sure an enrolling student has a real portal login before the
+// confirmation email goes out, so it can carry a working {{portal_link}}
+// (a one-time Supabase sign-in link, resolved at send time by
+// send-email.js — see its own comments) instead of "you'll receive a
+// link shortly". Returns true when a login exists either way: one just
+// created here, or one already there (most often a sibling an admin has
+// already linked to a shared family login by hand).
+//
+// Deliberately does NOT try to link siblings automatically. ~5% of
+// students share one family login (auth.users.email must be unique), set
+// up today by leaving every sibling but one's students.email blank — so
+// most of the time there is simply no candidate address here and this
+// returns false straight away. The rarer case is two siblings each
+// entered through their own separate website enquiry, both naming the
+// same parent email — the first to enrol gets the real login, and the
+// second's attempt here hits Postgres's "already registered" the same
+// way addLogin() would. That is the existing shared-login situation, not
+// an error, and the admin already knows how to handle it by hand — this
+// just leaves that student's record untouched and the email falls back
+// to the generic wording, same as if this feature did not exist.
+async function ensureLoginForEnrolment(studentId) {
+  const { data: s } = await db.from('students')
+    .select('user_id,email,parent_email').eq('id', studentId).maybeSingle();
+  if (!s?.user_id) return false;
+
+  // Already has a real login — nothing to do.
+  try {
+    const checkRes = await fetch('/.netlify/functions/create-user', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'get-email', userId: s.user_id }),
+    });
+    if (checkRes.ok) return true;
+  } catch (_) { /* treat like "not found" and try to create one below */ }
+
+  const candidate = (s.email || s.parent_email || '').trim();
+  if (!candidate) return false;   // no address to create a login with
+
+  try {
+    const createRes = await fetch('/.netlify/functions/create-user', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: candidate, role: 'student' }),
+    });
+    const data = await createRes.json();
+    if (!createRes.ok) {
+      // existed: true is the shared-family-login case described above —
+      // expected, not an error. Anything else is worth a log, but either
+      // way this never blocks the confirmation email over it.
+      if (!data?.existed) console.error('[processes] auto-login failed', data);
+      return false;
+    }
+
+    // Same move as addLogin() in students.html: point this student at
+    // the new auth id and drop the old placeholder profile — a fresh
+    // enquiry's user_id was never a real account (see receive-enquiry.js),
+    // so nothing else references it.
+    const { data: profile } = await db.from('profiles')
+      .select('first_name,last_name,phone').eq('id', s.user_id).maybeSingle();
+    const oldUserId = s.user_id;
+
+    await db.from('profiles').upsert({
+      id: data.id,
+      first_name: profile?.first_name ?? '', last_name: profile?.last_name ?? '',
+      phone: profile?.phone ?? null, role: 'student', status: 'active',
+      must_change_password: true,
+    }, { onConflict: 'id' });
+
+    await db.from('students').update({ user_id: data.id, email: candidate }).eq('id', studentId);
+    if (oldUserId && oldUserId !== data.id) {
+      await db.from('profiles').delete().eq('id', oldUserId);
+    }
+    return true;
+  } catch (err) {
+    console.error('[processes] auto-login failed', err);
+    return false;
+  }
+}
+
 // Send if the lesson exists and it hasn't gone already.
 // Returns 'sent' | 'already' | 'no-lesson' | 'no-studio-email' | 'failed'
 async function maybeSendConfirmation(studentId, sentBy) {
@@ -416,6 +493,9 @@ async function maybeSendConfirmation(studentId, sentBy) {
     const lesson = await buildLessonSummary(studentId, !isTrial, proc.started_at);
     if (!lesson) return 'no-lesson';                 // nothing to tell them yet
     if (!lesson.studioEmail) return 'no-studio-email';
+
+    // Trials don't get a login — only an ongoing enrolment does.
+    const hasPortalLink = !isTrial && await ensureLoginForEnrolment(studentId);
 
     // The enrolment email previously carried no lesson details at all —
     // Zoho held the enrolment and MyMusicStaff held the lessons, so they
@@ -450,8 +530,11 @@ async function maybeSendConfirmation(studentId, sentBy) {
         `YOUR LESSONS\n\n` +
         `**${details}**\n\n` +
         `NEXT STEPS\n\n` +
-        `See your upcoming lessons: you'll receive a link to log in to the Student ` +
-        `Portal shortly — there are lots of music resources in there too.\n\n` +
+        (hasPortalLink
+          ? `Log in to the Student Portal here: {{portal_link}}\n` +
+            `There are lots of music resources in there too.\n\n`
+          : `See your upcoming lessons: you'll receive a link to log in to the Student ` +
+            `Portal shortly — there are lots of music resources in there too.\n\n`) +
         `Pay for your first lesson: ${PAYMENT_URL}\n` +
         `We'll then set it up ongoing using the same card for you.\n\n` +
         `Read the policies below: any questions, let us know. If after reading them ` +
@@ -600,12 +683,7 @@ async function sendFinanceFollowUp(studentId, sentBy) {
   if (result !== 'sent') return result;
 
   const studio = await studioFor(studentId);
-  const { data: stu } = await db.from('students')
-    .select('user_id').eq('id', studentId).maybeSingle();
-  const { data: p } = stu?.user_id
-    ? await db.from('profiles').select('first_name,last_name').eq('id', stu.user_id).maybeSingle()
-    : { data: null };
-  const name = `${p?.first_name ?? ''} ${p?.last_name ?? ''}`.trim();
+  const name = await studentName(studentId);
 
   await db.from('tasks').insert({
     title:        `Finance follow-up — ${name}`,
@@ -645,8 +723,13 @@ async function sendFarewellEmail(studentId, sentBy) {
 // ============================================================
 
 async function studentName(studentId) {
+  // The student's own name (students.first_name/last_name) is the source
+  // of truth — siblings sharing a login would otherwise all resolve to
+  // whichever name is on the shared profiles row (phase 10, Oct 2026).
   const { data: s } = await db.from('students')
-    .select('user_id').eq('id', studentId).maybeSingle();
+    .select('user_id,first_name,last_name').eq('id', studentId).maybeSingle();
+  const own = `${s?.first_name ?? ''} ${s?.last_name ?? ''}`.trim();
+  if (own) return own;
   if (!s?.user_id) return '';
   const { data: p } = await db.from('profiles')
     .select('first_name,last_name').eq('id', s.user_id).maybeSingle();

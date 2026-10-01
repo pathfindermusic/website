@@ -302,6 +302,7 @@
           <label class="form-label">Email Address</label>
           <input class="form-input" type="email" id="sEmail"
                  placeholder="leave blank if they share a family login">
+          <div class="form-hint" id="sEmailLoginStatus"></div>
           <div class="form-hint">
             Gives this student their own portal login. Leave blank for a
             sibling who will share one — you can link them afterwards.
@@ -477,6 +478,12 @@ let allStudents  = [];
 let allStudiosMap = {};
 let myStudioIds   = [];   // studios this admin may create students in
 let csvData      = [];
+// Every real auth.users id, refreshed each loadStudents(). students.email
+// having a value is NOT proof a login exists — a website enquiry fills
+// that column in at intake (receive-enquiry.js), long before anyone
+// creates a portal account — so Add login/Reset PW and the modal's login
+// status both check a student's user_id against this instead.
+let authUserIds  = new Set();
 let currentProfile = null;
 
 // Every instrument shows a grade selector instead of the 0-8 skill slider
@@ -540,7 +547,8 @@ async function loadStudents() {
   const { data: studentData, error } = await db
     .from('students')
     .select('id, status, user_id, studio_id, email, parent_name, parent_phone, ' +
-            'parent_email, enquiry_notes, enquiry_date, enquiry_source, lesson_reminders')
+            'parent_email, enquiry_notes, enquiry_date, enquiry_source, lesson_reminders, ' +
+            'first_name, last_name')
     .in('status', ['trial','active','inactive'])
     .order('id');
 
@@ -556,7 +564,7 @@ async function loadStudents() {
   // else fetched here, so it used to sit after the lessons/teachers
   // chain below for no reason, adding a whole extra sequential round
   // trip to every load (reported as page lag, Sep 2026).
-  const [profileRes, instrRes, assignRes, cgRes] = await Promise.all([
+  const [profileRes, instrRes, assignRes, cgRes, authIdsRes] = await Promise.all([
     userIds.length > 0
       ? db.from('profiles').select('*').in('id', userIds)
       : Promise.resolve({ data: [] }),
@@ -573,7 +581,14 @@ async function loadStudents() {
       ? db.from('student_current_grades')
           .select('student_id,instrument,grade_level_id,tier,label,sort_order').in('student_id', studentIds)
       : Promise.resolve({ data: [] }),
+    // Every real auth.users id, for Add login/Reset PW below — see
+    // authUserIds' own comment for why students.email can't answer that.
+    fetch('/.netlify/functions/create-user', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'list-user-ids' }),
+    }).then(r => r.json()).catch(() => ({ ids: [] })),
   ]);
+  authUserIds = new Set(authIdsRes?.ids ?? []);
 
   const profileMap = {};
   (profileRes.data ?? []).forEach(p => { profileMap[p.id] = p; });
@@ -658,7 +673,12 @@ function renderStudents(students) {
   }
 
   tbody.innerHTML = students.map(s => {
+    // A student's own name (students.first_name/last_name) is the source
+    // of truth — siblings sharing a login would otherwise all show
+    // whichever name is on the shared profiles row (phase 10, Oct 2026).
     const p           = s.profiles ?? {};
+    const studentName = `${s.first_name ?? ''} ${s.last_name ?? ''}`.trim()
+                      || `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim();
     const instruments = (s.student_instruments ?? []).map(i => i.instrument);
     const teachers    = [...new Set((s.student_teachers ?? []).map(t =>
       `${t.teachers?.profiles?.first_name ?? ''} ${t.teachers?.profiles?.last_name ?? ''}`.trim()
@@ -666,7 +686,7 @@ function renderStudents(students) {
 
     return `<tr>
       <td>
-        <div class="student-name">${p.first_name ?? ''} ${p.last_name ?? ''}</div>
+        <div class="student-name">${studentName}</div>
         <div class="student-email">${p.email ?? ''}</div>
       </td>
       <td class="text-sm">${allStudiosMap[s.studio_id] ?? '–'}</td>
@@ -700,8 +720,8 @@ function renderStudents(students) {
                       endPending[s.id].due_date
                         ? formatShortDate(parseLocalDate(endPending[s.id].due_date)) : 'soon'}</button>`
               : `<button class="btn btn-danger btn-sm" onclick="endEnrolmentFor('${s.id}')">End enrolment</button>`}
-          ${s.email
-            ? `<button class="btn btn-ghost btn-sm" onclick="resetPassword('${s.user_id}','${s.profiles?.first_name ?? ''} ${s.profiles?.last_name ?? ''}')">Reset PW</button>`
+          ${(s.email && authUserIds.has(s.user_id))
+            ? `<button class="btn btn-ghost btn-sm" onclick="resetPassword('${s.user_id}','${studentName}')">Reset PW</button>`
             : sharesLoginWith(s)
               ? `<button class="btn btn-ghost btn-sm" disabled title="Signs in with ${sharesLoginWith(s)}">Shared login</button>`
               : `<button class="btn btn-ghost btn-sm" onclick="addLogin('${s.id}')" title="No portal login yet">Add login</button>`}
@@ -918,7 +938,7 @@ async function startNextProcess() {
 async function planEndEnrolment() {
   const studentId = document.getElementById('procPlanBtn').dataset.studentId;
   const s = allStudents.find(x => x.id === studentId);
-  const name = `${s?.profiles?.first_name ?? ''} ${s?.profiles?.last_name ?? ''}`.trim();
+  const name = `${s?.first_name ?? s?.profiles?.first_name ?? ''} ${s?.last_name ?? s?.profiles?.last_name ?? ''}`.trim();
 
   if (endPending[studentId]) {
     const t = endPending[studentId];
@@ -988,7 +1008,7 @@ function availableProcesses(status) {
 
 async function offerStartProcess(studentId) {
   const s = allStudents.find(x => x.id === studentId);
-  const name = `${s?.profiles?.first_name ?? ''} ${s?.profiles?.last_name ?? ''}`.trim() || 'this student';
+  const name = `${s?.first_name ?? s?.profiles?.first_name ?? ''} ${s?.last_name ?? s?.profiles?.last_name ?? ''}`.trim() || 'this student';
   const avail = availableProcesses(s?.status);
 
   if (!avail.length) { showToast('Nothing to start for a student at this status.', 'warning'); return; }
@@ -1030,7 +1050,7 @@ async function openProcess(studentId) {
     }
   } catch (_) { /* opening a checklist must never fail on an email */ }
   const s = allStudents.find(x => x.id === studentId);
-  const name = `${s?.profiles?.first_name ?? ''} ${s?.profiles?.last_name ?? ''}`.trim();
+  const name = `${s?.first_name ?? s?.profiles?.first_name ?? ''} ${s?.last_name ?? s?.profiles?.last_name ?? ''}`.trim();
 
   document.getElementById('procTitle').textContent =
     `${PROCESS_DEFS[entry.proc.process_type].label} — ${name}`;
@@ -1152,7 +1172,7 @@ async function blockItem(studentId, itemId) {
   const { proc, items } = procByStudent[studentId];
   const it = items.find(x => x.id === itemId);
   const s  = allStudents.find(x => x.id === studentId);
-  const name = `${s?.profiles?.first_name ?? ''} ${s?.profiles?.last_name ?? ''}`.trim();
+  const name = `${s?.first_name ?? s?.profiles?.first_name ?? ''} ${s?.last_name ?? s?.profiles?.last_name ?? ''}`.trim();
   if (!it) return;
 
   // Tie the due date to the lessons — an eWay payment wants setting up
@@ -1247,7 +1267,8 @@ function filterStudents() {
 
   const filtered = allStudents.filter(s => {
     const p    = s.profiles ?? {};
-    const name  = `${p.first_name ?? ''} ${p.last_name ?? ''}`.toLowerCase();
+    const name  = (`${s.first_name ?? ''} ${s.last_name ?? ''}`.trim()
+                || `${p.first_name ?? ''} ${p.last_name ?? ''}`).toLowerCase();
     // Own email/phone or a parent's — the student is reachable either
     // way, so a search for either should find them. Bug fix in passing:
     // this used to check p.email, which is profiles.email — a column
@@ -1398,8 +1419,12 @@ async function applyRemindersToFamily(studentId, on) {
 
 async function addLogin(studentId) {
   const s = allStudents.find(x => x.id === studentId);
-  const first = s?.profiles?.first_name ?? '';
-  const name  = `${first} ${s?.profiles?.last_name ?? ''}`.trim();
+  // The student's own name, not the (possibly shared) login's — see
+  // phase 10 (Oct 2026): students.first_name/last_name is now the source
+  // of truth.
+  const first = s?.first_name ?? s?.profiles?.first_name ?? '';
+  const last  = s?.last_name  ?? s?.profiles?.last_name  ?? '';
+  const name  = `${first} ${last}`.trim();
 
   const email = prompt(
     `Give ${name} their own email address to sign in with.\n\n` +
@@ -1426,7 +1451,7 @@ async function addLogin(studentId) {
     const oldUserId = s.user_id;
     await db.from('profiles').upsert({
       id: data.id,
-      first_name: s.profiles?.first_name, last_name: s.profiles?.last_name,
+      first_name: first, last_name: last,
       phone: s.profiles?.phone ?? null, role: 'student', status: 'active',
       must_change_password: true,
     }, { onConflict: 'id' });
@@ -1499,23 +1524,24 @@ function openStudentModal(student = null) {
     document.getElementById('studentModalTitle').textContent = 'Edit Student';
     document.getElementById('editStudentId').value = student.id;
     document.getElementById('editUserId').value    = student.profiles?.id ?? '';
-    document.getElementById('sFirstName').value    = student.profiles?.first_name ?? '';
-    document.getElementById('sLastName').value     = student.profiles?.last_name  ?? '';
-    document.getElementById('sEmail').value        = 'Loading…';
+    document.getElementById('sFirstName').value    = student.first_name ?? student.profiles?.first_name ?? '';
+    document.getElementById('sLastName').value     = student.last_name  ?? student.profiles?.last_name  ?? '';
+    // The student's own record, not whatever auth.users says — those
+    // can disagree. A website enquiry (receive-enquiry.js) writes an
+    // address straight into students.email at intake, long before any
+    // portal login exists; this field used to show blank for exactly
+    // that student, which looked like the address had gone missing when
+    // it was sitting right here all along. Saving this form only ever
+    // writes this one column (further down in saveStudent()) — it never
+    // creates or touches a login, so round-tripping the real value here
+    // is always safe.
+    document.getElementById('sEmail').value        = student.email ?? '';
     document.getElementById('sPhone').value        = student.profiles?.phone      ?? '';
 
-    // Fetch email from auth.users via Netlify Function
-    const userId = student.profiles?.id ?? student.user_id ?? '';
-    if (userId) {
-      fetch('/.netlify/functions/create-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get-email', userId }),
-      })
-      .then(r => r.json())
-      .then(d => { document.getElementById('sEmail').value = d.email ?? ''; })
-      .catch(() => { document.getElementById('sEmail').value = ''; });
-    }
+    const hasLogin = !!(student.user_id && authUserIds.has(student.user_id));
+    document.getElementById('sEmailLoginStatus').textContent = hasLogin
+      ? 'Has a portal login.'
+      : 'No portal login yet — "Add login" on the student list creates one; saving this field alone will not.';
     document.getElementById('sStudio').value       = student.studio_id ?? '';
     document.getElementById('sStatus').value       = student.status               ?? 'active';
     document.getElementById('sReminders').checked = !!student.lesson_reminders;
@@ -1528,6 +1554,7 @@ function openStudentModal(student = null) {
     document.getElementById('studentModalTitle').textContent = 'Add Student';
     document.getElementById('editStudentId').value = '';
     document.getElementById('editUserId').value    = '';
+    document.getElementById('sEmailLoginStatus').textContent = '';
     ['sFirstName','sLastName','sEmail','sPhone','sParentName','sParentPhone','sParentEmail'].forEach(id => {
       document.getElementById(id).value = '';
     });
@@ -1640,6 +1667,7 @@ async function saveStudent() {
       // show for it — so it is removed again.
       const { data: sData, error: sErr } = await db.from('students').insert({
         user_id: userId, status, studio_id: studioId || null, email: email || null,
+        first_name: firstName, last_name: lastName,
         parent_name: parentName || null, parent_phone: parentPhone || null, parent_email: parentEmail || null,
         lesson_reminders: document.getElementById('sReminders').checked,
       }).select('id').single();
@@ -1658,8 +1686,12 @@ async function saveStudent() {
       }
 
     } else {
-      // Update profile
-      await db.from('profiles').update({ first_name: firstName, last_name: lastName, phone }).eq('id', editUserId);
+      // Update profile — phone only. Name used to be saved here too, but
+      // profiles is the shared LOGIN, not this one student: with siblings
+      // sharing a login, saving a name here silently renamed every sibling
+      // on that login (phase 10, Oct 2026). Name now lives on the student
+      // record below instead.
+      await db.from('profiles').update({ phone }).eq('id', editUserId);
       // Update student
       // Reminders are a household decision — a parent with three children
       // wants one answer, not three.
@@ -1667,6 +1699,7 @@ async function saveStudent() {
 
       await db.from('students').update({
         status, studio_id: studioId || null, email,
+        first_name: firstName, last_name: lastName,
         parent_name: parentName || null, parent_phone: parentPhone || null, parent_email: parentEmail || null,
       }).eq('id', editId);
     }
@@ -1732,7 +1765,7 @@ function openEndTask(studentId) {
 
 async function endEnrolmentFor(studentId) {
   const s = allStudents.find(x => x.id === studentId);
-  const name = `${s?.profiles?.first_name ?? ''} ${s?.profiles?.last_name ?? ''}`.trim();
+  const name = `${s?.first_name ?? s?.profiles?.first_name ?? ''} ${s?.last_name ?? s?.profiles?.last_name ?? ''}`.trim();
 
   // Already in train — one ending per student
   if (endDone[studentId]) {
@@ -1789,7 +1822,7 @@ async function endEnrolmentFor(studentId) {
 // so past attendance and notes survive.
 async function endLessonsFor(studentId) {
   const s = allStudents.find(x => x.id === studentId);
-  const name = `${s?.profiles?.first_name ?? ''} ${s?.profiles?.last_name ?? ''}`.trim();
+  const name = `${s?.first_name ?? s?.profiles?.first_name ?? ''} ${s?.last_name ?? s?.profiles?.last_name ?? ''}`.trim();
 
   // Permanent series membership only — ending an ad-hoc, one-off
   // occurrence elsewhere isn't "this student's series" to end, and
@@ -2007,6 +2040,7 @@ async function confirmImport() {
       // Upsert student
       const { data: sData } = await db.from('students')
         .upsert({ user_id: userId, status: row.status || 'active', studio_id: studioByName[(row.studio ?? '').toLowerCase()] ?? null,
+          first_name: row.first_name, last_name: row.last_name,
           parent_name: row.parent_name || null, parent_phone: row.parent_phone || null, parent_email: row.parent_email || null
         }, { onConflict: 'user_id' }).select('id').single();
 

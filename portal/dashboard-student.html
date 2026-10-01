@@ -405,12 +405,14 @@ async function renderChildSwitcher() {
   const wrap = document.getElementById('childSwitcher');
   if (!wrap || myStudents.length < 2) return;
 
+  // Each student now carries their own name (students.first_name/
+  // last_name, phase 10, Oct 2026), so siblings sharing a login no
+  // longer need the instrument fallback to tell them apart — kept only
+  // for the rare case a record somehow still has neither.
   const { data: profs } = await db.from('profiles')
     .select('id,first_name,last_name')
     .in('id', myStudents.map(s => s.user_id).filter(Boolean));
 
-  // Siblings sharing a login share a profile, so fall back to the
-  // instrument to tell them apart.
   const names = {};
   (profs ?? []).forEach(p => { names[p.id] = `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim(); });
 
@@ -420,7 +422,8 @@ async function renderChildSwitcher() {
   (insts ?? []).forEach(i => { (instBy[i.student_id] ??= []).push(i.instrument); });
 
   wrap.innerHTML = myStudents.map(s => {
-    const label = names[s.user_id] || (instBy[s.id]?.[0] ?? 'Student');
+    const ownName = `${s.first_name ?? ''} ${s.last_name ?? ''}`.trim();
+    const label = ownName || names[s.user_id] || (instBy[s.id]?.[0] ?? 'Student');
     const sub   = (instBy[s.id] ?? []).join(', ');
     const on    = s.id === studentRecord.id;
     return `<button class="child-btn ${on ? 'active' : ''}" onclick="switchChild('${s.id}')">

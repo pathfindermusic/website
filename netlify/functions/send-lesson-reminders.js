@@ -63,7 +63,7 @@ exports.handler = async () => {
     const ids = [...new Set(rows.map(r => r.student_id))];
     const students = await get(
       `students?id=in.(${ids.join(',')})&lesson_reminders=is.true` +
-      `&select=id,user_id,email,parent_email,parent_name,reminder_token,status`);
+      `&select=id,user_id,email,parent_email,parent_name,reminder_token,status,first_name,last_name`);
 
     const wanted = students.filter(s => ['active','trial'].includes(s.status));
     if (!wanted.length) {
@@ -105,9 +105,14 @@ exports.handler = async () => {
         .filter((v, i, a) => a.indexOf(v) === i);
       if (!to.length) { skipped++; continue; }
 
+      // The student's own name (students.first_name/last_name) is the
+      // source of truth — siblings sharing a login would otherwise all
+      // get a reminder naming whichever sibling is on the shared profile
+      // (phase 10, Oct 2026).
       const p     = nameById[s.user_id] ?? {};
-      const first = s.parent_name?.split(' ')[0] || p.first_name || 'there';
-      const who   = `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim();
+      const ownFirst = s.first_name || p.first_name || '';
+      const first = s.parent_name?.split(' ')[0] || ownFirst || 'there';
+      const who   = `${s.first_name ?? p.first_name ?? ''} ${s.last_name ?? p.last_name ?? ''}`.trim();
 
       const html = reminderEmail({
         greeting: first,

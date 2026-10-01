@@ -217,7 +217,7 @@ exports.handler = async (event) => {
 
     const students = await get(
       `students?id=in.(${idList})${statusFilter}` +
-      `&select=id,user_id,email,parent_name,parent_email`
+      `&select=id,user_id,email,parent_name,parent_email,first_name,last_name`
     );
 
     const userIds = students.map(s => s.user_id).filter(Boolean);
@@ -241,9 +241,15 @@ exports.handler = async (event) => {
     const unreachable = [];
     const invalidAddresses = [];
     students.forEach(s => {
+      // A student's own name (students.first_name/last_name) is the source
+      // of truth — siblings sharing a login would otherwise all resolve to
+      // whichever name happens to be on the shared profiles row (phase 10,
+      // Oct 2026). Fall back to the profile only for any row that
+      // somehow never got backfilled.
       const p         = profileMap[s.user_id] ?? {};
-      const firstName = p.first_name ?? '';
-      const fullName  = `${firstName} ${p.last_name ?? ''}`.trim();
+      const firstName = s.first_name ?? p.first_name ?? '';
+      const lastName  = s.last_name  ?? p.last_name  ?? '';
+      const fullName  = `${firstName} ${lastName}`.trim();
       const addresses = [];
       const seen      = new Set();
       const push = (addr) => {
@@ -262,7 +268,7 @@ exports.handler = async (event) => {
 
       const valid = addresses.filter(isValidEmail);
       const bad   = addresses.filter(a => !isValidEmail(a));
-      const label = `${firstName} ${p.last_name ?? ''}`.trim() || '(unnamed)';
+      const label = fullName || '(unnamed)';
 
       if (bad.length) invalidAddresses.push(`${label} (${bad.join(', ')})`);
       if (valid.length === 0) { unreachable.push(label); return; }
