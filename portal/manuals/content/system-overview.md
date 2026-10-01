@@ -197,4 +197,3 @@ guide says it should, or something is missing, let your studio admin know
 with a description of what you saw — that's the fastest way for it to get
 looked at and, if needed, fixed.
 </p>
-
