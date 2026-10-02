@@ -49,3 +49,18 @@
 # ------------------------------------------------------------
 [functions."attendance-marking-report"]
   schedule = "0 7 * * 0"
+
+# ------------------------------------------------------------
+# Waiting list auto-lapse
+#
+# 18:00 UTC daily, an hour ahead of the recurring-tasks job — no
+# dependency between them, just spread so the nightly jobs don't
+# all land on the same minute. Closes any waiting-list entry whose
+# waitlisted_at is 3+ months old, same as an admin choosing "Not
+# proceeding" by hand.
+#
+# Internal only — no email, just the usual students/tasks/task_notes
+# writes an admin closing the task themselves would make.
+# ------------------------------------------------------------
+[functions."lapse-waiting-list"]
+  schedule = "0 18 * * *"

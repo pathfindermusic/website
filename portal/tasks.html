@@ -219,9 +219,49 @@
       <button class="modal-close" onclick="closeOutcome()">✕</button>
     </div>
     <div class="modal-body">
-      <p class="text-sm" style="line-height:1.7;margin-bottom:1rem;" id="ocPrompt"></p>
-      <div style="display:flex;flex-direction:column;gap:0.5rem;" id="ocButtons"></div>
-      <div class="form-hint" style="margin-top:0.85rem;" id="ocHint"></div>
+      <div id="ocChoices">
+        <p class="text-sm" style="line-height:1.7;margin-bottom:1rem;" id="ocPrompt"></p>
+        <div style="display:flex;flex-direction:column;gap:0.5rem;" id="ocButtons"></div>
+        <div class="form-hint" style="margin-top:0.85rem;" id="ocHint"></div>
+      </div>
+
+      <!-- Shown only after "Add to waiting list" is picked -->
+      <div class="hidden" id="ocWaitlistForm">
+        <p class="text-sm" style="line-height:1.6;margin-bottom:0.85rem;">
+          Capture what's driving the wait, if you already know it — all optional,
+          and you can fill this in later from the task itself.
+        </p>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Preferred teacher</label>
+            <select class="form-select" id="wlTeacher"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Preferred day</label>
+            <select class="form-select" id="wlDay">
+              <option value="">Any day</option>
+              <option value="0">Sunday</option><option value="1">Monday</option>
+              <option value="2">Tuesday</option><option value="3">Wednesday</option>
+              <option value="4">Thursday</option><option value="5">Friday</option>
+              <option value="6">Saturday</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">From</label>
+            <input class="form-input" type="time" id="wlFrom">
+          </div>
+          <div class="form-group">
+            <label class="form-label">To</label>
+            <input class="form-input" type="time" id="wlTo">
+          </div>
+        </div>
+        <div class="flex gap-1" style="margin-top:0.5rem;">
+          <button class="btn btn-ghost btn-sm" onclick="backToOutcomeChoices()">← Back</button>
+          <button class="btn btn-primary btn-sm" onclick="confirmWaitlist()">Add to waiting list</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -280,6 +320,42 @@
         <div class="form-group">
           <label class="form-label">Due date</label>
           <input class="form-input" type="date" id="tmDue">
+        </div>
+      </div>
+
+      <!-- Only meaningful when Kind = Waiting list -->
+      <div class="hidden" id="tmWaitlistFields"
+           style="background:var(--off-white);border-left:3px solid var(--orange);
+                  border-radius:0 var(--r-sm) var(--r-sm) 0;padding:0.7rem 0.85rem;margin-bottom:0.85rem;">
+        <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.07em;
+                    color:var(--mid-grey);font-weight:600;margin-bottom:0.5rem;">
+          Waiting list details<span id="tmWaitingSince" style="text-transform:none;letter-spacing:normal;font-weight:400;"></span>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Preferred teacher</label>
+            <select class="form-select" id="tmWlTeacher"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Preferred day</label>
+            <select class="form-select" id="tmWlDay">
+              <option value="">Any day</option>
+              <option value="0">Sunday</option><option value="1">Monday</option>
+              <option value="2">Tuesday</option><option value="3">Wednesday</option>
+              <option value="4">Thursday</option><option value="5">Friday</option>
+              <option value="6">Saturday</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row" style="margin-bottom:0;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">From</label>
+            <input class="form-input" type="time" id="tmWlFrom">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">To</label>
+            <input class="form-input" type="time" id="tmWlTo">
+          </div>
         </div>
       </div>
 
@@ -617,7 +693,7 @@ async function loadOptions() {
     db.from('admins').select('id,user_id,studio_ids'),
     db.from('students').select('id,user_id,status,enquiry_notes,enquiry_date,email,first_name,last_name')
       .in('status',['active','trial','prospective','lapsed','inactive']),
-    db.from('teachers').select('id,user_id'),
+    db.from('teachers').select('id,user_id,studio_ids'),
   ]);
 
   studios = stRes.data ?? [];
@@ -685,6 +761,14 @@ async function loadOptions() {
   if ((teachRes.data ?? []).length && !teacherOpts.length) {
     console.warn('[tasks] Teachers exist but none are selectable — check profile status');
   }
+
+  // Waiting-list "preferred teacher" pickers — same list in both the
+  // outcome modal's capture form and the task-detail edit fields.
+  const teacherPickerHtml =
+    `<option value="">Any teacher</option>` +
+    teacherOpts.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+  document.getElementById('wlTeacher').innerHTML   = teacherPickerHtml;
+  document.getElementById('tmWlTeacher').innerHTML = teacherPickerHtml;
 
   const fs = document.getElementById('filterStudio');
   studios.forEach(s => { fs.innerHTML += `<option value="${s.id}">${s.name}</option>`; });
@@ -948,8 +1032,25 @@ function render() {
     return;
   }
 
-  const studioName = id => studios.find(s => s.id === id)?.name;
-  const adminName  = id => admins.find(a => a.id === id)?.name;
+  const studioName  = id => studios.find(s => s.id === id)?.name;
+  const adminName   = id => admins.find(a => a.id === id)?.name;
+  const teacherName = id => teacherOpts.find(x => x.id === id)?.name;
+
+  // "Check one by one" (today's manual process) means this summary has
+  // to carry enough to judge a match at a glance — no reason to open
+  // the task just to see who/when it's waiting for.
+  const waitlistSummary = t => {
+    const bits2 = [];
+    if (t.waitlist_teacher_id) bits2.push(teacherName(t.waitlist_teacher_id) ?? 'a teacher');
+    if (t.waitlist_day_of_week != null) bits2.push(WEEKDAY_NAMES[t.waitlist_day_of_week]);
+    if (t.waitlist_time_from || t.waitlist_time_to) {
+      bits2.push([
+        t.waitlist_time_from ? formatTime(t.waitlist_time_from) : 'any time',
+        t.waitlist_time_to   ? formatTime(t.waitlist_time_to)   : '',
+      ].filter(Boolean).join(' – '));
+    }
+    return bits2.length ? bits2.join(', ') : 'no preference recorded yet';
+  };
 
   el.innerHTML = list.map(t => {
     const isDone      = t.status === 'done';
@@ -975,7 +1076,10 @@ function render() {
         : `<span class="tag tag-unassigned">Unassigned</span>`);
     }
     if (dueTxt) bits.push(`<span class="${dueCls}">${dueTxt}</span>`);
-    if (t.kind === 'waitlist') bits.push(`<span class="tag tag-wait">Waiting</span>`);
+    if (t.kind === 'waitlist') {
+      bits.push(`<span class="tag tag-wait">Waiting</span>`);
+      bits.push(`<span class="text-muted" style="font-size:0.78rem;">${escapeHtml(waitlistSummary(t))}</span>`);
+    }
     if (t.recurring_task_id) bits.push(`<span class="tag tag-wait">🔁 Recurring</span>`);
     if (t.awaiting_admin && !isTeacher) bits.push(`<span class="tag tag-replied">Teacher replied</span>`);
     if (t.subject_type === 'student') {
@@ -1058,6 +1162,12 @@ async function openTaskModal(id) {
   document.getElementById('tmTitleInput').value  = t.title ?? '';
   document.getElementById('tmDue').value         = t.due_date ?? '';
   document.getElementById('tmKind').value       = t.kind ?? 'task';
+  document.getElementById('tmWlTeacher').value  = t.waitlist_teacher_id ?? '';
+  document.getElementById('tmWlDay').value      = t.waitlist_day_of_week ?? '';
+  document.getElementById('tmWlFrom').value     = (t.waitlist_time_from ?? '').slice(0, 5);
+  document.getElementById('tmWlTo').value       = (t.waitlist_time_to   ?? '').slice(0, 5);
+  document.getElementById('tmWaitingSince').textContent =
+    t.waitlisted_at ? ` · waiting since ${formatShortDate(new Date(t.waitlisted_at))}` : '';
   renderEnquiryContext(t);
   onKindChange();
 
@@ -1419,6 +1529,7 @@ function onKindChange() {
   due.placeholder = waiting ? 'Optional — set one to prompt a review' : '';
   document.getElementById('tmDoneBtn').textContent =
     openTask?.status === 'open' ? (waiting ? 'Slot found — close' : 'Mark done') : 'Reopen';
+  document.getElementById('tmWaitlistFields').classList.toggle('hidden', !waiting);
 }
 
 function snooze(days) {
@@ -1454,12 +1565,27 @@ async function saveTask() {
   const movedStudio = newStudio !== prevStudio;
   const movedOwner  = newAssignee !== prevAssignee;
 
+  const newKind = document.getElementById('tmKind').value;
+  const isWaitlist = newKind === 'waitlist';
+  // Starting the clock only the moment a task first becomes a waiting-list
+  // entry — editing one that already is one must not reset waitlisted_at,
+  // or the 3-month lapse would never catch up with an entry someone
+  // revisits occasionally to tweak the preferred time.
+  const becomingWaitlist = isWaitlist && openTask?.kind !== 'waitlist';
+
   // Fields that are always the caller's to change
   const { error } = await db.from('tasks').update({
     title,
-    kind:         document.getElementById('tmKind').value,
+    kind:         newKind,
     subject_type: sType, subject_id: sId,
     due_date:     document.getElementById('tmDue').value || null,
+    waitlist_teacher_id:  isWaitlist ? (document.getElementById('tmWlTeacher').value || null) : null,
+    waitlist_day_of_week: isWaitlist && document.getElementById('tmWlDay').value !== ''
+                             ? parseInt(document.getElementById('tmWlDay').value, 10) : null,
+    waitlist_time_from:  isWaitlist ? (document.getElementById('tmWlFrom').value || null) : null,
+    waitlist_time_to:    isWaitlist ? (document.getElementById('tmWlTo').value   || null) : null,
+    ...(becomingWaitlist ? { waitlisted_at: new Date().toISOString() } : {}),
+    ...(!isWaitlist ? { waitlisted_at: null } : {}),
   }).eq('id', id);
 
   if (error) {
@@ -1626,6 +1752,7 @@ function openOutcome(ctx) {
     document.getElementById('ocButtons').innerHTML = `
       <button class="btn btn-secondary" onclick="resolveEnquiry('trial')">Booked a trial lesson</button>
       <button class="btn btn-secondary" onclick="resolveEnquiry('active')">Enrolling in ongoing lessons</button>
+      <button class="btn btn-secondary" onclick="showWaitlistForm()">Ready, but no suitable slot — add to waiting list</button>
       <button class="btn btn-secondary" onclick="resolveEnquiry('lapsed')">Not proceeding</button>`;
     document.getElementById('ocHint').innerHTML =
       `Booking a trial or enrolling moves them out of Enquiries and into Students.<br><br>` +
@@ -1643,12 +1770,68 @@ function openOutcome(ctx) {
       `and log what they said — the task stays open.`;
   }
 
+  document.getElementById('ocChoices').classList.remove('hidden');
+  document.getElementById('ocWaitlistForm').classList.add('hidden');
   document.getElementById('outcomeModal').classList.remove('hidden');
 }
 
 function closeOutcome() {
   document.getElementById('outcomeModal').classList.add('hidden');
   pendingClose = null;
+}
+
+// ---- Fourth outcome: ready to enrol, nothing suitable open yet ----
+// Reuses the 'waitlist' task kind already built for a manually-created
+// entry (phase4a) — the task just stays open, with no due date, tagged
+// so it shows up in the Waiting list tile instead of the day-to-day
+// queue. The student's own status is deliberately left at 'prospective'
+// — they're still an undecided enquiry, just gated on availability
+// rather than a decision — so every existing rule keyed off
+// 'prospective' (kept out of Students, bulk notifications, the task
+// subject picker) keeps applying unchanged.
+function showWaitlistForm() {
+  document.getElementById('wlTeacher').value = '';
+  document.getElementById('wlDay').value     = '';
+  document.getElementById('wlFrom').value    = '';
+  document.getElementById('wlTo').value      = '';
+  document.getElementById('ocChoices').classList.add('hidden');
+  document.getElementById('ocWaitlistForm').classList.remove('hidden');
+}
+
+function backToOutcomeChoices() {
+  document.getElementById('ocWaitlistForm').classList.add('hidden');
+  document.getElementById('ocChoices').classList.remove('hidden');
+}
+
+async function confirmWaitlist() {
+  if (!pendingClose) return;
+  const { taskId, student } = pendingClose;
+
+  const patch = {
+    kind: 'waitlist',
+    due_date: null,
+    waitlisted_at: new Date().toISOString(),
+    waitlist_teacher_id:  document.getElementById('wlTeacher').value || null,
+    waitlist_day_of_week: document.getElementById('wlDay').value !== ''
+                             ? parseInt(document.getElementById('wlDay').value, 10) : null,
+    waitlist_time_from:  document.getElementById('wlFrom').value || null,
+    waitlist_time_to:    document.getElementById('wlTo').value   || null,
+  };
+  const { error } = await db.from('tasks').update(patch).eq('id', taskId);
+  if (error) { showToast('Could not add to the waiting list: ' + error.message, 'error'); return; }
+
+  const { error: noteErr } = await db.from('task_notes').insert({
+    task_id: taskId,
+    note_text: 'Student added to waiting list.',
+    logged_by: me.id,
+  });
+  if (noteErr) console.error('[tasks] waiting-list log entry failed:', noteErr);
+
+  document.getElementById('outcomeModal').classList.add('hidden');
+  pendingClose = null;
+
+  showToast(`${student.name} added to the waiting list.`, 'success');
+  await loadTasks();
 }
 
 async function resolveEnquiry(outcome) {

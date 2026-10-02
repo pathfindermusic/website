@@ -1681,6 +1681,87 @@ a superuser or multi-studio admin sees by default) rather than being a
 pure performance fix, so it's left as a future option rather than bundled
 in here.
 
+## Waiting list (Oct 2026) — a fourth enquiry outcome, not a new concept
+
+**Tested live and confirmed working (Oct 2026).** Confirmed against real
+enquiries: closing a task via "Add to waiting list" keeps it open with no
+due date, logs the automatic note, and the Waiting list stat tile/bucket
+view pick it up correctly.
+
+Closing an enquiry's follow-up task always had three outcomes (trial,
+enrolling, not proceeding). This adds a fourth, for when the family is ready
+but nothing suitable is currently open: **Ready, but no suitable slot — add
+to waiting list**, next to the other three in the same "How did it go?"
+modal (`tasks.html`, `openOutcome()`/`resolveEnquiry()`).
+
+**It reuses infrastructure that was already there and unused.**
+`phase4a-waitlist-and-transfer.sql` gave `tasks` a `kind` column
+(`'task'` / `'waitlist'`) specifically so an open-ended, no-due-date entry
+wouldn't get lost among day-to-day work — and the Tasks dashboard's
+**Waiting list** stat tile, and the bucket view it opens, were built off
+that `kind` from the start. Both sat there counting zero until now: the
+only piece missing was something that actually turned an enquiry into one.
+Picking the new outcome does exactly that **in place** — the same
+follow-up task flips to `kind='waitlist'`, `due_date` clears, and an
+automatic `task_notes` entry ("Student added to waiting list.") is logged
+— it does not close the task or create a new one, so the whole existing
+contact-log thread carries over.
+
+**The student's own status stays `prospective`.** They are still,
+fundamentally, an undecided enquiry — what changed is only what's gating
+them. Keeping `prospective` means every existing rule keyed off it
+(excluded from the Students page, from notification recipients, from the
+task subject picker) keeps applying with no further changes anywhere else
+in the app. A distinct `waitlisted` status was considered and deliberately
+not built — it would have meant touching the status check constraint and
+every place that branches on `'prospective'`, for a label that the
+Waiting list tile already makes visible on its own.
+
+**Gating factors are optional structured fields on the task itself**,
+not a new table: `waitlist_teacher_id`, `waitlist_day_of_week` (0=Sun..6=Sat,
+same convention as `teacher_availability` and `recurring_tasks.weekday`),
+`waitlist_time_from`/`waitlist_time_to`. "Preferred studio" is deliberately
+**not** one of them — it's just the task's existing `studio_id`, which the
+admin already sets; adding a second studio field would only invite the two
+to disagree. All three are editable later from the task's own "Waiting
+list details" panel (shown whenever Kind = Waiting list, same place the
+manually-created kind already exposed), not just at the moment of
+conversion — the admin may not know the family's preferred teacher yet
+when they first join the list. The Waiting list bucket's row listing also
+summarises them inline (teacher / day / time), so checking entries "one by
+one" — today's manual process, see below — doesn't require opening each
+task just to see who/when it's waiting for.
+
+**`waitlisted_at` drives the 3-month clock, and is deliberately not
+`tasks.created_at`.** The follow-up task may have existed for weeks before
+the family actually decided to wait; the clock starts the moment they
+join the list, set once when `kind` first becomes `'waitlist'` and left
+untouched by later edits (editing an existing entry's preferred time must
+not reset how long it's been waiting).
+
+**Lapsing after 3 months is the "Not proceeding" outcome, reached
+automatically.** `netlify/functions/lapse-waiting-list.js` runs nightly
+(18:00 UTC, `netlify.toml`) and, for every open waitlist entry 90+ days
+old, does exactly what an admin choosing "Not proceeding" does by hand:
+`students.status → 'lapsed'` with an automatic `lapsed_reason`, the task
+closes (`status='done'`), and a `task_notes` entry records why. Guarded on
+the student still being `'prospective'` at the moment it runs — if an
+admin already moved them on (booked a trial, enrolled, or manually marked
+them lapsed) since they joined the list, the sweep leaves that decision
+alone rather than overwriting it. No email is sent by this function, or by
+adding someone to the waiting list in the first place — the admin has
+usually just discussed it with the family directly; easy to add a
+lifecycle email later if that turns out to be wanted.
+
+**No automatic "a slot is now free" notification yet.** Checking entries
+against current availability is still a manual process: open the Waiting
+list tile and work through them one by one, same as today. An automated
+version — comparing each entry's preferred teacher/day/time against that
+teacher's `teacher_availability` and current bookings, then raising a
+follow-up task when a match appears — was deliberately deferred rather
+than guessed at; it deserves its own round once there are real waiting-list
+entries to define "a suitable slot" against.
+
 ## Traps that have already cost time
 
 - **Check which environment you're looking at.** Local dev runs against the same
@@ -1827,6 +1908,9 @@ Run in order. All are re-runnable.
     (see "A student's name now lives on `students`, not `profiles`" below)
 39. `phase11-schedule-view-own-student-name.sql` — `schedule_view` rebuilt to use
     the new columns
+40. `phase12-waiting-list.sql` — `tasks.waitlist_teacher_id`/`waitlist_day_of_week`/
+    `waitlist_time_from`/`waitlist_time_to`/`waitlisted_at` (see Waiting list
+    section above)
 
 *(Several migrations applied between 27 and 35 — schedule performance
 indexes, BoK grading, fortnightly lessons, recurring tasks, and others —
@@ -1887,8 +1971,17 @@ checked at login only: an existing session survives until it expires.
 `isAccountBlocked()` in `supabase-client.js` is there for wiring into
 `requireAuth` if per-page enforcement is ever wanted.
 
-**Phase 4d complete (Oct 2026) — website enquiries go to the portal only,
-Zoho retired from this path.** The contact form on `index.html` and
+**Phase 4d complete and tested live (Oct 2026) — website enquiries go to
+the portal only, Zoho retired from this path.** Confirmed in production on
+both `index.html` and `pricing.html`: enquiries create the student + task
+for the right studio, no longer reach Zoho, the enquirer lands on the
+thank-you page and gets the acknowledgement email, the studio gets its
+notification, and server-side reCAPTCHA verification is active (after
+`RECAPTCHA_SECRET_KEY` was added under the site's own environment
+variables — not the account-wide "shared" ones, which need a paid plan; a
+per-site variable doesn't).
+
+The contact form on `index.html` and
 `pricing.html` no longer posts to Zoho at all; it submits via `fetch` to
 `receive-enquiry.js`, which is now the sole destination and sends both emails
 Zoho used to send — the acknowledgement to the enquirer and the notification
@@ -1946,9 +2039,7 @@ payment follow-up and farewell — silently, for weeks. Fixed in `processes.js`;
 `email_log` has the record of everything that went out regardless.
 
 **Next up:** finish end-enrolment testing; attendance report page; RLS on
-views before go-live; set `RECAPTCHA_SECRET_KEY` in Netlify so the new
-server-side reCAPTCHA check on enquiries actually takes effect (see Phase 4d
-above).
+views before go-live.
 
 **Teacher landing page.** The teacher dashboard shows an open-task count —
 red when non-zero — and a strip listing outstanding tasks above the schedule.
