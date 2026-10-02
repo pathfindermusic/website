@@ -338,6 +338,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
       Attendance
     </a>
+    <a class="nav-item" href="grading-report.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+      Grading
+    </a>
     <a class="nav-item" href="credits.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/></svg>
       Credits
@@ -3618,41 +3622,33 @@ async function markAttendanceAsAdmin(occId, studentId, status) {
 async function saveSeriesEdit(lessonId, f) {
   const today = toISODate(new Date());
 
-  const { error: uErr } = await db.from('lessons').update({
-    teacher_id: f.teacherId, studio_id: f.studioId, instrument: f.instrument,
-    lesson_type: f.lType, day_of_week: f.day, start_time: f.time,
-    duration_mins: f.duration, series_notes: f.seriesNotes,
-    frequency: f.frequency,
-  }).eq('id', lessonId);
-  if (uErr) { showToast('Could not save: ' + uErr.message, 'error'); return; }
-
-  // Students may have changed too — the permanent roster only. An
-  // occurrence-only guest on some other date of this lesson is a
-  // separate row (added_for_occurrence_id set) and isn't touched here.
-  const { data: existing } = await db.from('lesson_students')
-    .select('student_id').eq('lesson_id', lessonId).is('added_for_occurrence_id', null);
-  const before = new Set((existing ?? []).map(r => r.student_id));
-  const after  = new Set(lessonStudents);
-
-  for (const sid of after) if (!before.has(sid)) {
-    await db.from('lesson_students').insert({
-      lesson_id: lessonId, student_id: sid, added_for_occurrence_id: null,
-    });
-  }
-  for (const sid of before) if (!after.has(sid)) {
-    await db.from('lesson_students').delete()
-      .eq('lesson_id', lessonId).eq('student_id', sid).is('added_for_occurrence_id', null);
+  // Needed either way: to know what actually changed (vs. just notes or
+  // the roster), and — when splitting — to carry over every field this
+  // form doesn't touch (recurrence_type/count/start/end, max_students)
+  // onto the new row instead of losing them.
+  const { data: oldLesson, error: oldErr } = await db.from('lessons')
+    .select('*').eq('id', lessonId).single();
+  if (oldErr || !oldLesson) {
+    showToast('Could not load this series: ' + (oldErr?.message ?? 'not found'), 'error');
+    return;
   }
 
   // A one-off is exactly one lesson on one fixed date — there is
-  // nothing to regenerate. The logic below (rebuilding future
-  // occurrences out to a bounded date range) is for real recurring
-  // series; run it against a one-off and it deletes that single
-  // occurrence and replaces it with a run of new ones on the same
-  // weekday, silently turning a single makeup/trial/one-off lesson
-  // into a repeating series and losing its makeup flag. So: just sync
-  // the "what is it for" kind onto the existing occurrence and stop.
+  // nothing to regenerate and nothing to split (it's never had, and
+  // never will have, more than the one occurrence it already owns). So:
+  // just sync the "what is it for" kind onto the existing occurrence,
+  // same as before, and stop.
   if (f.isOneOff) {
+    const { error: uErr } = await db.from('lessons').update({
+      teacher_id: f.teacherId, studio_id: f.studioId, instrument: f.instrument,
+      lesson_type: f.lType, day_of_week: f.day, start_time: f.time,
+      duration_mins: f.duration, series_notes: f.seriesNotes,
+      frequency: f.frequency,
+    }).eq('id', lessonId);
+    if (uErr) { showToast('Could not save: ' + uErr.message, 'error'); return; }
+
+    await syncPermanentRoster(lessonId);
+
     await db.from('lesson_occurrences')
       .update({ is_makeup: f.oneOffKind === 'makeup' })
       .eq('lesson_id', lessonId);
@@ -3684,6 +3680,103 @@ async function saveSeriesEdit(lessonId, f) {
     return;
   }
 
+  // Does this edit change anything that's supposed to describe a fixed
+  // point in time — time, day, duration, teacher, studio, instrument,
+  // lesson type or frequency? A straight UPDATE here would silently
+  // rewrite history: lesson_occurrences has no time/day/teacher of its
+  // own, so EVERY occurrence — past and future alike — reads those from
+  // this one shared lessons row (reported 1 Oct 2026: a 5pm→4pm change
+  // "for future lessons only" moved every past occurrence to 4pm too,
+  // because there was nowhere else for the old 5pm to live). So instead
+  // of updating in place, split: this existing row keeps its old values
+  // and stays attached only to what's already happened; a new row
+  // carries the new values forward and owns everything from today on.
+  const seriesFieldsChanged =
+    oldLesson.teacher_id    !== f.teacherId ||
+    oldLesson.studio_id     !== f.studioId  ||
+    oldLesson.instrument    !== f.instrument ||
+    oldLesson.lesson_type   !== f.lType     ||
+    oldLesson.day_of_week   !== f.day       ||
+    oldLesson.start_time    !== f.time      ||
+    oldLesson.duration_mins !== f.duration  ||
+    oldLesson.frequency     !== f.frequency;
+
+  // Did the roster itself change? Exactly the same problem as the
+  // schedule fields above, just a different column: rosterFor() builds
+  // EVERY occurrence's roster — past and future alike — from whichever
+  // students are on this lesson's permanent roster RIGHT NOW, with no
+  // record of who was actually on it at the time. So adding or removing
+  // a student "from future lessons" via Edit series silently did the
+  // same to every occurrence that already happened too (reported 2 Oct
+  // 2026, a student removed from a group lesson disappearing from past
+  // occurrences). Needs the same split as a schedule change.
+  const { data: currentRoster } = await db.from('lesson_students')
+    .select('student_id').eq('lesson_id', lessonId).is('added_for_occurrence_id', null);
+  const beforeRosterIds = new Set((currentRoster ?? []).map(r => r.student_id));
+  const afterRosterIds  = new Set(lessonStudents);
+  const rosterChanged =
+    beforeRosterIds.size !== afterRosterIds.size ||
+    [...beforeRosterIds].some(id => !afterRosterIds.has(id));
+
+  const { data: pastOcc } = await db.from('lesson_occurrences')
+    .select('id').eq('lesson_id', lessonId).lt('date', today).limit(1);
+  const hasPast = (pastOcc ?? []).length > 0;
+
+  // Skipped (plain update instead) when there's no history to protect
+  // yet (hasPast false) or when nothing that affects display actually
+  // changed (e.g. only series_notes did).
+  const splitting = (seriesFieldsChanged || rosterChanged) && hasPast;
+
+  let activeLessonId = lessonId; // which row owns the roster + future occurrences below
+
+  if (splitting) {
+    const { data: newLesson, error: nErr } = await db.from('lessons').insert({
+      teacher_id: f.teacherId, studio_id: f.studioId, instrument: f.instrument,
+      lesson_type: f.lType, day_of_week: f.day, start_time: f.time,
+      duration_mins: f.duration, series_notes: f.seriesNotes,
+      frequency: f.frequency,
+      max_students:      oldLesson.max_students,
+      recurrence_type:   oldLesson.recurrence_type,
+      recurrence_count:  oldLesson.recurrence_count,
+      recurrence_start:  oldLesson.recurrence_start,
+      recurrence_end:    oldLesson.recurrence_end,
+      status: 'active',
+    }).select('id').single();
+    if (nErr) { showToast('Could not split the series: ' + nErr.message, 'error'); return; }
+    activeLessonId = newLesson.id;
+
+    // The old row is history now — its own time/day/teacher AND its
+    // permanent roster stay exactly as they were, untouched, so its
+    // past occurrences keep showing the right student instead of
+    // reading as a non-teaching event (the grid builds each
+    // occurrence's roster from whichever lesson_id it still belongs
+    // to — wiping the old roster here broke every occurrence still on
+    // the old row, caught 2 Oct 2026). What DOES need to stop is the
+    // old row counting as anyone's CURRENT lesson, so "who is this
+    // teacher's student right now" queries (My Students, the
+    // Attendance and Grading reports) don't double up on both rows —
+    // all of those already filter lessons to status='active', and a
+    // cancelled series already keeps showing its past occurrences
+    // normally (same rule loadDailyView/loadMonthlyView use for any
+    // other series that stopped), so marking it cancelled here is
+    // enough on its own.
+    await db.from('lessons').update({ status: 'cancelled' }).eq('id', lessonId);
+  } else {
+    const { error: uErr } = await db.from('lessons').update({
+      teacher_id: f.teacherId, studio_id: f.studioId, instrument: f.instrument,
+      lesson_type: f.lType, day_of_week: f.day, start_time: f.time,
+      duration_mins: f.duration, series_notes: f.seriesNotes,
+      frequency: f.frequency,
+    }).eq('id', lessonId);
+    if (uErr) { showToast('Could not save: ' + uErr.message, 'error'); return; }
+  }
+
+  // Students may have changed too — the permanent roster only, against
+  // whichever row is now "current" (the new row when split, the same
+  // row otherwise). An occurrence-only guest on some other date is a
+  // separate row (added_for_occurrence_id set) and isn't touched here.
+  await syncPermanentRoster(activeLessonId);
+
   // How far did the old series run? The rebuilt one should reach the
   // same date rather than quietly shortening or extending it.
   const { data: lastOcc } = await db.from('lesson_occurrences')
@@ -3691,8 +3784,12 @@ async function saveSeriesEdit(lessonId, f) {
     .order('date', { ascending: false }).limit(1);
   const runsUntil = lastOcc?.[0]?.date ?? null;
 
-  // Remove only future, untouched occurrences. Anything marked is kept:
-  // a lesson that happened is a fact, whatever the series says now.
+  // Remove only future, untouched occurrences — still off the OLD
+  // lesson_id at this point, whether or not we're splitting; this is
+  // where they get re-parented, by being deleted here and reinserted
+  // under activeLessonId below. Anything marked is kept right where it
+  // is: a lesson that happened (or was already marked ahead of time,
+  // e.g. a future cancellation) is a fact, whatever the series says now.
   const { data: future } = await db.from('lesson_occurrences')
     .select('id,date').eq('lesson_id', lessonId).gte('date', today);
 
@@ -3708,21 +3805,25 @@ async function saveSeriesEdit(lessonId, f) {
   }
 
   // Rebuild from today on the new day — and the new frequency, if it
-  // changed. A weekly series switched to fortnightly mid-run keeps its
-  // past occurrences (weekly, as they happened) and generates the rest
-  // fortnightly from today.
+  // changed — attached to activeLessonId. A weekly series switched to
+  // fortnightly mid-run keeps its past occurrences (weekly, as they
+  // happened) and generates the rest fortnightly from today.
   const dates = plannedDates(
     f.day, today,
     runsUntil ? 'date_range' : 'indefinite',
     null, runsUntil, f.frequency);
 
+  // Dates to skip still checked against the OLD lesson_id: any kept/
+  // marked occurrence (including a future one, per the comment above)
+  // is still there, and its date shouldn't be duplicated under the new
+  // row either.
   const { data: kept } = await db.from('lesson_occurrences')
     .select('date').eq('lesson_id', lessonId);
   const keptDates = new Set((kept ?? []).map(o => o.date?.slice(0, 10)));
 
   const rows = dates
     .filter(d => !keptDates.has(d))
-    .map(date => ({ lesson_id: lessonId, date, status: 'scheduled' }));
+    .map(date => ({ lesson_id: activeLessonId, date, status: 'scheduled' }));
 
   if (rows.length) {
     const { error: oErr } = await db.from('lesson_occurrences').insert(rows);
@@ -3734,6 +3835,28 @@ async function saveSeriesEdit(lessonId, f) {
     `past lessons unchanged.`, 'success');
   closeLessonModal();
   loadView();
+}
+
+// Syncs the permanent roster (lesson_students rows with no
+// added_for_occurrence_id) on `targetLessonId` to match the form's
+// current `lessonStudents` selection. Pulled out of saveSeriesEdit()
+// so both the one-off path and the split-series path can call it
+// against whichever lesson_id is actually "current" for them.
+async function syncPermanentRoster(targetLessonId) {
+  const { data: existing } = await db.from('lesson_students')
+    .select('student_id').eq('lesson_id', targetLessonId).is('added_for_occurrence_id', null);
+  const before = new Set((existing ?? []).map(r => r.student_id));
+  const after  = new Set(lessonStudents);
+
+  for (const sid of after) if (!before.has(sid)) {
+    await db.from('lesson_students').insert({
+      lesson_id: targetLessonId, student_id: sid, added_for_occurrence_id: null,
+    });
+  }
+  for (const sid of before) if (!after.has(sid)) {
+    await db.from('lesson_students').delete()
+      .eq('lesson_id', targetLessonId).eq('student_id', sid).is('added_for_occurrence_id', null);
+  }
 }
 
 async function editSeries() {

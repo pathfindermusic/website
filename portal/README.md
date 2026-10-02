@@ -282,6 +282,7 @@ lesson on the admin grid.
 | | Sends | From | Templates | Limit |
 |---|---|---|---|---|
 | **Resend** (via `send-email.js`) | portal notifications | the studio's address | in `send-email.js` | Resend plan: free = 100/day |
+| **Resend** (via `receive-enquiry.js`) | enquiry acknowledgement + studio notification | the matched studio's address, `admin@` if none matched | in `receive-enquiry.js` (not `emailTemplate()` — see Phase 4d) | same Resend plan |
 | **Supabase Auth** (via Resend SMTP) | password resets | `info@` | Supabase → Auth → Email Templates | 30/hour, configurable |
 
 Supabase Auth was switched to Resend's SMTP so resets are branded and no longer
@@ -1886,16 +1887,37 @@ checked at login only: an existing session survives until it expires.
 `isAccountBlocked()` in `supabase-client.js` is there for wiring into
 `requireAuth` if per-page enforcement is ever wanted.
 
-**Website enquiries reach the portal (parallel run).** The contact form still
-posts to Zoho, which stays authoritative and still sends both the
-acknowledgement and the studio notification. A `keepalive` fetch also creates
-the enquiry and its follow-up task in the portal, so admins can work it in both
-systems. `receive-enquiry.js` sends nothing — see `SEND_ACKNOWLEDGEMENT` for
-the cutover.
+**Phase 4d complete (Oct 2026) — website enquiries go to the portal only,
+Zoho retired from this path.** The contact form on `index.html` and
+`pricing.html` no longer posts to Zoho at all; it submits via `fetch` to
+`receive-enquiry.js`, which is now the sole destination and sends both emails
+Zoho used to send — the acknowledgement to the enquirer and the notification
+to the studio (reply-to set to the enquirer, so the studio can just hit
+reply). On success the browser redirects to the same thank-you page Zoho used
+to redirect to; on failure the form shows an inline error rather than losing
+the enquiry silently, and the submit button and reCAPTCHA widget both reset so
+the visitor can retry.
 
-Protections are an origin check, a honeypot field and duplicate suppression
-within the hour. reCAPTCHA is **not** verified: Zoho consumes the token and
-Google allows one verification per token. At cutover the portal takes it over.
+These two emails are built with their own small, fully-`escapeHtml`'d
+templates in `receive-enquiry.js` — deliberately **not** `send-email.js`'s
+`emailTemplate()` markdown-lite renderer, since these carry free text an
+enquirer typed into a public form, and that renderer's `**bold**`/
+`[link](url)` syntax would let an enquirer's own message turn itself into a
+styled callout or a clickable link in the studio's inbox.
+
+Protections are an origin check, a honeypot field, duplicate suppression
+within the hour, and now **server-side reCAPTCHA verification** (the form's
+existing checkbox widget was always client-side only — Zoho consumed the
+token itself, and Google only allows one verification per token, so this
+function never could have also checked it against the same token). This
+needs `RECAPTCHA_SECRET_KEY` set in Netlify (the secret for the sitekey
+already on the form, from the Google reCAPTCHA admin console) — without it,
+`verifyRecaptcha()` logs an error and **skips verification rather than
+rejecting every submission**, so the form stays up but isn't actually
+protected until that key is set. Same fail-open philosophy if Google itself
+is unreachable at submit time. Missing `RESEND_API_KEY` degrades similarly:
+the enquiry and its task are still created, the two emails are just skipped
+(logged) — never the other way around.
 
 **Lesson reminders** run from a Netlify scheduled function at 20:00 UTC — 6 AM
 Melbourne in winter, 7 AM in summer. Netlify cron is UTC only, so an
@@ -1923,8 +1945,10 @@ trial and enrolment confirmations, the enquiry acknowledgement, check-in,
 payment follow-up and farewell — silently, for weeks. Fixed in `processes.js`;
 `email_log` has the record of everything that went out regardless.
 
-**Next up:** finish end-enrolment testing; Phase 4d (website form posts to the
-portal, Zoho retired); attendance report page; RLS on views before go-live.
+**Next up:** finish end-enrolment testing; attendance report page; RLS on
+views before go-live; set `RECAPTCHA_SECRET_KEY` in Netlify so the new
+server-side reCAPTCHA check on enquiries actually takes effect (see Phase 4d
+above).
 
 **Teacher landing page.** The teacher dashboard shows an open-task count —
 red when non-zero — and a strip listing outstanding tasks above the schedule.

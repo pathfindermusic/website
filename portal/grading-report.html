@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grading Report — Pathfinder Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/portal.css">
+  <style>
+    .report-toolbar {
+      display: flex; align-items: flex-end; gap: 0.75rem; flex-wrap: wrap;
+      margin-bottom: 1.25rem;
+    }
+    .toolbar-field { display: flex; flex-direction: column; gap: 0.3rem; }
+    .toolbar-field label {
+      font-size: 0.72rem; font-weight: 600; color: var(--mid-grey);
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .toolbar-field input[type="date"] {
+      font-size: 0.82rem; font-family: 'Inter', sans-serif;
+      padding: 0.46rem 0.7rem; border: 1px solid var(--border);
+      border-radius: var(--r-sm); background: var(--white); color: var(--charcoal);
+    }
+    .toolbar-search {
+      display: flex; align-items: center; gap: 0.4rem;
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      background: var(--white); padding: 0.46rem 0.75rem; min-width: 200px;
+    }
+    .toolbar-search input {
+      border: none; outline: none; font-size: 0.82rem; font-family: 'Inter', sans-serif;
+      width: 100%; background: transparent; color: var(--charcoal);
+    }
+
+    th.sortable { cursor: pointer; user-select: none; }
+    th.sortable:hover { color: rgba(255,255,255,0.95); }
+    th.sortable .arrow { opacity: 0.55; margin-left: 3px; font-size: 0.7rem; }
+
+    .student-name-cell { font-weight: 600; color: var(--charcoal); }
+    .grade-pill {
+      display: inline-block; padding: 0.2rem 0.55rem; border-radius: 999px;
+      font-size: 0.78rem; font-weight: 600; white-space: nowrap;
+      background: rgba(232,73,30,0.1); color: var(--orange);
+      border: 1px solid rgba(232,73,30,0.25);
+    }
+    .notes-cell { color: var(--dark-grey); font-size: 0.82rem; }
+    .notes-cell.empty { color: var(--mid-grey); font-style: italic; }
+
+    .toolbar-checkbox {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 0.8rem; color: var(--dark-grey); padding-bottom: 0.5rem;
+    }
+    .toolbar-checkbox input { accent-color: var(--orange); }
+    .ungraded-row td { color: var(--mid-grey); }
+    .ungraded-row .student-name-cell { color: var(--charcoal); }
+    .not-graded-cell { font-style: italic; color: var(--mid-grey); }
+  </style>
+</head>
+<body>
+<div class="portal-shell">
+
+  <nav class="topnav">
+    <a href="#" class="topnav-logo"><img src="../Logo_-_long.png" alt="Pathfinder Music Lessons"></a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">–</span>
+        </div>
+      </div>
+      <a href="change-password.html" class="btn-logout" style="text-decoration:none;">🔑 Password</a>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Front desk</div>
+    <a class="nav-item" href="tasks.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Tasks
+    </a>
+    <a class="nav-item" href="enquiries.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+      Enquiries
+    </a>
+    <a class="nav-item" href="notifications.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/></svg>
+      Notifications
+    </a>
+    <a class="nav-item" href="day-sheet.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
+      Day Sheet
+    </a>
+    <div class="sidebar-section">Teaching</div>
+    <a class="nav-item" href="lessons.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Lessons
+    </a>
+    <a class="nav-item" href="students.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      Students
+    </a>
+    <a class="nav-item" href="teachers.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+      Teachers
+    </a>
+    <div class="sidebar-section">Curriculum</div>
+    <a class="nav-item" href="bok-artefacts.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Artefact Library
+    </a>
+    <div class="sidebar-section">Reports</div>
+    <a class="nav-item" href="attendance-report.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Attendance
+    </a>
+    <a class="nav-item active" href="grading-report.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+      Grading
+    </a>
+    <a class="nav-item" href="credits.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/></svg>
+      Credits
+    </a>
+    <a class="nav-item" href="distribution-lists.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      Distribution Lists
+    </a>
+    <div class="sidebar-section hidden" id="superuserSection">Super User</div>
+    <a class="nav-item hidden" href="studios.html" id="studiosLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Studios
+    </a>
+    <a class="nav-item hidden" href="admins.html" id="adminsLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Admins
+    </a>
+    <div class="sidebar-section">Manuals</div>
+    <a class="nav-item" href="manuals/index.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      How-To Guide
+    </a>
+  </aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Grading Report</div>
+        <div class="page-sub" id="pageSub">Loading…</div>
+      </div>
+      <div class="flex gap-1" style="flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm" onclick="exportCSV()">⬇ Export CSV</button>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="report-toolbar">
+      <div class="toolbar-field">
+        <label for="filterStudio">Studio</label>
+        <select class="filter-select" id="filterStudio" onchange="loadReport()">
+          <option value="">All Studios</option>
+        </select>
+      </div>
+      <div class="toolbar-field">
+        <label for="filterTeacher">Teacher</label>
+        <select class="filter-select" id="filterTeacher" onchange="loadReport()">
+          <option value="">All Teachers</option>
+        </select>
+      </div>
+      <div class="toolbar-field">
+        <label for="filterInstrument">Instrument</label>
+        <select class="filter-select" id="filterInstrument" onchange="loadReport()">
+          <option value="">All Instruments</option>
+        </select>
+      </div>
+      <div class="toolbar-field">
+        <label for="fromDate">From</label>
+        <input type="date" id="fromDate" onchange="loadReport()">
+      </div>
+      <div class="toolbar-field">
+        <label for="toDate">To</label>
+        <input type="date" id="toDate" onchange="loadReport()">
+      </div>
+      <div class="toolbar-search">
+        <span>🔍</span>
+        <input type="text" id="searchInput" placeholder="Search student…" oninput="renderTable()">
+      </div>
+      <label class="toolbar-checkbox">
+        <input type="checkbox" id="showUngraded" onchange="renderTable()">
+        Show ungraded students
+      </label>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row" id="statsRow">
+      <div class="stat-card">
+        <div class="stat-card-top">
+          <span class="stat-label">Gradings</span>
+          <div class="stat-icon">🏅</div>
+        </div>
+        <div class="stat-value" id="statTotal">–</div>
+        <div class="stat-sub">in this filter</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-top">
+          <span class="stat-label">Students graded</span>
+          <div class="stat-icon">👥</div>
+        </div>
+        <div class="stat-value" id="statStudents">–</div>
+        <div class="stat-sub">distinct students</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-top">
+          <span class="stat-label">Instruments</span>
+          <div class="stat-icon">🎵</div>
+        </div>
+        <div class="stat-value" id="statInstruments">–</div>
+        <div class="stat-sub">represented in this filter</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-top">
+          <span class="stat-label">Date range</span>
+          <div class="stat-icon">📅</div>
+        </div>
+        <div class="stat-value" id="statRange" style="font-size:1.1rem;">–</div>
+        <div class="stat-sub">grading date, not lesson date</div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="schedule-wrap">
+      <table class="schedule-table" id="reportTable">
+        <thead>
+          <tr>
+            <th class="sortable" onclick="setSort('name')">Student<span class="arrow" id="arrow-name"></span></th>
+            <th>Studio</th>
+            <th>Instrument</th>
+            <th>Teacher</th>
+            <th>Grade</th>
+            <th class="sortable" onclick="setSort('date')">Grading Date<span class="arrow" id="arrow-date"></span></th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody id="reportBody">
+          <tr><td colspan="7"><div class="loading"><div class="spinner"></div> Loading…</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script>
+
+// Canonical instrument list — must stay identical to lessons.html / students.html / teachers.html
+const INSTRUMENTS = ['Guitar','Bass','Drums','Piano / Keyboard','Voice / Singing','Violin','Ukulele','Music Theory','Saxophone','Band','Other'];
+
+let currentProfile = null;
+let myStudioIds     = [];
+let allRows         = [];   // every actual grading row for the current filter, before search
+let ungradedRows    = [];   // one row per (student, instrument) in scope with no grading in range
+let sortKey         = 'date';
+let sortDir         = 'desc';
+
+// ---- Init ----
+(async () => {
+  currentProfile = await requireAuth(['superuser','admin']);
+  if (!currentProfile) return;
+
+  renderTopNavUser(currentProfile);
+
+  if (currentProfile.role === 'superuser') {
+    document.getElementById('superuserSection').classList.remove('hidden');
+    document.getElementById('studiosLink').classList.remove('hidden');
+    document.getElementById('adminsLink').classList.remove('hidden');
+  }
+
+  if (window.innerWidth < 900) {
+    document.getElementById('menuToggle').style.display = '';
+  }
+
+  // Default range: 1 January this year, through today — a school-year-
+  // to-date view of grading activity, open anytime without first having
+  // to set dates.
+  const today = new Date();
+  const jan1  = new Date(today.getFullYear(), 0, 1);
+  document.getElementById('toDate').value   = toISODate(today);
+  document.getElementById('fromDate').value = toISODate(jan1);
+
+  const instSel = document.getElementById('filterInstrument');
+  INSTRUMENTS.forEach(i => { instSel.innerHTML += `<option value="${i}">${i}</option>`; });
+
+  await loadFilters();
+  await loadReport();
+})();
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+// ---- Filters: studios + teachers ----
+async function loadFilters() {
+  const { data: studios } = await db.from('studios').select('id, name').eq('status','active').order('name');
+
+  if (currentProfile.role === 'superuser') {
+    myStudioIds = (studios ?? []).map(s => s.id);
+  } else {
+    const { data: me } = await db.from('admins')
+      .select('studio_ids').eq('user_id', currentProfile.id).maybeSingle();
+    myStudioIds = me?.studio_ids?.length ? me.studio_ids : (studios ?? []).map(s => s.id);
+  }
+
+  const studioSel = document.getElementById('filterStudio');
+  (studios ?? []).forEach(s => { studioSel.innerHTML += `<option value="${s.id}">${s.name}</option>`; });
+
+  const { data: teachers } = await db
+    .from('teachers')
+    .select('id, profiles(first_name, last_name)')
+    .order('profiles(last_name)');
+  const teacherSel = document.getElementById('filterTeacher');
+  (teachers ?? []).forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = `${t.profiles?.first_name ?? ''} ${t.profiles?.last_name ?? ''}`.trim();
+    teacherSel.appendChild(opt);
+  });
+
+  // Default the studio filter to this admin's own studio — after the
+  // options exist, or applyDefaultStudio finds no match and gives up.
+  // No onChange here: the caller loads the report right after this
+  // returns, so triggering it again here would just double the fetch.
+  applyDefaultStudio('filterStudio', myStudioIds);
+}
+
+// ---- Load ----
+// Grading is a history, not a current snapshot, so this reads
+// student_grade_milestones directly (one row per grading event) rather
+// than student_current_grades (which collapses to just the latest grade
+// per student/instrument and would hide everything else in the date
+// range). The milestones table doesn't carry studio/teacher of its own —
+// see the README note on grade animal names and the students table's
+// own lack of a "current teacher" column — so, same as the Attendance
+// report, "studio" and "teacher" here reflect the student's CURRENT
+// assignment, not necessarily who taught them on the day the grade was
+// actually recorded.
+async function loadReport() {
+  const studio     = document.getElementById('filterStudio').value;
+  const teacher    = document.getElementById('filterTeacher').value;
+  const instrument = document.getElementById('filterInstrument').value;
+  const from       = document.getElementById('fromDate').value;
+  const to         = document.getElementById('toDate').value;
+
+  document.getElementById('reportBody').innerHTML =
+    `<tr><td colspan="7"><div class="loading"><div class="spinner"></div> Loading…</div></td></tr>`;
+
+  // Active students in scope for the studio filter — a student's own
+  // name (students.first_name/last_name) is the source of truth, same
+  // as everywhere else since phase 10 (Oct 2026): siblings sharing a
+  // login would otherwise all show whichever name is on the shared
+  // profiles row.
+  let studentQuery = db.from('students')
+    .select('id, studio_id, status, first_name, last_name, profiles(first_name, last_name)')
+    .eq('status', 'active');
+  if (studio) studentQuery = studentQuery.eq('studio_id', studio);
+  const { data: allStudents, error: studentErr } = await studentQuery;
+
+  if (studentErr) {
+    console.error('[grading report] students query failed:', studentErr);
+    document.getElementById('reportBody').innerHTML =
+      `<tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon">⚠️</div><h3>Couldn't load students</h3><p>${studentErr.message}</p></div></td></tr>`;
+    return;
+  }
+
+  const studentsMap = {};
+  (allStudents ?? []).forEach(s => {
+    const name = `${s.first_name ?? ''} ${s.last_name ?? ''}`.trim()
+              || `${s.profiles?.first_name ?? ''} ${s.profiles?.last_name ?? ''}`.trim();
+    studentsMap[s.id] = { name: name || '(no name)', studioId: s.studio_id };
+  });
+  const studentIds = Object.keys(studentsMap);
+
+  if (studentIds.length === 0) {
+    allRows = [];
+    document.getElementById('pageSub').textContent =
+      `${toDisplayDate(from)} – ${toDisplayDate(to)} · grading date, not lesson date`;
+    renderTable();
+    return;
+  }
+
+  // Every grading milestone in range, for students in scope. Embeds
+  // bok_grade_levels so gradeLabel() has tier/label/sort_order to work
+  // with without a second round trip.
+  let milestoneQuery = db.from('student_grade_milestones')
+    .select('id,student_id,instrument,achieved_on,notes,grade_level_id,bok_grade_levels(tier,label,sort_order)')
+    .in('student_id', studentIds)
+    .gte('achieved_on', from)
+    .lte('achieved_on', to)
+    .order('achieved_on', { ascending: false });
+  if (instrument) milestoneQuery = milestoneQuery.eq('instrument', instrument);
+
+  const { data: milestones, error: msErr } = await milestoneQuery;
+  if (msErr) {
+    console.error('[grading report] milestones query failed:', msErr);
+    document.getElementById('reportBody').innerHTML =
+      `<tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon">⚠️</div><h3>Couldn't load gradings</h3><p>${msErr.message}</p></div></td></tr>`;
+    return;
+  }
+
+  // Current teacher per student+instrument, from each student's
+  // permanent lesson roster (added_for_occurrence_id null) on an active
+  // lesson — same "whose student is this" test as the Attendance
+  // report's teacher filter and my-students.html's own roster.
+  const { data: activeLessons } = await db.from('lessons')
+    .select('id,teacher_id,instrument').eq('status','active');
+  const lessonIds = (activeLessons ?? []).map(l => l.id);
+  const { data: roster } = lessonIds.length > 0
+    ? await db.from('lesson_students')
+        .select('lesson_id,student_id').in('lesson_id', lessonIds).is('added_for_occurrence_id', null)
+    : { data: [] };
+
+  const lessonById = {};
+  (activeLessons ?? []).forEach(l => { lessonById[l.id] = l; });
+
+  const { data: teacherRows } = await db.from('teachers').select('id, profiles(first_name, last_name)');
+  const teacherNameById = {};
+  (teacherRows ?? []).forEach(t => {
+    teacherNameById[t.id] = `${t.profiles?.first_name ?? ''} ${t.profiles?.last_name ?? ''}`.trim();
+  });
+
+  // studentId -> instrument -> Set(teacherId)
+  const teacherByStudentInstrument = {};
+  (roster ?? []).forEach(r => {
+    const lesson = lessonById[r.lesson_id];
+    if (!lesson) return;
+    const byInst = (teacherByStudentInstrument[r.student_id] ??= {});
+    (byInst[lesson.instrument] ??= new Set()).add(lesson.teacher_id);
+  });
+
+  function teachersFor(studentId, inst) {
+    const ids = teacherByStudentInstrument[studentId]?.[inst];
+    if (!ids || ids.size === 0) return '–';
+    return [...ids].map(id => teacherNameById[id]).filter(Boolean).sort().join(', ') || '–';
+  }
+
+  // Teacher filter applies after the roster map exists, since it needs
+  // to check per (student, instrument), not just per student — a
+  // student can have different teachers for different instruments.
+  let rows = (milestones ?? [])
+    .filter(m => studentsMap[m.student_id])
+    .map(m => {
+      const s = studentsMap[m.student_id];
+      return {
+        id: m.id,
+        studentId: m.student_id,
+        name: s.name,
+        studioId: s.studioId,
+        instrument: m.instrument,
+        teacherIds: [...(teacherByStudentInstrument[m.student_id]?.[m.instrument] ?? [])],
+        teacherNames: teachersFor(m.student_id, m.instrument),
+        grade: gradeLabel(m.bok_grade_levels, m.instrument),
+        date: m.achieved_on,
+        notes: m.notes ?? '',
+      };
+    });
+
+  if (teacher) rows = rows.filter(r => r.teacherIds.includes(teacher));
+
+  // Ungraded students: every (student, instrument) pair the student is
+  // currently enrolled in — same roster map as the Teacher column above
+  // — that has no milestone at all in this date range. Per instrument,
+  // not per student, since a student can be graded in one instrument
+  // and not another. Only shown when "Show ungraded students" is
+  // ticked; same idea as the Attendance report's zero-lesson rows.
+  const gradedKey = new Set(rows.map(r => `${r.studentId}:${r.instrument}`));
+  let ungraded = [];
+  Object.keys(studentsMap).forEach(studentId => {
+    const byInst = teacherByStudentInstrument[studentId] ?? {};
+    Object.keys(byInst).forEach(inst => {
+      if (instrument && inst !== instrument) return;
+      if (gradedKey.has(`${studentId}:${inst}`)) return;
+      const s = studentsMap[studentId];
+      ungraded.push({
+        id: `ungraded:${studentId}:${inst}`,
+        studentId, name: s.name, studioId: s.studioId,
+        instrument: inst,
+        teacherIds: [...byInst[inst]],
+        teacherNames: teachersFor(studentId, inst),
+        grade: '', date: null, notes: '',
+        isUngraded: true,
+      });
+    });
+  });
+  if (teacher) ungraded = ungraded.filter(r => r.teacherIds.includes(teacher));
+
+  allRows      = rows;
+  ungradedRows = ungraded;
+
+  document.getElementById('pageSub').textContent =
+    `${toDisplayDate(from)} – ${toDisplayDate(to)} · grading date, not lesson date`;
+
+  renderTable();
+}
+
+function toDisplayDate(iso) {
+  return iso ? formatShortDate(parseLocalDate(iso)) : '';
+}
+
+// ---- Sorting ----
+function setSort(key) {
+  if (sortKey === key) { sortDir = sortDir === 'asc' ? 'desc' : 'asc'; }
+  else { sortKey = key; sortDir = key === 'date' ? 'desc' : 'asc'; }
+  renderTable();
+}
+
+// ---- Render ----
+function renderTable() {
+  const q             = document.getElementById('searchInput').value.trim().toLowerCase();
+  const showUngraded  = document.getElementById('showUngraded').checked;
+
+  const source = showUngraded ? allRows.concat(ungradedRows) : allRows;
+  let list = source.filter(r => !q || r.name.toLowerCase().includes(q));
+
+  list = list.slice().sort((a, b) => {
+    // Ungraded rows have no date — always last when sorting by date,
+    // regardless of direction, same as a "no lessons" row on the
+    // Attendance report never competing with a real rate.
+    if (sortKey === 'date' && (a.date == null) !== (b.date == null)) {
+      return a.date == null ? 1 : -1;
+    }
+    let av = a[sortKey], bv = b[sortKey];
+    if (av === bv) return a.name.localeCompare(b.name);
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    return sortDir === 'asc' ? (av < bv ? -1 : 1) : (av < bv ? 1 : -1);
+  });
+
+  // Stats always describe actual gradings, never the ungraded
+  // placeholders, even when "Show ungraded students" is ticked.
+  const graded = list.filter(r => !r.isUngraded);
+  document.getElementById('statTotal').textContent = graded.length;
+  document.getElementById('statStudents').textContent = new Set(graded.map(r => r.studentId)).size;
+  document.getElementById('statInstruments').textContent = new Set(graded.map(r => r.instrument)).size;
+  document.getElementById('statRange').textContent =
+    `${toDisplayDate(document.getElementById('fromDate').value)} – ${toDisplayDate(document.getElementById('toDate').value)}`;
+
+  ['name','date'].forEach(k => {
+    document.getElementById(`arrow-${k}`).textContent = sortKey === k ? (sortDir === 'asc' ? '▲' : '▼') : '';
+  });
+
+  const tbody = document.getElementById('reportBody');
+  if (list.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon">📭</div><h3>No gradings match</h3><p>Try widening the date range, clearing a filter, or ticking "Show ungraded students".</p></div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = list.map(r => r.isUngraded ? `
+    <tr class="ungraded-row">
+      <td class="student-name-cell">${escapeHTML(r.name)}</td>
+      <td>${studioName(r.studioId)}</td>
+      <td>${escapeHTML(r.instrument)}</td>
+      <td>${escapeHTML(r.teacherNames)}</td>
+      <td class="not-graded-cell">Not yet graded</td>
+      <td>–</td>
+      <td class="notes-cell empty">–</td>
+    </tr>` : `
+    <tr>
+      <td class="student-name-cell">${escapeHTML(r.name)}</td>
+      <td>${studioName(r.studioId)}</td>
+      <td>${escapeHTML(r.instrument)}</td>
+      <td>${escapeHTML(r.teacherNames)}</td>
+      <td><span class="grade-pill">${escapeHTML(r.grade) || '–'}</span></td>
+      <td>${formatShortDate(parseLocalDate(r.date))}</td>
+      <td class="notes-cell ${r.notes ? '' : 'empty'}">${r.notes ? escapeHTML(r.notes) : 'No notes'}</td>
+    </tr>`).join('');
+}
+
+let studiosCache = null;
+function studioName(id) {
+  // populated lazily from the filter select, which already has every active studio
+  if (!studiosCache) {
+    studiosCache = {};
+    [...document.getElementById('filterStudio').options].forEach(o => { if (o.value) studiosCache[o.value] = o.textContent; });
+  }
+  return studiosCache[id] ?? '–';
+}
+
+function escapeHTML(str) {
+  const div = document.createElement('div');
+  div.textContent = str ?? '';
+  return div.innerHTML;
+}
+
+// ---- CSV export ----
+function exportCSV() {
+  const showUngraded = document.getElementById('showUngraded').checked;
+  const source = showUngraded ? allRows.concat(ungradedRows) : allRows;
+  const header = ['Student','Studio','Instrument','Teacher','Grade','Grading Date','Notes'];
+  const rows = source.map(r => [
+    r.name, studioName(r.studioId), r.instrument, r.teacherNames,
+    r.isUngraded ? 'Not yet graded' : r.grade,
+    r.isUngraded ? '' : r.date,
+    r.isUngraded ? '' : r.notes,
+  ]);
+  const csv = [header, ...rows]
+    .map(row => row.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))
+    .join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const from = document.getElementById('fromDate').value;
+  const to   = document.getElementById('toDate').value;
+  a.href = url;
+  a.download = `grading-report_${from}_to_${to}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+</script>
+</body>
+</html>

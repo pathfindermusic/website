@@ -259,6 +259,7 @@ function renderSidebar() {
     list:  '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
     help:  '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
     ticket:'<path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/>',
+    award: '<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>',
   };
   const it = (h,l,p,a) => `<a class="nav-item ${a?'active':''}" href="${h}">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${p}</svg>${l}</a>`;
@@ -278,6 +279,7 @@ function renderSidebar() {
     ${it('bok-artefacts.html','Artefact Library',I.book)}
     <div class="sidebar-section">Reports</div>
     ${it('attendance-report.html','Attendance',I.check)}
+    ${it('grading-report.html','Grading',I.award)}
     ${it('credits.html','Credits',I.ticket)}
     ${it('distribution-lists.html','Distribution Lists',I.list)}`;
   if (me.role === 'superuser') {
