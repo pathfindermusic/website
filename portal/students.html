@@ -708,6 +708,10 @@ function renderStudents(students) {
       <td>
         <div class="action-btns" onclick="event.stopPropagation()">
           <button class="btn btn-ghost btn-sm" onclick="openStudentByIndex(${allStudents.indexOf(s)})">Edit</button>
+          ${(s.status === 'trial' || s.status === 'active')
+            ? `<button class="btn btn-ghost btn-sm" onclick="triggerFinanceFollowUp('${s.id}')"
+                  title="Email the family about a failed payment and create a follow-up task">Finance Follow-up</button>`
+            : ''}
           ${s.status === 'inactive'
             ? `<button class="btn btn-secondary btn-sm" onclick="reactivateStudent('${s.id}')">Reactivate</button>`
             : endDone[s.id]
@@ -982,6 +986,42 @@ async function planEndEnrolment() {
 
   closeProcess();
   showToast(`Task created, due ${formatShortDate(parseLocalDate(when.trim()))}. Closing it starts the end-enrolment checklist.`, 'success');
+}
+
+// One click: email the family about a failed payment and raise a
+// follow-up task, replacing the old send-it-from-Gmail-then-add-a-task
+// two-step process. `sendFinanceFollowUp` (processes.js) does both; this
+// just confirms, works out which studio the task should belong to, and
+// reports the result.
+async function triggerFinanceFollowUp(studentId) {
+  const s = allStudents.find(x => x.id === studentId);
+  const first = s?.first_name ?? s?.profiles?.first_name ?? '';
+  const last  = s?.last_name  ?? s?.profiles?.last_name  ?? '';
+  const name  = `${first} ${last}`.trim() || 'this student';
+
+  if (!confirm(
+    `Email ${name} now about a failed payment, and create a follow-up task?\n\n` +
+    `Subject: Urgent: Finance Follow-up`)) return;
+
+  // The task belongs to whichever studio this admin is currently working
+  // from (the Studio filter above, same "default, not a restriction"
+  // convention as the rest of the Portal) — falls back to the student's
+  // own studio when "All Studios" is selected.
+  const taskStudioId = document.getElementById('filterStudio').value || s?.studio_id || null;
+
+  const result = await sendFinanceFollowUp(studentId, currentProfile.id, taskStudioId);
+
+  const failureMessages = {
+    'no-studio-email': `${name}'s studio has no email address on file — nothing was sent.`,
+    'no-address':      `${name} has no reachable email address on file — nothing was sent.`,
+    'no-recipients':   `${name} has no reachable email address on file — nothing was sent.`,
+  };
+
+  if (result === 'sent') {
+    showToast(`Finance follow-up email sent to ${name}, and a task was created.`, 'success');
+  } else {
+    showToast(failureMessages[result] ?? 'Could not send the finance follow-up email. Try again shortly.', 'error');
+  }
 }
 
 // What can sensibly be started from where they are now.

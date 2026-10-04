@@ -1,6 +1,6 @@
 ---
 title: Admin Guide
-updated: 2026-09-28
+updated: 2026-10-03
 ---
 <h2 id="getting-started">Getting started</h2>
 <p>
@@ -73,11 +73,47 @@ it's blocked on enquiry follow-ups, because every enquiry genuinely needs
 chasing. <strong>Discard as spam</strong> permanently deletes the enquiry,
 its record and its task(s) — use it only for fake/spam enquiries, never
 for a real person who simply didn't proceed. <strong>Mark done</strong> on
-a real enquiry or trial opens a "How did it go?" prompt (Booked a trial /
-Enrolling / Not proceeding) that updates the student's status correctly —
-this is almost always the right button for a genuine enquiry or trial.
+a real enquiry or trial opens a "How did it go?" prompt — <strong>Booked a
+trial</strong>, <strong>Enrolling</strong>, <strong>Not proceeding</strong>,
+or <strong>Ready, but no suitable slot — add to waiting list</strong> —
+that updates the student's status correctly; this is almost always the
+right button for a genuine enquiry or trial.
 </p>
 </div>
+
+<h4 id="waiting-list">Waiting list</h4>
+<p>
+Sometimes a family is ready and keen to enrol, but there's no suitable
+lesson slot open right now. Rather than leaving the enquiry hanging or
+closing it as "Not proceeding," pick <strong>Ready, but no suitable slot —
+add to waiting list</strong> from the "How did it go?" prompt.
+</p>
+<ul>
+<li>The task <strong>stays open</strong>, with no due date, instead of
+closing — this is what keeps it out of Overdue/Due today and off your
+daily radar until you come looking for it.</li>
+<li>The student's status doesn't change — they stay <strong>prospective</strong>,
+the same as any other undecided enquiry.</li>
+<li>A note — <em>"Student added to waiting list"</em> — is added to the
+task's contact log automatically, so there's always a record of when and
+why someone went on the list.</li>
+<li>You can record <strong>Preferred teacher</strong>, <strong>Preferred
+day</strong> and <strong>Preferred time</strong> on the task — either at
+the moment you add someone to the list, or later, once you've actually
+discussed it with the family. Open the task and look for the Waiting list
+details section; any of the three can be left blank if you don't have
+that detail yet, and you can come back and fill them in or change them at
+any time.</li>
+<li>"Preferred studio" isn't a separate field — it's just whichever studio
+the task is already set to.</li>
+</ul>
+<p>
+Checking the waiting list for openings is currently a manual process:
+click the <strong>Waiting list</strong> bucket tile and work through the
+entries, comparing what each one is waiting for against the current
+timetable. There's no automatic alert yet when a matching slot opens up —
+if that would be useful, mention it to your developer.
+</p>
 <div class="callout callout-tip">
 <strong>Waiting list entries are easy to forget</strong>
 <p>
@@ -85,6 +121,17 @@ Waitlist tasks don't have a due date and are deliberately left out of
 Overdue/Due today/Next 7 days, so they don't clutter those counts — but
 that also means they're invisible unless you click "Waiting list" or
 switch Status to "Everything."
+</p>
+</div>
+<div class="callout callout-tip">
+<strong>Entries lapse automatically after 3 months</strong>
+<p>
+A family is unlikely to still be waiting three months on, so a waiting
+list entry that's been open that long closes itself overnight — the
+student is marked lapsed, with a note explaining why, exactly as if you'd
+chosen "Not proceeding" by hand. If you've since booked a trial or
+enrolled the student yourself, this won't touch them — it only acts on
+entries nobody has moved on from.
 </p>
 </div>
 
@@ -253,10 +300,27 @@ it walks through a short checklist rather than just flipping a status.</li>
 <li><strong>Reset PW</strong> sends a password-reset email (only if the
 student has their own login); <strong>Add login</strong> creates one for a
 student who doesn't have one yet.</li>
+<li><strong>Finance Follow-up</strong> (Trial/Active students only) emails
+the family about a failed payment and creates a follow-up task in one
+click — see below.</li>
 <li><strong>CSV Import</strong> lets you bulk-load students from a
 spreadsheet (a template is provided) — up to 1000 rows at a time, matched
 to existing records by email.</li>
 </ul>
+<div class="callout callout-tip">
+<strong>Finance Follow-up replaces the Gmail-then-task two-step</strong>
+<p>
+Click <strong>Finance Follow-up</strong> next to a Trial or Active
+student to send a fixed "Urgent: Finance Follow-up" email about a failed
+payment, and automatically create a task — assigned to you, in your
+currently selected studio, due the next day — with a log entry already
+explaining what happened. From there it's chased like any other task:
+log each contact attempt in its contact log, and once the payment goes
+through, just tick it done — that's it, no second email, no follow-up
+prompt. The button itself only ever sends the one email; use it again by
+hand if you ever need to send another.
+</p>
+</div>
 <div class="callout callout-tip">
 <strong>There's no delete button — and that's deliberate</strong>
 <p>

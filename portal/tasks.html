@@ -1884,21 +1884,24 @@ async function resolveEnquiry(outcome) {
 // The plain close, with the enquiry prompt already dealt with
 // Some tasks have an email that goes with them. Offer it at the moment
 // the admin closes the task, rather than expecting them to remember.
+//
+// Finance problem tasks used to be offered here too — closing one asked
+// to resend the payment email and raised tomorrow's follow-up task in a
+// loop. The studio decided against that (Oct 2026): once the Finance
+// Follow-up email has gone out, the task is chased and logged just like
+// any other task, and marking it done should simply close it — no
+// prompt, no second email. `sendFinanceFollowUp()` is still what the
+// Students page button calls to send that first email.
 async function offerTaskEmail(id) {
   const t = tasks.find(x => x.id === id);
   if (!t || t.subject_type !== 'student') return;
 
   const title = String(t.title ?? '').toLowerCase();
-  const isCheckIn = title.startsWith('check-in');
-  const isFinance = title.startsWith('finance follow-up');
-  if (!isCheckIn && !isFinance) return;
+  if (!title.startsWith('check-in')) return;
 
-  const what = isCheckIn ? 'the check-in email' : 'the payment follow-up email';
-  if (!confirm(`Send ${what} to the student?`)) return;
+  if (!confirm('Send the check-in email to the student?')) return;
 
-  const r = isCheckIn
-    ? await sendCheckInEmail(t.subject_id, me.id)
-    : await sendFinanceFollowUp(t.subject_id, me.id);
+  const r = await sendCheckInEmail(t.subject_id, me.id);
 
   showToast(
     r === 'sent' ? 'Email sent.'

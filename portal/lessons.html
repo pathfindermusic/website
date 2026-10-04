@@ -4025,6 +4025,13 @@ async function cancelOccurrence(scope) {
   const occ      = allOccurrences.find(o => o.id === occId);
   const occDate  = occ?.date ?? today;
 
+  // Whatever's currently typed in the Notes field — an admin cancelling
+  // straight after typing a reason, without clicking Save first, should
+  // not lose it. Only "Cancel this lesson only" writes it anywhere (the
+  // single occurrence being cancelled); "this + future"/"the series"
+  // don't touch occurrence_notes at all, same as before.
+  const liveNotes = document.getElementById('occNotes').value.trim();
+
   // Ask whether to notify the student(s) before cancelling
   const notify = confirm(
     'Email the student(s) to let them know this lesson has been cancelled?\n\n' +
@@ -4034,8 +4041,13 @@ async function cancelOccurrence(scope) {
 
   if (scope === 'single') {
     // One-off: the series continues, so this shows with a red ✕
-    await db.from('lesson_occurrences').update({ status: 'cancelled' }).eq('id', occId);
+    await db.from('lesson_occurrences')
+      .update({ status: 'cancelled', occurrence_notes: liveNotes || null })
+      .eq('id', occId);
     showToast('Lesson occurrence cancelled.', 'success');
+    // Keep the in-memory copy in step with what was just saved, so the
+    // email below (and the grid, until the next reload) reflect it too.
+    if (occ) occ.occurrence_notes = liveNotes || null;
 
     // A single-date cancellation is exactly the "teacher unavailable /
     // public holiday" scenario a lesson credit is meant for. "Cancel
@@ -4105,6 +4117,17 @@ async function sendCancellationEmail(occId, occ, scope = 'single') {
 
   const ongoing = (scope === 'future' || scope === 'all');
 
+  // Only a single-occurrence cancellation carries its own note into the
+  // email. For "this + future"/"the series", occ is still just the one
+  // occurrence that happened to be open when Cancel was clicked — its
+  // note was very likely written for an earlier, unrelated purpose (e.g.
+  // "bring sheet music", "online this week") and would be misleading
+  // attached to a blanket "cancelled from X onwards" notice, so it's left
+  // out there rather than guessed at.
+  const noteLine = (!ongoing && occ?.occurrence_notes)
+    ? `Note from the studio: ${occ.occurrence_notes}\n\n`
+    : '';
+
   const bodyText = ongoing
     ? 'Dear {{student_name}},\n\n' +
       'Your {{instrument}} lessons with {{teacher_name}} at {{lesson_time}} on {{lesson_weekday}}s ' +
@@ -4113,6 +4136,7 @@ async function sendCancellationEmail(occId, occ, scope = 'single') {
       'Kind regards,\nPathfinder Music Lessons'
     : 'Dear {{student_name}},\n\n' +
       'Your {{instrument}} lesson with {{teacher_name}} at {{lesson_time}} on {{lesson_day}} has been cancelled.\n\n' +
+      noteLine +
       'Our admin will contact you shortly to arrange makeup lessons if applicable.\n\n' +
       'Kind regards,\nPathfinder Music Lessons';
 

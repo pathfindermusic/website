@@ -667,33 +667,54 @@ async function sendCheckInEmail(studentId, sentBy) {
     `Cheers,\nThe Pathfinder Team`, sentBy);
 }
 
-// 3 — Failed payment. Creates its own task, due immediately.
-async function sendFinanceFollowUp(studentId, sentBy) {
+// 3 — Failed payment. Admin-triggered from the Students page (not part of
+// any automatic checklist, unlike the rest of this group) — one click sends
+// the email and raises the follow-up task in the same action, replacing
+// the old send-it-from-Gmail-then-add-a-task-by-hand two-step process.
+// `taskStudioId` is the admin's own working studio (the Students page's
+// Studio filter, same "default, not a restriction" convention as
+// elsewhere) — deliberately not necessarily the student's own studio,
+// since the admin chasing this up may not be the one who normally sees
+// them. Falls back to the student's own studio if not supplied.
+async function sendFinanceFollowUp(studentId, sentBy, taskStudioId = null) {
   const result = await sendStudentEmail(studentId,
-    '{{first_name}}, something\'s gone wrong with your lesson payments!',
+    'Urgent: Finance Follow-up',
     `Hi {{first_name}},\n\n` +
-    `Looks like we've had a payment fail for your music lessons.\n\n` +
+    `Looks like we've had a payment fail for your music lessons!\n\n` +
     `Can you please check if you have enough funds in your account and let us know ` +
     `a good time to re-try?\n\n` +
     `If we don't hear from you we'll try again in the next few days, but we won't be ` +
     `able to run any lessons until it's resolved.\n\n` +
     `If you're under any financial pressures, just let us know and we'll help out!\n\n` +
-    `Thanks,\nThe Pathfinder Team`, sentBy);
+    `Thanks,\n\nThe Pathfinder Team`, sentBy);
 
   if (result !== 'sent') return result;
 
   const studio = await studioFor(studentId);
   const name = await studentName(studentId);
 
-  await db.from('tasks').insert({
-    title:        `Finance follow-up — ${name}`,
+  const { data: task, error } = await db.from('tasks').insert({
+    title:        `Finance problem for ${name}`,
     subject_type: 'student', subject_id: studentId,
-    studio_id:    studio?.id ?? null,
+    studio_id:    taskStudioId ?? studio?.id ?? null,
     assigned_to:  sentBy ?? null,
-    due_date:     toISODate(new Date()),   // chase straight away
+    due_date:     plusDays(toISODate(new Date()), 1),   // chase it the next day
     created_by:   sentBy ?? null,
-    source:       'system',
-  });
+    source:       'manual',
+  }).select('id').single();
+
+  // The email already went out — a logging hiccup shouldn't be reported
+  // as a failure to send, so this is deliberately not awaited into `result`.
+  if (!error && task) {
+    await db.from('task_notes').insert({
+      task_id: task.id,
+      note_text: `${name} has had a payment fail, so we've emailed them to follow up. ` +
+                 `If no response, please try again, and send the email again. Note that ` +
+                 `no lessons should be taking place if money is owed, so don't let this ` +
+                 `slide for too long!`,
+      logged_by: sentBy ?? null,
+    });
+  }
 
   return 'sent';
 }

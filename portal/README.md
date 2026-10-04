@@ -1762,6 +1762,76 @@ follow-up task when a match appears — was deliberately deferred rather
 than guessed at; it deserves its own round once there are real waiting-list
 entries to define "a suitable slot" against.
 
+## Finance Follow-up (Oct 2026) — email + task in one click
+
+**Tested live and confirmed working (Oct 2026).** Both the student and the
+studio received the email, and the task was created with the right
+details — the resend-on-close behaviour described further down was then
+removed the same day, once seen working, in favour of treating the task
+as a normal one (see below).
+
+Admins used to send a "payment failed" email from Gmail by hand, then
+separately add a task in the Portal to chase it — two steps for one piece
+of work. **Finance Follow-up** on the Students page (`students.html`,
+shown only for Trial/Active students) does both at once: send
+`{{first_name}}` the fixed email below, and raise a follow-up task with an
+automatic log entry, in a single click.
+
+- Subject (not personalised): **"Urgent: Finance Follow-up"**.
+- Body is fixed studio wording — payment may have failed, check your
+  account, let us know a good time to retry, no lessons run until it's
+  resolved, and an offer to help with financial pressure.
+- The task: title **"Finance problem for {name}"**, About the student,
+  assigned to whichever admin clicked the button, due **the next day** (not
+  immediately — the family needs a day to respond before anyone chases
+  again), with an automatic log entry explaining what happened and telling
+  whoever picks it up not to let it slide.
+
+**Half of this already existed, unwired, from an earlier round.**
+`sendFinanceFollowUp()` in `portal/js/processes.js` and the "does this
+task have an email that goes with it?" check in `tasks.html`'s
+`offerTaskEmail()` were both already in place — written in anticipation of
+exactly this feature, but with no button anywhere that actually called
+them, and a few details that didn't match what the studio described once
+asked directly: the old subject line was personalised instead of the fixed
+"Urgent: Finance Follow-up" the studio wants, the task's due date was
+*today* rather than *the next day*, the title read "Finance follow-up —
+{name}" rather than "Finance problem for {name}", and no automatic log
+entry was written at all. All four are now corrected to match.
+
+**The task's studio is the admin's own working studio, not necessarily the
+student's.** `triggerFinanceFollowUp()` in `students.html` reads the
+Students page's own Studio filter (`#filterStudio`) — same "default, not a
+restriction" convention as everywhere else — rather than the student's
+`studio_id`, since the admin chasing a payment may not be the one who
+normally sees that student. Falls back to the student's own studio if "All
+Studios" is selected. `sendFinanceFollowUp()` takes this as an optional
+third argument and keeps defaulting to the student's own studio when
+nothing is passed, so the one other call site (below) didn't need to
+change its own logic, just pass through what it already had on hand.
+
+**No new Netlify Function.** Unlike the website enquiry form, this is an
+authenticated admin action — the email still goes out through
+`send-email.js` (the one path that can resolve a real address from
+`auth.users`), but the task and its log entry are a plain client-side
+insert under the admin's own session, the same as every other task created
+from the Students or Tasks page. Nothing here needed service-role access.
+
+**Closing a Finance Follow-up task does nothing special (deliberately,
+Oct 2026) — it's chased and logged like any other task from here on.**
+The first version matched the task's title in `offerTaskEmail()` so that
+ticking it done re-offered the email and raised a fresh task due the next
+day, looping until someone declined — mirroring how "Check-in with
+student" tasks already worked. Tested live and explicitly walked back the
+same day: the studio's actual process is an admin chasing the family and
+logging contact attempts on the one task via its normal contact log, same
+as any other follow-up, until the payment goes through — not a fresh
+emailed reminder and a fresh task every single day. `offerTaskEmail()` no
+longer matches a Finance problem title at all; only "Check-in with
+student" still gets the resend prompt it was originally built for.
+**One email, one task, closed by hand once it's resolved** — simpler than
+the loop, and what was actually asked for once it was seen working.
+
 ## Traps that have already cost time
 
 - **Check which environment you're looking at.** Local dev runs against the same
@@ -2037,6 +2107,30 @@ told where to, and the lifecycle sends passed `from` but not `bcc`. Affected the
 trial and enrolment confirmations, the enquiry acknowledgement, check-in,
 payment follow-up and farewell — silently, for weeks. Fixed in `processes.js`;
 `email_log` has the record of everything that went out regardless.
+
+**Lesson cancellation emails now carry the occurrence's own note (Oct
+2026).** `sendCancellationEmail()` in `lessons.html` builds its own
+`bodyText` client-side and already had the cancelled occurrence (`occ`)
+in hand, including `occurrence_notes` — it just wasn't being used. A
+single-occurrence cancellation ("Cancel this lesson only") now adds
+`Note from the studio: {text}` into the email when that occurrence has
+one. Deliberately **not** added to the "this + future" / "entire series"
+scope: `occ` there is still just the one occurrence that happened to be
+open when Cancel was clicked, and its note was very likely written for
+something unrelated (bring sheet music, online this week) — attaching it
+to a blanket "cancelled from X onwards" notice would more likely mislead
+than help, so that case is left exactly as it was.
+
+**Typing a note and clicking Cancel straight away, with no Save in
+between, used to lose it (fixed same day, Oct 2026).** `occ.occurrence_notes`
+came from `allOccurrences` — whatever was last loaded from the database —
+not from the `#occNotes` textarea itself, so a note typed just before
+clicking "Cancel this lesson only" was never persisted and never made it
+into the cancellation email either. `cancelOccurrence('single')` now reads
+the textarea directly at the moment Cancel is clicked and writes it into
+the same `lesson_occurrences` update that sets `status: 'cancelled'`, so
+the note is saved and emailed in one action — no separate Save required.
+Still scoped to the single-occurrence cancel only, same as above.
 
 **Next up:** finish end-enrolment testing; attendance report page; RLS on
 views before go-live.
