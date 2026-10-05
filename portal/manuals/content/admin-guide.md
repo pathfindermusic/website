@@ -1,6 +1,6 @@
 ---
 title: Admin Guide
-updated: 2026-10-03
+updated: 2026-10-05
 ---
 <h2 id="getting-started">Getting started</h2>
 <p>
@@ -216,6 +216,26 @@ The lesson timetable, with Daily, Weekly and Monthly views. Use
 filters above the grid to find what you need — picking a specific student
 automatically switches you to Monthly view.
 </p>
+<h4>Seeing one teacher's week</h4>
+<p>
+Pick a name in the <strong>All teachers</strong> filter and the Lessons page
+switches to Weekly view and shows that teacher's week as a grid: the days
+Monday to Sunday across the top, the time slots down the side, and each
+lesson in its slot with the same details you see on the Daily grid (student
+or group, instrument, online badge, notes, attendance). Use the
+<code>‹ ›</code> arrows to move to earlier or later weeks, and
+<strong>Today</strong> to come back to this one.
+</p>
+<ul>
+<li>Lessons the teacher is <strong>covering</strong> for a colleague appear
+in their week marked "Covering…", and their own lessons that someone else
+is covering are marked "Covered by…".</li>
+<li>Shaded cells are outside the teacher's availability. Click any empty
+cell to add a lesson prefilled for that teacher, studio, day and time.</li>
+<li>The Studio filter still applies. The teacher and student filters work
+one at a time — choosing one clears the other. Choose <strong>All
+teachers</strong> (or click "show all teachers") to go back.</li>
+</ul>
 <h4>Adding a lesson</h4>
 <ul>
 <li>Click <strong>+ Add Lesson</strong>, or click directly on an empty slot
@@ -286,6 +306,11 @@ lapsed enquiries live on the Enquiries page instead).
 leave it blank for a sibling sharing a family login), phone, studio,
 status, and up to five instruments with a skill grade each. You need
 either a student email or a parent email so the family stays reachable.</li>
+<li><strong>Additional Notes:</strong> a short note (up to 50
+characters) at the very bottom of the Add/Edit window — for something worth
+remembering at a glance, like "Prefers Thursday lessons". A counter shows how
+many characters you have left. It's for internal use only, so keep it
+factual.</li>
 <li><strong>Instruments &amp; grade:</strong> add or remove an instrument
 row and pick a <strong>Grade</strong> from the dropdown (Foundation /
 Beginner / Intermediate / Advanced tiers) — this is the only place to

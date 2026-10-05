@@ -83,6 +83,10 @@
       font-size: 0.68rem;
     }
     .daily-grid thead th.teacher-col { min-width: 160px; }
+    /* Teacher's weekly grid — seven day columns instead of teacher columns */
+    .daily-grid thead th.day-col { min-width: 130px; line-height: 1.25; }
+    .daily-grid thead th.day-col.today { background: var(--orange); color: #fff; }
+    .daily-grid thead th.day-col .day-date { font-weight: 400; font-size: 0.68rem; opacity: 0.8; }
 
     /* Time rows */
     .daily-grid tbody tr { border-bottom: 1px solid var(--border); }
@@ -407,6 +411,10 @@
       </select>
       <select class="filter-select" id="filterStudent" onchange="onStudentFilter()">
         <option value="">All students</option>
+      </select>
+      <select class="filter-select" id="filterTeacher" onchange="onTeacherFilter()"
+              title="Pick a teacher to see their week as a grid">
+        <option value="">All teachers</option>
       </select>
     </div>
 
@@ -1006,10 +1014,12 @@ async function loadTeachers() {
 
   const lTeacher  = document.getElementById('lTeacher');
   const agTeacher = document.getElementById('agendaTeacher');
+  const fTeacher  = document.getElementById('filterTeacher');
   allTeachers.forEach(t => {
     const name = `${t.profile?.first_name ?? ''} ${t.profile?.last_name ?? ''}`.trim();
     lTeacher.innerHTML  += `<option value="${t.id}">${name}</option>`;
     agTeacher.innerHTML += `<option value="${t.id}">${name}</option>`;
+    fTeacher.innerHTML  += `<option value="${t.id}">${name}</option>`;
   });
 }
 
@@ -1158,7 +1168,19 @@ async function loadView() {
 // only visible as a pattern once you can see a month of it.
 function onStudentFilter() {
   const sid = document.getElementById('filterStudent').value;
+  // A student and a teacher are two different lenses on the schedule —
+  // picking one clears the other rather than combining them.
+  if (sid) document.getElementById('filterTeacher').value = '';
   if (sid && currentView !== 'monthly') { switchView('monthly'); return; }
+  loadView();
+}
+
+// Picking a teacher switches to the weekly view, which for a teacher is a
+// grid (days across, time slots down) — see loadTeacherWeekGrid().
+function onTeacherFilter() {
+  const tid = document.getElementById('filterTeacher').value;
+  if (tid) document.getElementById('filterStudent').value = '';
+  if (tid && currentView !== 'weekly') { switchView('weekly'); return; }
   loadView();
 }
 
@@ -1182,6 +1204,7 @@ async function loadMonthlyView() {
   const studioId  = document.getElementById('filterStudio').value;
   const statusF   = document.getElementById('filterStatus').value;
   const studentId = document.getElementById('filterStudent').value;
+  const teacherId = document.getElementById('filterTeacher').value;
 
   let q = db.from('schedule_view').select('*')   // includes is_makeup via the view
     .gte('date', toISODate(first)).lte('date', toISODate(last))
@@ -1197,6 +1220,15 @@ async function loadMonthlyView() {
 
   let rows = (data ?? []).filter(o =>
     o.lesson_status !== 'active' ? o.occurrence_status !== 'cancelled' : true);
+
+  // Filtering by teacher: the view doesn't expose a teacher id, but it
+  // does carry lesson_id, so match on that (same approach as the student
+  // filter below).
+  if (teacherId) {
+    const { data: tl } = await db.from('lessons').select('id').eq('teacher_id', teacherId);
+    const theirs = new Set((tl ?? []).map(l => l.id));
+    rows = rows.filter(r => theirs.has(r.lesson_id));
+  }
 
   // Filtering by student needs lesson membership, which the view
   // doesn't carry — it holds one row per occurrence, not per student.
@@ -1425,12 +1457,18 @@ async function loadDailyView() {
     // lesson booked today even without a matching availability record
     // (so a real booked lesson never silently disappears because of
     // missing/stale availability data).
+    const dailyTeacherFilter = document.getElementById('filterTeacher').value;
     const teachers = studioTeachersAll.filter(t => {
+      if (dailyTeacherFilter && t.id !== dailyTeacherFilter) return false;
       const hasAvailToday = (t.teacher_availability ?? [])
         .some(a => a.studio_id === studio.id && a.day_of_week === dayOfWeek);
       const hasLessonToday = studioOccs.some(o => o.lessons?.teacher_id === t.id);
       return hasAvailToday || hasLessonToday;
     });
+
+    // With a teacher picked, a studio they don't work at today is simply
+    // left out rather than explained.
+    if (dailyTeacherFilter && teachers.length === 0) return;
 
     if (studioTeachersAll.length === 0) {
       html += `<div class="studio-grid-section">
@@ -1744,14 +1782,416 @@ async function loadDailyView() {
     html += `</tbody></table></div></div>`;
   });
 
+  // Teacher picked, but they're neither available nor booked at any
+  // studio shown today.
+  if (html === `<div class="studios-wrap">` && document.getElementById('filterTeacher').value) {
+    wrap.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📅</div>
+      <h3>Nothing for this teacher today</h3>
+      <p>They have no availability or lessons here on this day. Try the Weekly view for their full week.</p></div>`;
+    return;
+  }
+
   html += `</div>`;
   wrap.innerHTML = html;
+}
+
+// ============================================================
+// TEACHER'S WEEKLY GRID
+//
+// Picking a teacher in the filter bar turns the Weekly view into a grid:
+// the seven days of the week (Mon–Sun) across the top, the same
+// half-hour time slots as the daily grid down the side, and every lesson
+// drawn the way the daily grid draws it. The ‹ › arrows and the date
+// picker move the week exactly as they do for the ordinary weekly view.
+//
+// A deliberately separate renderer rather than a refactor of
+// loadDailyView(): that grid has had a run of overlap/rowspan fixes, and
+// this one needed to be added without any risk to it. The overlap
+// clustering and block drawing below are therefore a faithful copy of the
+// daily grid's, adapted from "one column per teacher" to "one column per
+// day" — if one is fixed, check the other.
+//
+// "Lessons taught by" the teacher means their own lessons plus any they
+// are covering for someone else. A lesson of theirs that someone else is
+// covering this week still shows (as in the daily grid, where it stays in
+// the usual teacher's column), labelled "Covered by …".
+//
+// Unlike getWeekDays() — Mon–Sat, for the card list — this is Mon–Sun, as
+// asked for.
+// ============================================================
+async function loadTeacherWeekGrid(teacherId) {
+  const wrap    = document.getElementById('viewContent');
+  const teacher = allTeachers.find(t => t.id === teacherId);
+  const teacherName = `${teacher?.profile?.first_name ?? ''} ${teacher?.profile?.last_name ?? ''}`.trim() || 'Teacher';
+
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + i);
+    return d;
+  });
+  const wStart = toISODate(days[0]);
+  const wEnd   = toISODate(days[6]);
+
+  document.getElementById('dateLabel').textContent =
+    `${teacherName} · ${formatShortDate(days[0])} – ${formatShortDate(days[6])}`;
+  syncDatePicker(days[0]);
+
+  wrap.innerHTML = `<div class="loading"><div class="spinner"></div> Loading…</div>`;
+
+  const studioFilter = document.getElementById('filterStudio').value;
+  const statusFilter = document.getElementById('filterStatus').value;
+
+  let query = db.from('lesson_occurrences')
+    .select(`id,date,status,is_online,occurrence_notes,is_makeup,
+      substitute_teacher_id,substitute_name,
+      lessons(id,teacher_id,studio_id,instrument,start_time,duration_mins,lesson_type,max_students,series_notes,status,frequency)`)
+    .gte('date', wStart).lte('date', wEnd);
+  if (statusFilter) query = query.eq('status', statusFilter);
+
+  const { data, error } = await query;
+  if (error) { wrap.innerHTML = `<div class="empty-state"><p style="color:#dc2626;">${error.message}</p></div>`; return; }
+
+  // Theirs, or covered by them — at the studio shown, if one is picked.
+  const mine = (data ?? []).filter(o => {
+    const l = o.lessons;
+    if (!l) return false;
+    if (studioFilter && l.studio_id !== studioFilter) return false;
+    if (l.teacher_id !== teacherId && o.substitute_teacher_id !== teacherId) return false;
+    // Same rule as the other views: hide the cancelled tail of a series
+    // that has been cancelled outright; a cancelled one-off in a live
+    // series stays, with its red ✕.
+    if (l.status !== 'active') return o.status !== 'cancelled';
+    return true;
+  });
+
+  // Rosters, names and attendance — same as the daily grid.
+  const lessonIds = [...new Set(mine.map(o => o.lessons.id))];
+  const { data: lsData } = lessonIds.length > 0
+    ? await db.from('lesson_students')
+        .select('lesson_id,student_id,added_for_occurrence_id').in('lesson_id', lessonIds)
+    : { data: [] };
+  const rosterMaps = splitRosterRows(lsData);
+
+  const studentIds = [...new Set((lsData ?? []).map(ls => ls.student_id))];
+  const { data: spData } = studentIds.length > 0
+    ? await db.from('students').select('id,user_id,first_name,last_name').in('id', studentIds)
+    : { data: [] };
+  const spUserIds = (spData ?? []).map(s => s.user_id);
+  const { data: spProfiles } = spUserIds.length > 0
+    ? await db.from('profiles').select('id,first_name,last_name').in('id', spUserIds)
+    : { data: [] };
+  const spMap = {};
+  (spData ?? []).forEach(s => {
+    // The student's own name first — see phase 10 (Oct 2026).
+    if (s.first_name || s.last_name) {
+      spMap[s.id] = `${s.first_name ?? ''} ${s.last_name ?? ''}`.trim();
+      return;
+    }
+    const p = (spProfiles ?? []).find(p => p.id === s.user_id);
+    if (p) spMap[s.id] = `${p.first_name} ${p.last_name}`.trim();
+  });
+
+  const occIds = mine.map(o => o.id);
+  const { data: attData } = occIds.length > 0
+    ? await db.from('attendance')
+        .select('lesson_occurrence_id,student_id,status').in('lesson_occurrence_id', occIds)
+    : { data: [] };
+  attByOccurrence = {};
+  (attData ?? []).forEach(a => {
+    (attByOccurrence[a.lesson_occurrence_id] ??= {})[a.student_id] = a.status;
+  });
+
+  // The occurrence modal reads allOccurrences.
+  allOccurrences = mine.map(o => ({
+    ...o,
+    lessonStudents:  rosterFor(o.lessons.id, o.id, rosterMaps),
+    adhocStudentIds: adhocFor(o.id, rosterMaps),
+  }));
+
+  const studioName = (id) => allStudios.find(s => s.id === id)?.name ?? '';
+  const teacherNameOf = (id) => {
+    const t = allTeachers.find(x => x.id === id);
+    return `${t?.profile?.first_name ?? ''} ${t?.profile?.last_name ?? ''}`.trim() || 'another teacher';
+  };
+  const hm = (s) => { const [h, m] = String(s).split(':').map(Number); return h * 60 + m; };
+  const slotKey = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  const showStudioTag = !studioFilter && allStudios.length > 1;
+
+  // ---- Availability, by weekday ----------------------------------
+  const availRecs = (teacher?.teacher_availability ?? [])
+    .filter(a => !studioFilter || a.studio_id === studioFilter);
+  const availByDow = {}; // 0..6 -> Set<"HH:MM">
+  availRecs.forEach(a => {
+    const set = (availByDow[a.day_of_week] ??= new Set());
+    for (let m = hm(a.start_time); m < hm(a.end_time); m += 30) set.add(slotKey(m));
+  });
+  // With no availability on record at all we don't know their hours, so
+  // nothing is greyed. Once there is some, a weekday with none is fully
+  // unavailable — unlike the daily grid, where an empty day stays neutral.
+  const hasAnyAvail = availRecs.length > 0;
+
+  // ---- Rows (time slots) ------------------------------------------
+  const TIME_SLOTS = computeTimeSlots(mine).slice();
+  if (mine.filter(o => o.status !== 'cancelled').length === 0) {
+    // Nothing live all week — show their working hours instead so the
+    // grid isn't empty. (Only then: one stray early availability window
+    // would otherwise stretch the whole week — see the daily grid.)
+    Object.values(availByDow).forEach(set =>
+      set.forEach(s => { if (!TIME_SLOTS.includes(s)) TIME_SLOTS.push(s); }));
+    TIME_SLOTS.sort();
+  }
+
+  // ---- Overlap clusters, per day ----------------------------------
+  // Same idea as the daily grid: two lessons that genuinely overlap must
+  // share ONE table cell, or the extra <td> pushes every later column
+  // sideways. `gridStart` snaps a cluster to its half-hour row so a
+  // lesson not starting on the half hour still lands on the grid.
+  const clustersByDay = {};
+  days.forEach(d => { clustersByDay[toISODate(d)] = []; });
+
+  // allOccurrences (not `mine`): these carry the rosters the blocks draw.
+  allOccurrences.slice()
+    .sort((a, b) => (a.lessons.start_time ?? '').localeCompare(b.lessons.start_time ?? ''))
+    .forEach(o => {
+      const clusters = clustersByDay[o.date?.slice(0, 10)];
+      const start    = o.lessons.start_time;
+      if (!clusters || !start) return;
+
+      const startMin = hm(start);
+      const ownEnd   = startMin + (o.lessons.duration_mins ?? 30);
+      const isLive   = o.status !== 'cancelled';
+      const last     = clusters[clusters.length - 1];
+
+      if (last && (startMin < last.mergeEnd || startMin === last.startMin)) {
+        last.occs.push(o);
+        if (isLive) last.mergeEnd = Math.max(last.mergeEnd, ownEnd);
+        last.renderEnd = Math.max(last.renderEnd, ownEnd);
+      } else {
+        clusters.push({
+          startMin,
+          gridStart: Math.floor(startMin / 30) * 30,
+          mergeEnd:  isLive ? ownEnd : startMin,
+          renderEnd: ownEnd,
+          occs: [o],
+        });
+      }
+    });
+
+  const occupied = {}; // dateKey -> { slotKey: true } — rows a rowspan already covers
+  days.forEach(d => {
+    const key = toISODate(d), set = {};
+    clustersByDay[key].forEach(c => {
+      for (let m = c.gridStart + 30; m < c.renderEnd; m += 30) set[slotKey(m)] = true;
+    });
+    occupied[key] = set;
+  });
+
+  // ---- One lesson's label -----------------------------------------
+  const nameOf = (o) => {
+    const sIds = o.lessonStudents ?? [];
+    const att  = attByOccurrence[o.id] ?? {};
+    // No students on a private lesson — a non-teaching event; its
+    // "instrument" is really the free-text label.
+    if (sIds.length === 0 && o.lessons?.lesson_type !== 'group') return o.lessons?.instrument || 'Blocked';
+    if (o.lessons?.lesson_type === 'group') {
+      const firstNames = sIds.map(id => spMap[id]).filter(Boolean).map(n => n.split(' ')[0]);
+      const label = firstNames.length
+        ? firstNames.join(', ')
+        : `${sIds.length} student${sIds.length !== 1 ? 's' : ''}`;
+      return `${groupAttendanceSummary(att, sIds.length)}${label}`;
+    }
+    return nameWithAttendance(sIds.map(id => spMap[id]).filter(Boolean)[0] ?? '—', att[sIds[0]]);
+  };
+
+  // Who is actually taking it, when that isn't just the usual teacher.
+  const coverLabel = (o) => {
+    const orange = 'color:var(--orange);font-weight:600;';
+    if (o.substitute_teacher_id === teacherId && o.lessons.teacher_id !== teacherId) {
+      return `<div class="lesson-block-meta" style="${orange}">Covering ${teacherNameOf(o.lessons.teacher_id)}</div>`;
+    }
+    if (o.substitute_teacher_id || o.substitute_name) {
+      return `<div class="lesson-block-meta" style="${orange}">Covered by ${substituteName(o)}</div>`;
+    }
+    return '';
+  };
+
+  const ROWPX = 48;
+
+  // ---- One cluster → one table cell body --------------------------
+  const clusterBody = (cluster) => {
+    const live      = cluster.occs.filter(o => o.status !== 'cancelled');
+    const cancelled = cluster.occs.filter(o => o.status === 'cancelled');
+
+    if (live.length === 0) {
+      // Only a history of cancellations here — a compact stacked list.
+      return `<div style="height:100%;display:flex;flex-direction:column;gap:2px;
+                  padding:2px 0;overflow:hidden;box-sizing:border-box;">
+        ${cancelled.map(o =>
+          `<div class="lesson-block cancelled"
+             onclick="event.stopPropagation();openOccurrenceModal('${o.id}')"
+             title="Cancelled — click to view"
+             style="cursor:pointer;padding:0 4px;flex:0 0 auto;min-height:0;line-height:1.35;overflow:hidden;">
+             <div style="display:flex;align-items:center;gap:3px;overflow:hidden;">
+               <span style="font-size:0.62rem;">✕</span>
+               <span class="lesson-block-name"
+                     style="font-size:0.72rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nameOf(o)}</span>
+             </div>
+             ${o.occurrence_notes ? `<div class="lesson-block-meta"
+               style="display:inline-block;width:100%;text-decoration:none;font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📝 ${o.occurrence_notes}</div>` : ''}
+           </div>`).join('')}
+      </div>`;
+    }
+
+    // Live lessons: each at its own true start and length inside the
+    // cell, side by side in columns when they genuinely overlap.
+    const ordered = cluster.occs.slice().sort((a, b) =>
+      timeToMins(a.lessons?.start_time ?? '00:00') - timeToMins(b.lessons?.start_time ?? '00:00'));
+
+    const colEnds = [];
+    const placed = ordered.map(o => {
+      const start = timeToMins(o.lessons?.start_time ?? '00:00');
+      const end   = start + (o.lessons?.duration_mins ?? 30);
+      let col = colEnds.findIndex(e => e <= start);
+      if (col === -1) { col = colEnds.length; colEnds.push(end); }
+      else { colEnds[col] = end; }
+      return { o, start, end, col };
+    });
+    const colCount = colEnds.length;
+
+    const blocks = placed.map(({ o, start, end, col }) => {
+      const top    = ((start - cluster.gridStart) / 30) * ROWPX;
+      const height = Math.max(22, ((end - start) / 30) * ROWPX - 2);
+      const left   = (col / colCount) * 100;
+      const width  = 100 / colCount;
+      const pos    = `position:absolute;margin:0;top:${top}px;height:${height}px;
+                      left:calc(${left}% + 1px);width:calc(${width}% - 2px);box-sizing:border-box;`;
+
+      if (o.status === 'cancelled') {
+        return `<div class="lesson-block cancelled"
+          onclick="event.stopPropagation();openOccurrenceModal('${o.id}')"
+          title="Cancelled — click to view"
+          style="${pos}cursor:pointer;padding:0 4px;overflow:hidden;line-height:1.35;">
+          <div style="display:flex;align-items:center;gap:3px;overflow:hidden;">
+            <span style="font-size:0.62rem;">✕</span>
+            <span class="lesson-block-name"
+                  style="font-size:0.64rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nameOf(o)}</span>
+          </div>
+          ${o.occurrence_notes ? `<div class="lesson-block-meta"
+            style="display:inline-block;width:100%;text-decoration:none;font-style:italic;font-size:0.58rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📝 ${o.occurrence_notes}</div>` : ''}
+        </div>`;
+      }
+
+      const lType   = o.lessons?.lesson_type ?? 'private';
+      const isBlock = lType !== 'group' && (o.lessonStudents ?? []).length === 0;
+      const cls     = o.is_makeup ? 'makeup' : lType;
+      const tip = [
+        studioName(o.lessons.studio_id),
+        lType === 'group' ? (o.lessonStudents ?? []).map(id => spMap[id]).filter(Boolean).join(', ') : '',
+      ].filter(Boolean).join(' — ').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+
+      return `<div class="lesson-block ${cls}"
+        ${tip ? `title="${tip}"` : ''}
+        onclick="event.stopPropagation();openOccurrenceModal('${o.id}')"
+        style="${pos}overflow:hidden;cursor:pointer;">
+        ${o.is_online ? onlineIconBadge() : ''}
+        <div class="lesson-block-name">${nameOf(o)}</div>
+        <div class="lesson-block-meta">${o.is_makeup ? 'Makeup · ' : ''}${o.lessons?.frequency === 'fortnightly' ? 'Fortnightly · ' : ''}${isBlock ? 'Non-teaching event' : `${lType === 'group' ? 'Group' : 'Private'} · ${o.lessons?.instrument}`}${showStudioTag ? ` · ${studioName(o.lessons.studio_id)}` : ''}</div>
+        ${coverLabel(o)}
+        ${o.occurrence_notes ? `<div class="lesson-block-meta" style="font-style:italic;">📝 ${o.occurrence_notes.slice(0,30)}…</div>` : ''}
+      </div>`;
+    }).join('');
+
+    return `<div style="position:relative;height:100%;box-sizing:border-box;">${blocks}</div>`;
+  };
+
+  // Which studio a click on an empty cell should book at: the one picked
+  // in the filter, else wherever their availability puts them then, else
+  // their first studio.
+  const studioForCell = (dow, slotMin) => {
+    if (studioFilter) return studioFilter;
+    const a = (teacher?.teacher_availability ?? []).find(x =>
+      x.day_of_week === dow && hm(x.start_time) <= slotMin && slotMin < hm(x.end_time));
+    return a?.studio_id ?? (teacher?.studio_ids ?? [])[0] ?? allStudios[0]?.id ?? '';
+  };
+
+  // ---- Assemble ---------------------------------------------------
+  const today    = toISODate(new Date());
+  const liveCount = mine.filter(o => o.status !== 'cancelled').length;
+
+  let html = `<div style="margin-bottom:0.85rem;font-size:0.875rem;color:var(--dark-grey);">
+      Showing <strong>${teacherName}</strong> — ${liveCount} lesson${liveCount !== 1 ? 's' : ''} this week
+      · <a href="#" onclick="document.getElementById('filterTeacher').value='';onTeacherFilter();return false;"
+           style="color:var(--orange);text-decoration:none;">show all teachers</a>
+    </div>
+    <div class="daily-grid-wrap">
+      <table class="daily-grid">
+        <thead>
+          <tr>
+            <th>Time</th>
+            ${days.map(d => {
+              const isToday = toISODate(d) === today;
+              return `<th class="day-col${isToday ? ' today' : ''}">
+                <div>${DAY_SHORT[d.getDay()]}</div>
+                <div class="day-date">${d.getDate()} ${d.toLocaleDateString('en-AU', { month: 'short' })}</div>
+              </th>`;
+            }).join('')}
+          </tr>
+        </thead>
+        <tbody>`;
+
+  TIME_SLOTS.forEach(slot => {
+    const [h, m]   = slot.split(':').map(Number);
+    const slotMin  = h * 60 + m;
+    const isHour   = m === 0;
+
+    html += `<tr>
+      <td class="time-label ${isHour ? 'full-hour' : 'half-hour'}">${isHour ? formatTime(slot + ':00') : ''}</td>`;
+
+    days.forEach(d => {
+      const key     = toISODate(d);
+      const dow     = d.getDay();
+      const cluster = clustersByDay[key].find(c => c.gridStart === slotMin);
+
+      if (cluster) {
+        const rowspan = Math.max(1, Math.ceil((cluster.renderEnd - cluster.gridStart) / 30));
+        html += `<td class="grid-cell" rowspan="${rowspan}"
+          style="vertical-align:top;height:${rowspan * ROWPX}px;padding:0;">
+          ${clusterBody(cluster)}
+        </td>`;
+      } else if (!occupied[key][slot]) {
+        const isUnavail = hasAnyAvail && !(availByDow[dow]?.has(slot));
+        html += `<td class="grid-cell${isUnavail ? ' cell-unavailable' : ''}"
+          onclick="openLessonModalFromWeekCell('${teacherId}','${studioForCell(dow, slotMin)}','${slot}','${key}')"
+          title="${isUnavail ? 'Outside availability — click to add anyway at ' : 'Click to add lesson at '}${formatTime(slot + ':00')}">
+        </td>`;
+      }
+      // else: covered by a rowspan above — skip
+    });
+
+    html += `</tr>`;
+  });
+
+  html += `</tbody></table></div>`;
+  wrap.innerHTML = html;
+}
+
+// Click on an empty cell of the teacher's weekly grid: same as the daily
+// grid's, except the date comes from the column rather than from
+// whichever day the daily view was last on.
+function openLessonModalFromWeekCell(teacherId, studioId, slot, dateStr) {
+  openLessonModalFromCell(teacherId, studioId, slot, String(parseLocalDate(dateStr).getDay()));
+  document.getElementById('lStartDate').value = dateStr;
+  syncDayFromStartDate();   // keep Day matching the date, as Add Lesson does
 }
 
 // ============================================================
 // WEEKLY VIEW
 // ============================================================
 async function loadWeeklyView() {
+  // A teacher picked in the filter bar turns this into a grid.
+  const teacherPicked = document.getElementById('filterTeacher').value;
+  if (teacherPicked) return loadTeacherWeekGrid(teacherPicked);
+
   const wrap  = document.getElementById('viewContent');
   const days  = getWeekDays(weekStart);
   const wStart = toISODate(days[0]);
@@ -4124,8 +4564,14 @@ async function sendCancellationEmail(occId, occ, scope = 'single') {
   // "bring sheet music", "online this week") and would be misleading
   // attached to a blanket "cancelled from X onwards" notice, so it's left
   // out there rather than guessed at.
+  //
+  // Wrapped in **double asterisks** as its own paragraph, which
+  // send-email.js's emailTemplate() renders as the highlighted callout
+  // (vertical bar) used in other emails. Any ** inside the note itself
+  // is stripped, since a stray pair would end the callout early. The
+  // template HTML-escapes the whole body, so the note text is safe.
   const noteLine = (!ongoing && occ?.occurrence_notes)
-    ? `Note from the studio: ${occ.occurrence_notes}\n\n`
+    ? `**Note from the studio: ${String(occ.occurrence_notes).replace(/\*\*/g, '')}**\n\n`
     : '';
 
   const bodyText = ongoing

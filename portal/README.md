@@ -1832,6 +1832,31 @@ student" still gets the resend prompt it was originally built for.
 **One email, one task, closed by hand once it's resolved** — simpler than
 the loop, and what was actually asked for once it was seen working.
 
+## Student "Additional Notes" (Oct 2026)
+
+A short internal note (max 50 characters) on each student, at the bottom
+of the Student modal on `students.html`, below Parent / Guardian.
+- **Storage:** `students.additional_notes text`, nullable, with a CHECK
+  `char_length <= 50` (`students_additional_notes_len`). Migration:
+  `supabase/student-additional-notes.sql` — run statement by statement
+  **before** deploying the page, because `loadStudents()` now selects the
+  column and the whole list would fail to load without it.
+- **UI:** single-line input, `maxlength=50`, live "n / 50" counter
+  (`updateNotesCount()`); saved on both Add and Edit as `null` when
+  blank.
+- **Side fix:** the Edit branch of `saveStudent()` used to ignore the
+  result of the `students` update, so a failed save still toasted
+  "Student updated." It now throws and shows the error.
+- Not shown in the student list and not in CSV import/template — modal
+  only, as asked.
+- Visibility: like `enquiry_notes`, it is an ordinary column on
+  `students`, so anyone whose RLS lets them read a student row (e.g. the
+  student on their own row) could read it via the API. Don't put anything
+  in it you wouldn't want the family to see.
+- Tested against a stubbed Supabase in headless Chromium (prefill, 70
+  chars typed → 50, update payload, blank on Add); **not yet tested
+  live**.
+
 ## Traps that have already cost time
 
 - **Check which environment you're looking at.** Local dev runs against the same
@@ -2131,6 +2156,40 @@ the textarea directly at the moment Cancel is clicked and writes it into
 the same `lesson_occurrences` update that sets `status: 'cancelled'`, so
 the note is saved and emailed in one action — no separate Save required.
 Still scoped to the single-occurrence cancel only, same as above.
+
+**Lessons: teacher filter and teacher weekly grid (Oct 2026).** A new
+"All teachers" dropdown sits beside the student filter on `lessons.html`.
+Picking a teacher switches to **Weekly** and, instead of the card list,
+`loadTeacherWeekGrid(teacherId)` draws a grid: Mon–Sun columns for the
+week held in `weekStart`, the same half-hour time-slot rows as the daily
+grid, and each lesson drawn as in the daily grid (private / group /
+makeup / cancelled, online badge, notes, attendance ticks). The ‹ Today ›
+arrows and date picker move the week as usual. Clearing the dropdown
+(or the "show all teachers" link) returns to the normal weekly cards.
+- *Taught by* includes lessons they **cover** for someone else (labelled
+  "Covering X") and shows their own lessons **covered by** someone else
+  ("Covered by X"); it is matched on `lessons.teacher_id` or
+  `lesson_occurrences.substitute_teacher_id`, filtered client-side.
+- Teacher and student filters are mutually exclusive — choosing one
+  clears the other (student → Monthly, teacher → Weekly).
+- The Studio and Status filters still apply. With "All Studios" and more
+  than one studio, each block also carries the studio name.
+- Daily view honours the teacher filter too (only that teacher's column);
+  Monthly view filters by that teacher's lesson ids.
+- Availability greying is per weekday. If the teacher has any
+  availability on record, a weekday or slot with none is greyed; with
+  none on record nothing is greyed. (Slightly stricter than the daily
+  grid, where an empty day stays neutral.) Empty cells are clickable and
+  prefill the Add Lesson modal with that column's date.
+- **Deliberate duplication:** the overlap-clustering and block-drawing
+  code is a copy of `loadDailyView`'s, not a shared helper, so as not to
+  risk regressions in the heavily-fixed daily grid. If one is fixed,
+  check the other (a comment in the code says so). Clustering must be fed
+  `allOccurrences` (which carries each lesson's roster), not the raw
+  query rows — an early version used the latter and showed blank names.
+- Tested against a stubbed Supabase in headless Chromium (column
+  placement, overlaps, week arrows, studio filter, cover labels, filter
+  exclusivity, add-lesson prefill); **not yet tested live**.
 
 **Next up:** finish end-enrolment testing; attendance report page; RLS on
 views before go-live.
