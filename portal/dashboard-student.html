@@ -192,6 +192,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
       My Progress
     </button>
+    <a class="nav-item" href="event-book.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      Events
+    </a>
     <div class="sidebar-section">Manuals</div>
     <a class="nav-item" href="manuals/index.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -205,6 +209,12 @@
     <!-- Stats row -->
     <!-- Shown only when one login owns more than one student -->
     <div class="child-switcher hidden" id="childSwitcher"></div>
+
+    <!-- Upcoming events the family can book (filled by loadEvents) -->
+    <div class="card hidden" id="eventsCard" style="padding:1rem 1.25rem;margin-bottom:1.1rem;border-left:4px solid var(--orange);">
+      <div style="font-weight:700;color:var(--charcoal);margin-bottom:.5rem;">🎤 Upcoming events — book your performance</div>
+      <div id="eventsCardBody"></div>
+    </div>
 
     <div class="stats-row">
       <div class="stat-card">
@@ -304,6 +314,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-client.js"></script>
+<script src="js/events-common.js"></script>
 <script>
 
 let currentProfile = null;
@@ -394,10 +405,38 @@ function materialsHtml(list) {
   const remembered = sessionStorage.getItem('activeStudentId');
   studentRecord = myStudents.find(s => s.id === remembered) ?? myStudents[0];
 
+  loadEvents();
   await renderChildSwitcher();
   await Promise.all([loadStats(), loadSchedule()]);
   tabsLoaded.schedule = true;
 })();
+
+// Open events this family can still book (or has booked). Quiet failure:
+// the dashboard must work even before the events migration is run.
+async function loadEvents() {
+  try {
+    const { data, error } = await db.rpc('list_events_for_me');
+    if (error) return;
+    const today = toISODate(new Date());
+    const rows = (data ?? []).filter(e => e.status === 'open' && e.event_date >= today
+      && !(e.booking_deadline && e.booking_deadline < today));
+    const card = document.getElementById('eventsCard');
+    if (!rows.length) { card.classList.add('hidden'); return; }
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    document.getElementById('eventsCardBody').innerHTML = rows.map(e => {
+      const d = parseLocalDate(e.event_date);
+      return `<div style="display:flex;gap:.8rem;align-items:center;flex-wrap:wrap;padding:.4rem 0;">
+        <div style="flex:1 1 240px;font-size:.88rem;line-height:1.5;">
+          <b>${esc(e.name)}</b> — ${d.toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long' })}, ${esc(PFEvents.timeRange(e))}
+          ${e.venue_name ? '<br><span style="color:var(--dark-grey)">📍 ' + esc(e.venue_name) + '</span>' : ''}
+          ${e.my_count ? '<br><span style="color:var(--orange-dark);font-weight:600">You have ' + e.my_count + ' performance' + (e.my_count === 1 ? '' : 's') + ' booked</span>' : ''}
+        </div>
+        <a class="btn ${e.my_count ? 'btn-secondary' : 'btn-primary'} btn-sm" href="event-book.html?event=${e.id}">${e.my_count ? 'View / change' : 'Book now'}</a>
+      </div>`;
+    }).join('');
+    card.classList.remove('hidden');
+  } catch (_) { /* events not set up yet */ }
+}
 
 // Only shown where there is more than one — a single child needs no
 // switcher and should see no sign that one exists.

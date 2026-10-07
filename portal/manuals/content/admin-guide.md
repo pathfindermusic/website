@@ -203,6 +203,118 @@ details.
 </p>
 </div>
 
+<h3 id="events">Events</h3>
+<p>
+Events is where you run a concert or recital: you set up the day, students
+book their own performance slots, and everyone sees the programme fill in
+live. It is in the <strong>Front desk</strong> section of the sidebar.
+</p>
+<p><strong>Create an event</strong> with <strong>＋ New event</strong>:</p>
+<ul>
+<li><strong>Name, date, start and end time, venue name and address.</strong></li>
+<li><strong>Block length</strong> (default 60 minutes) — students choose a block,
+for example 2:00 – 3:00 pm — and <strong>performances per block</strong>
+(default 12, so about 5 minutes each). The page shows a preview such as
+"3 blocks × 12 = 36 performances" as you type, and warns if the last block
+is shorter or the slots are very short.</li>
+<li><strong>Most performances per student</strong> (default 5) — students can
+book <em>one performance per instrument</em> (for example Guitar, Piano and
+Band), so this is only an overall ceiling. You can still add extra
+performances for a student yourself. Plus an optional
+<strong>Book by</strong> date.</li>
+<li><strong>Status</strong> — a new event is a <em>Draft</em> that only admins
+can see. <strong>Open for booking</strong> when you are ready; <strong>Close
+bookings</strong> later (students can still see the programme but can't book,
+change or cancel); <strong>Reopen</strong> if you need to.</li>
+</ul>
+<p><strong>The event page</strong> shows the grid: one panel per block, one
+numbered square per performance slot. Click a <strong>booked</strong> square
+to see everything the student entered (instrument, teacher, piece,
+accompaniment, the blocks they asked for, their comments) and to
+<strong>Edit</strong>, <strong>Move…</strong> (choosing a taken slot swaps the
+two performances) or <strong>Cancel this booking</strong>. Click a
+<strong>free</strong> square to add a performance for a student yourself — it
+lands exactly in that slot. <strong>Running order</strong> switches to a table
+you can <strong>Print</strong> for the day.</p>
+<p><strong>Inviting students.</strong> Under the grid title is the booking link.
+<strong>Copy</strong> it, or press <strong>✉️ Send invitation…</strong> to open
+Notifications with a ready-written email (it greets each family by first name
+and includes the link). Check the studio and recipients, then send as usual.
+The same link also appears on each student's dashboard once the event is open.</p>
+<div class="callout callout-tip">
+<strong>How students are placed</strong>
+<p>
+Each student picks up to three preferred blocks. The Portal puts them in the
+<strong>first</strong> one that still has room; if all three are full they are
+told and choose again. Nobody can be double-booked, even if two families press
+Submit at the same moment. Other families see each other only as first name and
+last initial (for example "Ava L.") with the instrument and piece — the teacher,
+comments and who accompanies stay private to the family, the teacher and you.
+</p>
+</div>
+<p>
+<strong>Changing the layout later.</strong> You can edit the event any time, but
+the Portal won't let you shrink the blocks or slots below where people are
+already booked — move or cancel those performances first. Changing the date or
+times moves everyone with the blocks, and students are not told automatically,
+so send a Notification. An event with bookings can't be deleted; close it
+instead.
+</p>
+
+<h3 id="vouchers">Gift Vouchers</h3>
+<p>
+Vouchers is where you issue a gift voucher on the spot — for example when
+someone buys one at the front desk or over the phone. You create it, check what
+it looks like, and the Portal emails it as a PDF. It is in the
+<strong>Front desk</strong> section of the sidebar.
+</p>
+<p><strong>Issue a voucher</strong> with <strong>＋ New voucher</strong>:</p>
+<ul>
+<li><strong>Issuing studio.</strong> The email comes from this studio's address
+and is blind-copied to it, so the studio keeps a copy.</li>
+<li><strong>To.</strong> If the recipient is already a student, start typing
+their name and pick them — their name and email fill in. To give the voucher to
+someone who isn't a student yet, simply type their name and email instead (or
+change the name afterwards).</li>
+<li><strong>Voucher for.</strong> What the voucher is worth, for example
+“5 Music Lessons at Pathfinder Music”. Tap one of the suggestions to fill it in.
+This becomes the headline on the voucher and the email subject, so keep it
+short. An optional dollar <strong>value</strong> can be printed as well.</li>
+<li><strong>From.</strong> The purchaser's name, and their email if you'd like
+them copied on the email.</li>
+<li><strong>Purchase date</strong> (today unless the voucher was bought earlier).
+The voucher is valid for one year from this date; the expiry is shown as you
+type and printed on the voucher.</li>
+<li><strong>Personal message.</strong> Anything the purchaser would like to say
+to the recipient (up to 500 characters). It is printed on the voucher.</li>
+</ul>
+<p>
+Press <strong>Preview voucher</strong> to see the finished PDF exactly as it
+will be sent, along with who the email goes to (recipient), who is copied
+(purchaser) and who is blind-copied (the studio). Use <strong>← Edit</strong> to
+change anything, or <strong>Send voucher</strong> to email it. The email is
+titled “Your Voucher for …”, has a short, friendly message, and the voucher
+attached.
+</p>
+<p>
+<strong>Afterwards.</strong> Every voucher is listed with its number, who it is
+for, its status and whether the email went. Click one to <strong>view or
+download the PDF</strong>, <strong>email it again</strong> (you can correct the
+address first), <strong>mark it redeemed</strong> when it has been used, or
+<strong>void</strong> it. A voucher shows as <em>Expired</em> automatically
+after its year is up. If an email ever fails, the voucher is still saved and
+shows “Not sent” — open it and press <strong>Send email</strong>.
+</p>
+<div class="callout callout-tip">
+<strong>Corrections</strong>
+<p>
+Once a voucher has been issued its details can't be edited, because the PDF has
+already gone out. If something was typed wrongly, void it and issue a new one.
+Each voucher has its own number (like PF-K7M2-9QXA); ask for it when someone
+redeems a voucher, and check it here.
+</p>
+</div>
+
 <h2 id="teaching">Teaching</h2>
 <p>
 Teaching covers the actual timetable: scheduling lessons, managing the
@@ -302,7 +414,8 @@ The student roster — Trial, Active and Inactive students (prospective and
 lapsed enquiries live on the Enquiries page instead).
 </p>
 <ul>
-<li><strong>Add/Edit Student:</strong> first/last name, an email (optional —
+<li><strong>Add/Edit Student:</strong> click a student's name in the list
+(or the Edit button) to open their details. First/last name, an email (optional —
 leave it blank for a sibling sharing a family login), phone, studio,
 status, and up to five instruments with a skill grade each. You need
 either a student email or a parent email so the family stays reachable.</li>
@@ -311,6 +424,12 @@ characters) at the very bottom of the Add/Edit window — for something worth
 remembering at a glance, like "Prefers Thursday lessons". A counter shows how
 many characters you have left. It's for internal use only, so keep it
 factual.</li>
+<li><strong>View Tasks:</strong> at the bottom-left of the Edit window.
+It lists every task about this student — open and closed, with open ones
+first — and clicking one takes you to the Tasks page with that task open. The
+number in brackets is how many tasks there are. If the student has no tasks the
+button is greyed out. If you've changed anything in the window without saving,
+you'll be asked before it takes you away.</li>
 <li><strong>Instruments &amp; grade:</strong> add or remove an instrument
 row and pick a <strong>Grade</strong> from the dropdown (Foundation /
 Beginner / Intermediate / Advanced tiers) — this is the only place to

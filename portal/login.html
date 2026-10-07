@@ -196,7 +196,21 @@
     }
   })();
 
+  // A link in an email (e.g. an event booking link) sends people here
+  // with ?next=event-book.html?event=... — honour it for that one page
+  // only, so this can never become an open redirect.
+  function safeNext() {
+    const n = new URLSearchParams(window.location.search).get('next') || '';
+    return /^event-book\.html(\?event=[0-9a-f-]{36})?$/i.test(n) ? n : null;
+  }
+
   function redirectByRole(role) {
+    const next = safeNext();
+    if (next && role === 'student') { window.location.href = next; return; }
+    if (next && role !== 'student') {
+      // staff following a student booking link get the staff view of the same event
+      window.location.href = next.replace('event-book.html', 'events.html'); return;
+    }
     const map = {
       superuser: 'tasks.html',
       admin:     'tasks.html',

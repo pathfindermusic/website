@@ -494,8 +494,35 @@ async function maybeSendConfirmation(studentId, sentBy) {
     if (!lesson) return 'no-lesson';                 // nothing to tell them yet
     if (!lesson.studioEmail) return 'no-studio-email';
 
+    // CLAIM the send before doing it. sent_at used to be stamped only
+    // AFTER the email went, so two callers that overlapped (a second
+    // click on a slow page, or the Add Lesson save racing the Students
+    // checklist) both read "not sent yet" and both sent — one student
+    // and their studio received three copies. The conditional update
+    // below is atomic in Postgres: only one caller can move sent_at
+    // from null to a value; everyone else gets zero rows back and stops.
+    const { data: claimed, error: claimErr } = await db.from('process_items')
+      .update({ sent_at: new Date().toISOString() })
+      .eq('id', item.id).is('sent_at', null).select('id');
+    if (claimErr) {
+      console.error('[processes] could not claim the confirmation send', claimErr);
+      return 'failed';
+    }
+    if (!claimed?.length) return 'already';          // someone else has it
+
+    // If the send does not happen, hand the claim back so it can be retried
+    const release = async () => {
+      const { error } = await db.from('process_items')
+        .update({ sent_at: null }).eq('id', item.id);
+      if (error) console.error('[processes] could not release the send claim', error);
+    };
+
     // Trials don't get a login — only an ongoing enrolment does.
-    const hasPortalLink = !isTrial && await ensureLoginForEnrolment(studentId);
+    let hasPortalLink = false;
+    if (!isTrial) {
+      try { hasPortalLink = await ensureLoginForEnrolment(studentId); }
+      catch (err) { await release(); throw err; }
+    }
 
     // The enrolment email previously carried no lesson details at all —
     // Zoho held the enrolment and MyMusicStaff held the lessons, so they
@@ -566,15 +593,16 @@ async function maybeSendConfirmation(studentId, sentBy) {
       const data = await res.json();
       if (!res.ok || !data.sent) {
         console.error('[processes] confirmation email failed', data);
+        await release();
         return 'failed';
       }
     } catch (err) {
       console.error('[processes] confirmation email failed', err);
+      await release();
       return 'failed';
     }
 
-    await db.from('process_items')
-      .update({ sent_at: new Date().toISOString() }).eq('id', item.id);
+    // sent_at was stamped when the send was claimed above
     return 'sent';
   }
   return 'already';

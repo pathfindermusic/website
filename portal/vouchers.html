@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Gift Vouchers — Pathfinder Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/portal.css">
+  <style>
+    .v-table { width: 100%; border-collapse: collapse; font-size: 0.845rem; }
+    .v-table th {
+      text-align: left; font-size: 0.7rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.07em; color: var(--mid-grey);
+      padding: 0 1rem 0.6rem; border-bottom: 1px solid var(--border); white-space: nowrap;
+    }
+    .v-table td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); color: var(--dark-grey); vertical-align: top; }
+    .v-table tr:last-child td { border-bottom: none; }
+    .v-table tbody tr:hover td { background: var(--off-white); cursor: pointer; }
+    .v-no   { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 600; color: var(--charcoal); font-size: 0.8rem; white-space: nowrap; }
+    .v-name { font-weight: 600; color: var(--charcoal); }
+    .v-sub  { font-size: 0.76rem; color: var(--mid-grey); }
+    .vpill  { display: inline-block; font-size: 0.7rem; font-weight: 600; padding: 0.12rem 0.55rem; border-radius: 99px; white-space: nowrap; }
+    .vpill.issued   { background: #dcfce7; color: #16a34a; }
+    .vpill.redeemed { background: #e0e7ff; color: #4338ca; }
+    .vpill.void     { background: #fee2e2; color: #dc2626; }
+    .vpill.expired  { background: #fef3c7; color: #b45309; }
+    .vpill.unsent   { background: #fef3c7; color: #b45309; }
+    .v-search { min-width: 220px; background-image: none; padding-right: 0.75rem; }
+
+    .kv { display: grid; grid-template-columns: 120px 1fr; gap: 0.45rem 0.85rem; font-size: 0.86rem; margin-bottom: 1rem; }
+    .kv dt { color: var(--mid-grey); font-size: 0.78rem; padding-top: 0.1rem; }
+    .kv dd { margin: 0; color: var(--charcoal); word-break: break-word; }
+    .v-msg { background: var(--off-white); border-left: 3px solid var(--orange); padding: 0.6rem 0.8rem; border-radius: 0 var(--r-sm) var(--r-sm) 0; white-space: pre-wrap; font-style: italic; }
+
+    /* new-voucher form */
+    .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.35rem; }
+    .chip-btn { font: inherit; font-size: 0.74rem; padding: 0.2rem 0.6rem; border-radius: 99px; cursor: pointer;
+      border: 1px solid rgba(232,73,30,0.35); background: rgba(232,73,30,0.06); color: var(--orange-dark, #c23a14); }
+    .chip-btn:hover { background: rgba(232,73,30,0.14); }
+    .pick-wrap { position: relative; }
+    .pick-list { position: absolute; z-index: 20; left: 0; right: 0; top: 100%; margin-top: 2px; max-height: 240px; overflow-y: auto;
+      background: var(--white); border: 1px solid var(--border); border-radius: var(--r-sm); box-shadow: var(--shadow-h, 0 6px 24px rgba(0,0,0,.14)); }
+    .pick-item { padding: 0.5rem 0.75rem; font-size: 0.84rem; cursor: pointer; border-bottom: 1px solid var(--border); }
+    .pick-item:last-child { border-bottom: none; }
+    .pick-item:hover, .pick-item.on { background: var(--off-white); }
+    .pick-item small { color: var(--mid-grey); margin-left: 0.4rem; }
+    .linked { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.76rem; color: #16a34a; margin-top: 0.3rem; }
+    .linked button { border: none; background: none; color: var(--mid-grey); cursor: pointer; font-size: 0.76rem; text-decoration: underline; padding: 0; }
+    .expiry-note { font-size: 0.8rem; color: var(--dark-grey); background: var(--off-white); border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 0.5rem 0.75rem; margin-bottom: 0.9rem; }
+    .form-error-box { background: #fee2e2; color: #b91c1c; font-size: 0.82rem; border-radius: var(--r-sm); padding: 0.6rem 0.8rem; margin-bottom: 0.9rem; }
+    .warn-box { background: #fef3c7; color: #92400e; font-size: 0.82rem; border-radius: var(--r-sm); padding: 0.6rem 0.8rem; margin-bottom: 0.9rem; }
+
+    /* preview */
+    .pdf-frame { width: 100%; height: min(62vh, 560px); border: 1px solid var(--border); border-radius: var(--r-sm); background: #f2f2f2; }
+    .send-summary { font-size: 0.82rem; color: var(--dark-grey); margin: 0.85rem 0 0; display: grid; grid-template-columns: 70px 1fr; gap: 0.25rem 0.75rem; }
+    .send-summary b { color: var(--mid-grey); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; padding-top: 0.1rem; }
+    .check-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.84rem; margin-bottom: 0.9rem; }
+    @media (max-width: 640px) { .v-hide-sm { display: none; } .kv { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<div class="portal-shell">
+
+  <nav class="topnav">
+    <a href="#" class="topnav-logo"><img src="../Logo_-_long.png" alt="Pathfinder Music Lessons"></a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">–</span>
+        </div>
+      </div>
+      <a href="change-password.html" class="btn-logout" style="text-decoration:none;">🔑 Password</a>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <aside class="sidebar" id="sidebar"><!-- injected --></aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Gift Vouchers</div>
+        <div class="page-sub" id="pageSub">Loading…</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="openNew()">+ New voucher</button>
+    </div>
+
+    <div class="filters-bar">
+      <input class="filter-select v-search" type="search" id="filterText" placeholder="Search number, name or email…" oninput="render()">
+      <select class="filter-select" id="filterStatus" onchange="render()">
+        <option value="active">Active</option>
+        <option value="redeemed">Redeemed</option>
+        <option value="void">Void</option>
+        <option value="expired">Expired</option>
+        <option value="all">All</option>
+      </select>
+    </div>
+
+    <div id="setupBox" class="warn-box hidden"></div>
+
+    <div class="card">
+      <div style="overflow-x:auto;">
+        <table class="v-table">
+          <thead>
+            <tr>
+              <th>Voucher</th><th>For</th><th class="v-hide-sm">From</th><th>Gift</th>
+              <th class="v-hide-sm">Purchased</th><th>Valid until</th><th>Status</th><th class="v-hide-sm">Email</th>
+            </tr>
+          </thead>
+          <tbody id="vBody">
+            <tr><td colspan="8"><div class="loading"><div class="spinner"></div> Loading…</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ============ NEW VOUCHER ============ -->
+<div class="modal-overlay hidden" id="newModal">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header">
+      <span class="modal-title">New gift voucher</span>
+      <button class="modal-close" onclick="closeNew()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="nErr" class="form-error-box hidden"></div>
+
+      <div class="form-group">
+        <label class="form-label">Issuing studio *</label>
+        <select class="form-select" id="nStudio"></select>
+        <span class="form-hint">The email is sent from, and blind-copied to, this studio.</span>
+      </div>
+
+      <div class="form-group pick-wrap">
+        <label class="form-label">Recipient is an existing student? <span class="text-muted" style="font-weight:400;">(optional — fills in the name and email below)</span></label>
+        <input class="form-input" type="text" id="nStudentSearch" placeholder="Type a student's name…" autocomplete="off">
+        <div class="pick-list hidden" id="nPickList"></div>
+        <div class="linked hidden" id="nLinked"></div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">To (recipient's name) *</label>
+          <input class="form-input" type="text" id="nTo" maxlength="120">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Recipient's email *</label>
+          <input class="form-input" type="email" id="nToEmail" maxlength="254">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Voucher for * <span class="text-muted" style="font-weight:400;">— the headline on the voucher and in the email subject</span></label>
+        <input class="form-input" type="text" id="nSubject" maxlength="120" placeholder="e.g. 5 Music Lessons at Pathfinder Music">
+        <div class="chips" id="nPresets"></div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">From (purchaser's name) *</label>
+          <input class="form-input" type="text" id="nFrom" maxlength="120">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Purchaser's email <span class="text-muted" style="font-weight:400;">(optional)</span></label>
+          <input class="form-input" type="email" id="nFromEmail" maxlength="254">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Purchase date *</label>
+          <input class="form-input" type="date" id="nDate">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Value, $ <span class="text-muted" style="font-weight:400;">(optional)</span></label>
+          <input class="form-input" type="number" id="nValue" min="0" step="0.01" placeholder="Leave blank to omit">
+        </div>
+      </div>
+      <div class="expiry-note" id="nExpiry"></div>
+
+      <div class="form-group">
+        <label class="form-label">Personal message <span class="text-muted" style="font-weight:400;">(optional)</span></label>
+        <textarea class="form-textarea" id="nMessage" maxlength="500" rows="4" style="min-height:90px;"
+                  placeholder="Anything the purchaser would like to say to the recipient"></textarea>
+        <span class="form-hint"><span id="nMsgCount">0</span>/500 · Emoji can't be printed on the voucher and are left out.</span>
+      </div>
+
+      <label class="check-row"><input type="checkbox" id="nCc" checked> <span id="nCcLabel">Copy the purchaser on the email</span></label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeNew()">Cancel</button>
+      <button class="btn btn-primary" id="nPreviewBtn" onclick="previewNew()">Preview voucher →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PREVIEW / SEND ============ -->
+<div class="modal-overlay hidden" id="prevModal">
+  <div class="modal" style="max-width:860px;">
+    <div class="modal-header">
+      <span class="modal-title" id="pTitle">Preview</span>
+      <button class="modal-close" onclick="closePrev()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="pErr" class="form-error-box hidden"></div>
+      <div id="pFrameWrap"></div>
+      <div style="margin-top:.5rem;font-size:.78rem;"><a id="pOpen" href="#" target="_blank" rel="noopener">Open the PDF in a new tab</a></div>
+      <div class="send-summary" id="pSummary"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="pBack" onclick="backToEdit()">← Edit</button>
+      <button class="btn btn-primary" id="pSend" onclick="sendNew()">Send voucher</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ VOUCHER DETAIL ============ -->
+<div class="modal-overlay hidden" id="detModal">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-header">
+      <span class="modal-title" id="dTitle">Voucher</span>
+      <button class="modal-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div class="modal-body" id="dBody"></div>
+    <div class="modal-footer" id="dFoot" style="flex-wrap:wrap;gap:.5rem;"></div>
+  </div>
+</div>
+
+<!-- ============ RESEND ============ -->
+<div class="modal-overlay hidden" id="resendModal">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <span class="modal-title">Email the voucher again</span>
+      <button class="modal-close" onclick="closeResend()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="rErr" class="form-error-box hidden"></div>
+      <div class="form-group">
+        <label class="form-label">Send to</label>
+        <input class="form-input" type="email" id="rTo">
+        <span class="form-hint">Change this if the first address was wrong — the voucher record is updated to match.</span>
+      </div>
+      <label class="check-row"><input type="checkbox" id="rCc" checked> <span id="rCcLabel">Copy the purchaser</span></label>
+      <div class="send-summary" id="rSummary"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeResend()">Cancel</button>
+      <button class="btn btn-primary" id="rSend" onclick="doResend()">Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ VOID / REDEEM ============ -->
+<div class="modal-overlay hidden" id="statusModal">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-header">
+      <span class="modal-title" id="sTitle">Update voucher</span>
+      <button class="modal-close" onclick="closeStatus()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-sm" id="sIntro" style="margin-bottom:.9rem;"></p>
+      <div id="sErr" class="form-error-box hidden"></div>
+      <div class="form-group">
+        <label class="form-label" id="sLabel">Note</label>
+        <textarea class="form-textarea" id="sNote" maxlength="500" rows="3" style="min-height:70px;"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeStatus()">Cancel</button>
+      <button class="btn btn-primary" id="sGo" onclick="doStatus()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastWrap" class="toast-wrap"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/voucher-pdf.js"></script>
+<script>
+const PRESETS = [
+  '5 Music Lessons at Pathfinder Music',
+  '10 Music Lessons at Pathfinder Music',
+  '5 Guitar Lessons at Pathfinder Music',
+  '10 Guitar Lessons at Pathfinder Music',
+];
+
+let me = null;
+let studios = [];
+let myStudioIds = [];
+let students = [];              // for the recipient picker
+let vouchers = [];
+let tableMissing = false;
+
+// state of the "new voucher" flow
+let draft = null;               // validated form values behind the current preview
+let draftPdf = null;            // { base64, filename, url }
+let saved = null;               // the DB row once inserted (so a retry never inserts twice)
+let linkedStudent = null;       // { id, name, email } chosen in the picker
+let detailId = null;            // voucher open in the detail modal
+let statusMode = null;          // 'redeem' | 'void'
+let resendVoucher = null;
+let sending = false;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const validEmail = a => { const s = String(a ?? '').trim(); return !!s && s.length <= 254 && !/\s/.test(s) && /^[^@]+@[^@.]+(\.[^@.]+)+$/.test(s); };
+
+(async () => {
+  me = await requireAuth(['superuser', 'admin']);
+  if (!me) return;
+  renderTopNavUser(me);
+  renderSidebar();
+  if (window.innerWidth < 900) $('menuToggle').style.display = '';
+
+  $('nPresets').innerHTML = PRESETS.map((p, i) =>
+    `<button type="button" class="chip-btn" data-i="${i}">${esc(p)}</button>`).join('');
+  $('nPresets').addEventListener('click', e => {
+    const b = e.target.closest('[data-i]'); if (!b) return;
+    $('nSubject').value = PRESETS[b.dataset.i];
+  });
+  $('nDate').addEventListener('input', showExpiry);
+  $('nMessage').addEventListener('input', () => { $('nMsgCount').textContent = $('nMessage').value.length; });
+  $('nFromEmail').addEventListener('input', syncCcLabel);
+  $('nToEmail').addEventListener('input', syncCcLabel);
+  $('nTo').addEventListener('input', onToEdited);
+  $('nStudentSearch').addEventListener('input', onPickInput);
+  $('nStudentSearch').addEventListener('keydown', onPickKey);
+  document.addEventListener('click', e => { if (!e.target.closest('.pick-wrap')) $('nPickList').classList.add('hidden'); });
+
+  await loadStudios();
+  await loadVouchers();
+  loadStudents();               // in the background — only the picker needs it
+})();
+
+// ============================================================
+// SIDEBAR
+// ============================================================
+function renderSidebar() {
+  const I = {
+    people:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>',
+    person:'<circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/>',
+    cal:   '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+    mail:  '<path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/>',
+    task:  '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+    check: '<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+    inbox: '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+    clipboard: '<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/>',
+    home:  '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+    book:  '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
+    list:  '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
+    help:  '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+    ticket:'<path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/>',
+    award: '<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>',
+    star:  '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+    gift:  '<polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>',
+  };
+  const it = (h,l,p,a) => `<a class="nav-item ${a?'active':''}" href="${h}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${p}</svg>${l}</a>`;
+  let html = `<div class="sidebar-section">Front desk</div>
+    ${it('tasks.html','Tasks',I.task)}
+    ${it('enquiries.html','Enquiries',I.inbox)}
+    ${it('notifications.html','Notifications',I.mail)}
+    ${it('day-sheet.html','Day Sheet',I.clipboard)}
+    ${it('events.html','Events',I.star)}
+    ${it('vouchers.html','Vouchers',I.gift,true)}
+    <div class="sidebar-section">Teaching</div>
+    ${it('lessons.html','Lessons',I.cal)}
+    ${it('students.html','Students',I.people)}
+    ${it('teachers.html','Teachers',I.person)}
+    <div class="sidebar-section">Curriculum</div>
+    ${it('bok-artefacts.html','Artefact Library',I.book)}
+    <div class="sidebar-section">Reports</div>
+    ${it('attendance-report.html','Attendance',I.check)}
+    ${it('grading-report.html','Grading',I.award)}
+    ${it('credits.html','Credits',I.ticket)}
+    ${it('distribution-lists.html','Distribution Lists',I.list)}`;
+  if (me.role === 'superuser') {
+    html += `<div class="sidebar-section">Super User</div>
+      ${it('studios.html','Studios',I.home)}
+      ${it('admins.html','Admins',I.shield)}`;
+  }
+  html += `<div class="sidebar-section">Manuals</div>
+    ${it('manuals/index.html','How-To Guide',I.help)}`;
+  $('sidebar').innerHTML = html;
+}
+function toggleSidebar() { $('sidebar').classList.toggle('open'); }
+
+// ============================================================
+// LOAD
+// ============================================================
+async function loadStudios() {
+  const { data } = await db.from('studios').select('id,name,email,address').eq('status', 'active').order('name');
+  studios = data ?? [];
+  if (me.role === 'superuser') {
+    myStudioIds = studios.map(s => s.id);
+  } else {
+    const { data: row } = await db.from('admins').select('studio_ids').eq('user_id', me.id).maybeSingle();
+    myStudioIds = row?.studio_ids?.length ? row.studio_ids : studios.map(s => s.id);
+  }
+}
+
+async function loadVouchers() {
+  const { data, error } = await db.from('gift_vouchers').select('*')
+    .order('created_at', { ascending: false }).limit(1000);
+  if (error) {
+    tableMissing = /gift_vouchers|relation|schema cache|does not exist/i.test(error.message ?? '');
+    const box = $('setupBox');
+    box.classList.remove('hidden');
+    box.innerHTML = tableMissing
+      ? '<b>Gift vouchers aren\'t set up yet.</b> Run <code>supabase/gift-vouchers.sql</code> in the Supabase SQL editor (one step at a time), then reload this page.'
+      : 'Could not load vouchers: ' + esc(error.message);
+    $('pageSub').textContent = '';
+    $('vBody').innerHTML = '';
+    return;
+  }
+  $('setupBox').classList.add('hidden');
+  vouchers = data ?? [];
+  render();
+}
+
+async function loadStudents() {
+  const { data } = await db.from('students')
+    .select('id,user_id,first_name,last_name,email,parent_name,parent_email,status')
+    .in('status', ['active', 'trial', 'prospective']).limit(2000);
+  students = (data ?? []).map(s => ({
+    id: s.id,
+    name: `${s.first_name ?? ''} ${s.last_name ?? ''}`.trim(),
+    email: s.email || s.parent_email || '',
+    parent: s.parent_name || '',
+    status: s.status,
+    user_id: s.user_id,
+  }));
+  // a few rows may predate students.first_name — borrow the profile name
+  const missing = students.filter(s => !s.name && s.user_id);
+  for (let i = 0; i < missing.length; i += 60) {
+    const chunk = missing.slice(i, i + 60);
+    const { data: ps } = await db.from('profiles').select('id,first_name,last_name').in('id', chunk.map(s => s.user_id));
+    (ps ?? []).forEach(p => { chunk.filter(s => s.user_id === p.id).forEach(s => { s.name = `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim(); }); });
+  }
+  students = students.filter(s => s.name).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// ============================================================
+// REGISTER
+// ============================================================
+const today = () => toISODate(new Date());
+function effStatus(v) {
+  if (v.status === 'issued' && v.expires_on < today()) return 'expired';
+  return v.status;
+}
+const STATUS_LABEL = { issued: 'Active', redeemed: 'Redeemed', void: 'Void', expired: 'Expired' };
+const dmy = iso => PFVoucher.fmtDate(iso);
+
+function render() {
+  const f  = $('filterStatus').value;
+  const q  = $('filterText').value.trim().toLowerCase();
+  const counts = { issued: 0, redeemed: 0, void: 0, expired: 0 };
+  vouchers.forEach(v => counts[effStatus(v)]++);
+  $('pageSub').textContent = `${counts.issued} active · ${counts.redeemed} redeemed` +
+    (counts.expired ? ` · ${counts.expired} expired` : '') + (counts.void ? ` · ${counts.void} void` : '');
+
+  const rows = vouchers.filter(v => {
+    const s = effStatus(v);
+    if (f === 'active' && s !== 'issued') return false;
+    if (f !== 'active' && f !== 'all' && s !== f) return false;
+    if (q) {
+      const hay = [v.voucher_no, v.recipient_name, v.recipient_email, v.purchaser_name, v.purchaser_email, v.subject].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  if (!rows.length) {
+    $('vBody').innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">🎁</div>
+      <h3>${vouchers.length ? 'No vouchers match' : 'No vouchers yet'}</h3>
+      <p>${vouchers.length ? 'Try a different filter.' : 'Press “+ New voucher” when someone buys one.'}</p></div></td></tr>`;
+    return;
+  }
+  $('vBody').innerHTML = rows.map(v => {
+    const s = effStatus(v);
+    const emailed = v.emailed_at
+      ? `<span class="v-sub">Sent ${esc(dmy(v.emailed_at.slice(0, 10)))}</span>`
+      : (s === 'issued' ? '<span class="vpill unsent">Not sent</span>' : '<span class="v-sub">—</span>');
+    return `<tr onclick="openDetail('${v.id}')">
+      <td class="v-no">${esc(v.voucher_no)}</td>
+      <td><div class="v-name">${esc(v.recipient_name)}</div><div class="v-sub">${esc(v.recipient_email)}</div></td>
+      <td class="v-hide-sm">${esc(v.purchaser_name)}</td>
+      <td>${esc(v.subject)}${v.value_amount != null ? `<div class="v-sub">$${Number(v.value_amount).toFixed(2)}</div>` : ''}</td>
+      <td class="v-hide-sm">${esc(dmy(v.purchase_date))}</td>
+      <td>${esc(dmy(v.expires_on))}</td>
+      <td><span class="vpill ${s}">${STATUS_LABEL[s]}</span></td>
+      <td class="v-hide-sm">${emailed}</td></tr>`;
+  }).join('');
+}
+
+// ============================================================
+// NEW VOUCHER — form
+// ============================================================
+function openNew() {
+  if (tableMissing) { showToast('Run gift-vouchers.sql first.', 'warning'); return; }
+  saved = null; draft = null; draftPdf = null; linkedStudent = null;
+  ['nStudentSearch', 'nTo', 'nToEmail', 'nSubject', 'nFrom', 'nFromEmail', 'nValue', 'nMessage'].forEach(i => { $(i).value = ''; });
+  $('nMsgCount').textContent = '0';
+  $('nDate').value = today(); $('nDate').max = today();
+  $('nCc').checked = true;
+  $('nStudio').innerHTML = studios.map(s => `<option value="${s.id}">${esc(s.name)}${s.email ? '' : ' (no email on file)'}</option>`).join('');
+  const mine = studios.find(s => myStudioIds.includes(s.id));
+  if (mine) $('nStudio').value = mine.id;
+  hideErr('nErr'); $('nLinked').classList.add('hidden'); $('nPickList').classList.add('hidden');
+  syncCcLabel(); showExpiry();
+  $('newModal').classList.remove('hidden');
+  $('nStudentSearch').focus();
+}
+function closeNew() { $('newModal').classList.add('hidden'); }
+
+function showExpiry() {
+  const d = $('nDate').value;
+  $('nExpiry').innerHTML = d
+    ? `Valid for one year from the purchase date — until <b>${esc(dmy(PFVoucher.addOneYear(d)))}</b>.`
+    : 'Choose the purchase date.';
+}
+function syncCcLabel() {
+  const pe = $('nFromEmail').value.trim();
+  const ok = validEmail(pe) && pe.toLowerCase() !== $('nToEmail').value.trim().toLowerCase();
+  $('nCc').disabled = !ok;
+  $('nCcLabel').textContent = ok ? `Copy the purchaser (${pe}) on the email`
+                                 : 'Copy the purchaser on the email (add their email address above)';
+}
+
+// --- student picker ---
+let pickIdx = -1, pickMatches = [];
+function onPickInput() {
+  const q = $('nStudentSearch').value.trim().toLowerCase();
+  const box = $('nPickList');
+  if (q.length < 2) { box.classList.add('hidden'); return; }
+  pickMatches = students.filter(s => s.name.toLowerCase().includes(q)).slice(0, 8);
+  pickIdx = pickMatches.length ? 0 : -1;
+  box.innerHTML = pickMatches.length
+    ? pickMatches.map((s, i) => `<div class="pick-item ${i === 0 ? 'on' : ''}" data-i="${i}">${esc(s.name)}<small>${esc(s.email)}</small></div>`).join('')
+    : '<div class="pick-item" style="cursor:default;color:var(--mid-grey);">No matching student — type the recipient\'s details below instead.</div>';
+  box.classList.remove('hidden');
+  box.onmousedown = e => { const el = e.target.closest('[data-i]'); if (el) { e.preventDefault(); chooseStudent(pickMatches[+el.dataset.i]); } };
+}
+function onPickKey(e) {
+  const box = $('nPickList');
+  if (box.classList.contains('hidden') || !pickMatches.length) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    pickIdx = (pickIdx + (e.key === 'ArrowDown' ? 1 : -1) + pickMatches.length) % pickMatches.length;
+    [...box.children].forEach((c, i) => c.classList.toggle('on', i === pickIdx));
+  } else if (e.key === 'Enter') { e.preventDefault(); chooseStudent(pickMatches[pickIdx]); }
+  else if (e.key === 'Escape') box.classList.add('hidden');
+}
+function chooseStudent(s) {
+  if (!s) return;
+  linkedStudent = { id: s.id, name: s.name, email: s.email };
+  $('nTo').value = s.name;
+  $('nToEmail').value = s.email;
+  $('nStudentSearch').value = '';
+  $('nPickList').classList.add('hidden');
+  showLinked();
+  syncCcLabel();
+  if (!s.email) $('nToEmail').focus(); else $('nSubject').focus();
+}
+function showLinked() {
+  const el = $('nLinked');
+  if (!linkedStudent) { el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  el.innerHTML = `✓ Linked to student <b>${esc(linkedStudent.name)}</b> <button type="button" onclick="unlinkStudent()">unlink</button>`;
+}
+function unlinkStudent() { linkedStudent = null; showLinked(); }
+// changing the name to someone else means it is no longer that student's voucher
+function onToEdited() {
+  if (linkedStudent && $('nTo').value.trim() !== linkedStudent.name) { linkedStudent = null; showLinked(); }
+}
+
+function showErr(id, msg) { const e = $(id); e.textContent = msg; e.classList.remove('hidden'); e.scrollIntoView({ block: 'nearest' }); }
+function hideErr(id) { $(id).classList.add('hidden'); }
+
+function readForm() {
+  const v = {
+    studio_id: $('nStudio').value,
+    recipient_name: $('nTo').value.trim(),
+    recipient_email: $('nToEmail').value.trim(),
+    recipient_student_id: linkedStudent?.id ?? null,
+    subject: $('nSubject').value.trim(),
+    purchaser_name: $('nFrom').value.trim(),
+    purchaser_email: $('nFromEmail').value.trim() || null,
+    purchase_date: $('nDate').value,
+    value_amount: $('nValue').value === '' ? null : Number($('nValue').value),
+    message: $('nMessage').value.trim() || null,
+  };
+  const problems = [];
+  const studio = studios.find(s => s.id === v.studio_id);
+  if (!studio) problems.push('Choose the issuing studio.');
+  else if (!validEmail(studio.email)) problems.push(`${studio.name} has no email address on file (Studios page), so the voucher can't be emailed from it.`);
+  if (!v.recipient_name) problems.push('Enter the recipient\'s name (To).');
+  if (!validEmail(v.recipient_email)) problems.push('Enter a valid email address for the recipient.');
+  if (!v.subject) problems.push('Enter what the voucher is for.');
+  if (!v.purchaser_name) problems.push('Enter the purchaser\'s name (From).');
+  if (v.purchaser_email && !validEmail(v.purchaser_email)) problems.push('The purchaser\'s email address doesn\'t look right.');
+  if (!v.purchase_date) problems.push('Choose the purchase date.');
+  else if (v.purchase_date > today()) problems.push('The purchase date can\'t be in the future.');
+  if (v.value_amount != null && !(v.value_amount >= 0)) problems.push('The value must be zero or more.');
+  const stripped = PFVoucher.clean(v.subject);
+  if (v.subject && !stripped) problems.push('The voucher headline has no printable characters.');
+  v.cc = !$('nCc').disabled && $('nCc').checked;
+  return { v, problems, studio };
+}
+
+// ============================================================
+// NEW VOUCHER — preview
+// ============================================================
+async function previewNew() {
+  hideErr('nErr');
+  const { v, problems, studio } = readForm();
+  if (problems.length) { showErr('nErr', problems.join('  ')); return; }
+  const btn = $('nPreviewBtn'); btn.disabled = true; btn.textContent = 'Preparing…';
+  try {
+    draft = { ...v, studio, voucher_no: draft?.voucher_no && !saved ? draft.voucher_no : PFVoucher.newVoucherNo() };
+    await buildDraftPdf();
+    showPreview();
+  } catch (e) {
+    console.error(e);
+    showErr('nErr', 'Could not build the voucher: ' + (e.message || e));
+  } finally { btn.disabled = false; btn.textContent = 'Preview voucher →'; }
+}
+
+function pdfDataFrom(d) {
+  return {
+    voucherNo: d.voucher_no, subject: d.subject, valueAmount: d.value_amount,
+    recipientName: d.recipient_name, purchaserName: d.purchaser_name,
+    purchaseDate: d.purchase_date, expiresOn: d.expires_on,
+    message: d.message, studio: d.studio,
+  };
+}
+async function buildDraftPdf() {
+  if (draftPdf?.url) URL.revokeObjectURL(draftPdf.url);
+  draftPdf = await PFVoucher.build(pdfDataFrom(draft));
+}
+
+function emailSummaryHtml(d, to, ccList) {
+  return `<b>To</b><span>${esc(to)}</span>
+    <b>Cc</b><span>${ccList.length ? esc(ccList.join(', ')) : '<span class="text-muted">—</span>'}</span>
+    <b>Bcc</b><span>${esc(d.studio.email)} <span class="text-muted">(${esc(d.studio.name)})</span></span>
+    <b>Subject</b><span>Your Voucher for ${esc(d.subject)}</span>`;
+}
+function setFrame(url) {
+  $('pFrameWrap').innerHTML = `<iframe class="pdf-frame" src="${url}#toolbar=0&navpanes=0&view=Fit" title="Voucher preview"></iframe>`;
+  $('pOpen').href = url;
+}
+function showPreview() {
+  hideErr('pErr');
+  $('pTitle').textContent = 'Preview — ' + draft.voucher_no;
+  setFrame(draftPdf.url);
+  const cc = draft.cc && draft.purchaser_email ? [draft.purchaser_email] : [];
+  $('pSummary').innerHTML = emailSummaryHtml(draft, draft.recipient_email, cc);
+  $('pBack').style.display = '';
+  $('pBack').disabled = false;
+  $('pSend').style.display = '';
+  $('pSend').textContent = saved ? 'Retry sending the email' : 'Send voucher';
+  $('pSend').disabled = false;
+  $('newModal').classList.add('hidden');
+  $('prevModal').classList.remove('hidden');
+}
+function backToEdit() {
+  if (saved) return;      // an issued voucher can no longer be edited
+  $('prevModal').classList.add('hidden');
+  $('newModal').classList.remove('hidden');
+}
+function closePrev() {
+  $('prevModal').classList.add('hidden');
+  if (saved) { loadVouchers(); }
+}
+
+// ============================================================
+// NEW VOUCHER — save + send
+// ============================================================
+async function authHeaders() {
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) throw new Error('Your session has expired — please sign in again.');
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` };
+}
+
+async function callSend(payload) {
+  const res = await fetch('/.netlify/functions/send-voucher', {
+    method: 'POST', headers: await authHeaders(), body: JSON.stringify(payload),
+  });
+  let j = {}; try { j = await res.json(); } catch (_) {}
+  if (!res.ok) { const e = new Error(j.error || `The email service answered ${res.status}.`); e.code = j.code; throw e; }
+  return j;
+}
+
+async function insertVoucher() {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { data, error } = await db.from('gift_vouchers').insert({
+      voucher_no: draft.voucher_no,
+      studio_id: draft.studio_id,
+      subject: draft.subject,
+      value_amount: draft.value_amount,
+      recipient_name: draft.recipient_name,
+      recipient_email: draft.recipient_email,
+      recipient_student_id: draft.recipient_student_id,
+      purchaser_name: draft.purchaser_name,
+      purchaser_email: draft.purchaser_email,
+      message: draft.message,
+      purchase_date: draft.purchase_date,
+      expires_on: PFVoucher.addOneYear(draft.purchase_date),   // the database overwrites this
+    }).select().single();
+    if (!error) return data;
+    // the (very unlikely) clash of two random numbers — pick another and go again
+    if (error.code === '23505' && /voucher_no/.test(error.message + (error.details ?? ''))) {
+      draft.voucher_no = PFVoucher.newVoucherNo();
+      continue;
+    }
+    throw new Error(error.message);
+  }
+  throw new Error('Could not allocate a voucher number. Please try again.');
+}
+
+async function sendNew() {
+  if (sending) return;
+  sending = true;
+  const btn = $('pSend'); btn.disabled = true; $('pBack').disabled = true;
+  hideErr('pErr');
+  try {
+    if (!saved) {
+      btn.textContent = 'Saving…';
+      saved = await insertVoucher();
+      // build the PDF from what the database actually stored (number, expiry)
+      draft = { ...draft, voucher_no: saved.voucher_no, expires_on: saved.expires_on };
+      await buildDraftPdf();
+    }
+    btn.textContent = 'Sending…';
+    await callSend({ voucherId: saved.id, pdfBase64: draftPdf.base64, ccPurchaser: !!draft.cc });
+    showToast(`Voucher ${saved.voucher_no} emailed to ${saved.recipient_email}.`, 'success');
+    $('prevModal').classList.add('hidden');
+    saved = null; draft = null;
+    await loadVouchers();
+  } catch (e) {
+    console.error(e);
+    if (saved) {
+      showErr('pErr', `The voucher ${saved.voucher_no} was saved, but the email didn't go: ${e.message} ` +
+        'You can try again here, or find it in the list later and use “Email again”.');
+      $('pBack').style.display = 'none';
+      btn.textContent = 'Retry sending the email';
+    } else {
+      showErr('pErr', 'Could not save the voucher: ' + e.message);
+      btn.textContent = 'Send voucher';
+      $('pBack').disabled = false;
+    }
+    btn.disabled = false;
+  } finally { sending = false; }
+}
+
+// ============================================================
+// DETAIL
+// ============================================================
+function openDetail(id) {
+  const v = vouchers.find(x => x.id === id); if (!v) return;
+  detailId = id;
+  const s = effStatus(v);
+  const studio = studios.find(x => x.id === v.studio_id);
+  $('dTitle').innerHTML = `${esc(v.voucher_no)} <span class="vpill ${s}" style="margin-left:.5rem;">${STATUS_LABEL[s]}</span>`;
+  $('dBody').innerHTML = `<dl class="kv">
+      <dt>Gift</dt><dd><b>${esc(v.subject)}</b>${v.value_amount != null ? ` · $${Number(v.value_amount).toFixed(2)}` : ''}</dd>
+      <dt>To</dt><dd>${esc(v.recipient_name)}<br><span class="v-sub">${esc(v.recipient_email)}</span></dd>
+      <dt>From</dt><dd>${esc(v.purchaser_name)}${v.purchaser_email ? `<br><span class="v-sub">${esc(v.purchaser_email)}</span>` : ''}</dd>
+      <dt>Purchased</dt><dd>${esc(dmy(v.purchase_date))}</dd>
+      <dt>Valid until</dt><dd>${esc(dmy(v.expires_on))}</dd>
+      <dt>Studio</dt><dd>${esc(studio?.name ?? '—')}</dd>
+      <dt>Email</dt><dd>${v.emailed_at
+        ? `Sent to ${esc(v.emailed_to ?? v.recipient_email)} on ${esc(dmy(v.emailed_at.slice(0, 10)))}${v.send_count > 1 ? ` (${v.send_count} times)` : ''}`
+        : '<span class="vpill unsent">Not sent</span>'}${v.email_error ? `<br><span class="v-sub" style="color:#b91c1c;">Last error: ${esc(v.email_error)}</span>` : ''}</dd>
+      ${v.status_changed_at ? `<dt>${s === 'void' ? 'Voided' : 'Redeemed'}</dt><dd>${esc(dmy(v.status_changed_at.slice(0, 10)))}${v.status_note ? ` — ${esc(v.status_note)}` : ''}</dd>` : ''}
+    </dl>
+    ${v.message ? `<div class="form-label" style="margin-bottom:.35rem;">Personal message</div><div class="v-msg">${esc(v.message)}</div>` : ''}`;
+  const live = v.status === 'issued';
+  $('dFoot').innerHTML = `
+    <button class="btn btn-secondary btn-sm" onclick="viewPdf()">View / download PDF</button>
+    ${live && s !== 'expired' ? `<button class="btn btn-secondary btn-sm" onclick="openResend()">${v.emailed_at ? 'Email again' : 'Send email'}</button>` : ''}
+    ${live ? `<button class="btn btn-primary btn-sm" onclick="openStatus('redeem')">Mark redeemed</button>
+              <button class="btn btn-danger btn-sm" onclick="openStatus('void')">Void</button>` : ''}`;
+  $('detModal').classList.remove('hidden');
+}
+function closeDetail() { $('detModal').classList.add('hidden'); detailId = null; }
+
+function voucherPdfData(v) {
+  const studio = studios.find(x => x.id === v.studio_id) ?? { name: '', email: '' };
+  return {
+    voucherNo: v.voucher_no, subject: v.subject, valueAmount: v.value_amount,
+    recipientName: v.recipient_name, purchaserName: v.purchaser_name,
+    purchaseDate: v.purchase_date, expiresOn: v.expires_on, message: v.message,
+    studio: { name: studio.name, email: studio.email },
+  };
+}
+
+// view / download an existing voucher's PDF (rebuilt from the register — identical to what was sent)
+async function viewPdf() {
+  const v = vouchers.find(x => x.id === detailId); if (!v) return;
+  try {
+    if (draftPdf?.url) URL.revokeObjectURL(draftPdf.url);
+    draftPdf = await PFVoucher.build(voucherPdfData(v));
+    hideErr('pErr');
+    $('pTitle').textContent = v.voucher_no;
+    setFrame(draftPdf.url);
+    $('pSummary').innerHTML = `<b>File</b><span><a href="${draftPdf.url}" download="${esc(draftPdf.filename)}">Download ${esc(draftPdf.filename)}</a></span>`;
+    $('pBack').style.display = 'none'; $('pSend').style.display = 'none';
+    $('prevModal').classList.remove('hidden');
+  } catch (e) { showToast('Could not build the PDF: ' + e.message, 'error'); }
+}
+
+// ============================================================
+// RESEND
+// ============================================================
+function openResend() {
+  const v = vouchers.find(x => x.id === detailId); if (!v) return;
+  resendVoucher = v;
+  hideErr('rErr');
+  $('rTo').value = v.recipient_email;
+  const canCc = validEmail(v.purchaser_email);
+  $('rCc').checked = canCc; $('rCc').disabled = !canCc;
+  $('rCcLabel').textContent = canCc ? `Copy the purchaser (${v.purchaser_email})` : 'Copy the purchaser (no email address recorded)';
+  $('rTo').oninput = updateResendSummary; $('rCc').onchange = updateResendSummary;
+  updateResendSummary();
+  $('rSend').disabled = false; $('rSend').textContent = 'Send';
+  $('resendModal').classList.remove('hidden');
+}
+function updateResendSummary() {
+  const v = resendVoucher; if (!v) return;
+  const studio = studios.find(x => x.id === v.studio_id) ?? { name: '', email: '' };
+  const to = $('rTo').value.trim();
+  const cc = $('rCc').checked && validEmail(v.purchaser_email) && v.purchaser_email.toLowerCase() !== to.toLowerCase() ? [v.purchaser_email] : [];
+  $('rSummary').innerHTML = emailSummaryHtml({ ...v, studio }, to || '—', cc);
+}
+function closeResend() { $('resendModal').classList.add('hidden'); resendVoucher = null; }
+async function doResend() {
+  const v = resendVoucher; if (!v || sending) return;
+  const to = $('rTo').value.trim();
+  hideErr('rErr');
+  if (!validEmail(to)) { showErr('rErr', 'Enter a valid email address.'); return; }
+  sending = true; $('rSend').disabled = true; $('rSend').textContent = 'Sending…';
+  try {
+    const pdf = await PFVoucher.build(voucherPdfData(v));
+    await callSend({ voucherId: v.id, pdfBase64: pdf.base64, to, ccPurchaser: $('rCc').checked });
+    showToast(`Voucher ${v.voucher_no} emailed to ${to}.`, 'success');
+    closeResend(); closeDetail();
+    await loadVouchers();
+  } catch (e) {
+    showErr('rErr', e.message);
+    $('rSend').disabled = false; $('rSend').textContent = 'Send';
+  } finally { sending = false; }
+}
+
+// ============================================================
+// REDEEM / VOID
+// ============================================================
+function openStatus(mode) {
+  const v = vouchers.find(x => x.id === detailId); if (!v) return;
+  statusMode = mode; hideErr('sErr'); $('sNote').value = '';
+  if (mode === 'redeem') {
+    $('sTitle').textContent = 'Mark as redeemed';
+    $('sIntro').textContent = `Use this once ${v.recipient_name} has used the voucher (or the value has been booked in). It will no longer count as active.`;
+    $('sLabel').textContent = 'Note (optional) — e.g. which lessons it was used for';
+    $('sGo').className = 'btn btn-primary'; $('sGo').textContent = 'Mark redeemed';
+  } else {
+    $('sTitle').textContent = 'Void this voucher';
+    $('sIntro').textContent = `Voiding ${v.voucher_no} means it can no longer be honoured or emailed. This can't be undone — if you need a corrected voucher, issue a new one.`;
+    $('sLabel').textContent = 'Reason (optional)';
+    $('sGo').className = 'btn btn-danger'; $('sGo').textContent = 'Void voucher';
+  }
+  $('statusModal').classList.remove('hidden');
+}
+function closeStatus() { $('statusModal').classList.add('hidden'); }
+async function doStatus() {
+  const v = vouchers.find(x => x.id === detailId); if (!v) return;
+  $('sGo').disabled = true;
+  const { error } = await db.from('gift_vouchers').update({
+    status: statusMode === 'redeem' ? 'redeemed' : 'void',
+    status_note: $('sNote').value.trim() || null,
+  }).eq('id', v.id).eq('status', 'issued');
+  $('sGo').disabled = false;
+  if (error) { showErr('sErr', error.message); return; }
+  showToast(statusMode === 'redeem' ? 'Marked as redeemed.' : 'Voucher voided.', 'success');
+  closeStatus(); closeDetail();
+  await loadVouchers();
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  for (const id of ['statusModal', 'resendModal', 'prevModal', 'detModal', 'newModal']) {
+    const m = $(id);
+    if (!m.classList.contains('hidden')) { id === 'newModal' ? closeNew() : id === 'prevModal' ? closePrev() : m.classList.add('hidden'); break; }
+  }
+});
+</script>
+</body>
+</html>

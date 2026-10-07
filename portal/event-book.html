@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Book a Performance — Pathfinder Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/portal.css">
+  <style>
+    .eb-card { padding: 1.1rem 1.25rem; margin-bottom: 1.1rem; }
+    .eb-card h3 { font-size: .95rem; font-weight: 700; color: var(--charcoal); margin-bottom: .6rem; }
+    .eb-list-row {
+      display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; cursor: pointer;
+      padding: 1rem 1.15rem; margin-bottom: .7rem; background: var(--white);
+      border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow);
+    }
+    .eb-list-row:hover { border-color: var(--orange); box-shadow: var(--shadow-h); }
+    .eb-list-main { flex: 1 1 260px; }
+    .eb-list-name { font-weight: 700; font-size: 1rem; color: var(--charcoal); }
+    .eb-list-meta { font-size: .82rem; color: var(--dark-grey); margin-top: .2rem; line-height: 1.5; }
+    .eb-mine {
+      display: flex; align-items: center; gap: .9rem; flex-wrap: wrap;
+      padding: .75rem .9rem; border: 1.5px solid var(--orange); background: rgba(232,73,30,.06);
+      border-radius: var(--r-sm); margin-bottom: .6rem;
+    }
+    .eb-mine-main { flex: 1 1 240px; font-size: .86rem; line-height: 1.5; }
+    .eb-mine-main b { color: var(--charcoal); }
+    .eb-mine-slot { font-size: .78rem; color: var(--orange-dark); font-weight: 700; }
+    .eb-banner { padding: .7rem .95rem; border-radius: var(--r-sm); font-size: .84rem; margin-bottom: 1rem; background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; }
+    .eb-back { background: none; border: none; color: var(--orange); font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; padding: 0; margin-bottom: .6rem; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+<div class="portal-shell">
+
+  <nav class="topnav">
+    <a href="#" class="topnav-logo"><img src="../Logo_-_long.png" alt="Pathfinder Music Lessons"></a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">–</span>
+        </div>
+      </div>
+      <a href="change-password.html" class="btn-logout" style="text-decoration:none;">🔑 Password</a>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">My Portal</div>
+    <a class="nav-item" href="dashboard-student.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      My Lessons
+    </a>
+    <a class="nav-item active" href="event-book.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      Events
+    </a>
+    <div class="sidebar-section">Manuals</div>
+    <a class="nav-item" href="manuals/index.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      How-To Guide
+    </a>
+  </aside>
+
+  <main class="main">
+
+    <!-- ============ LIST ============ -->
+    <div id="listView">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Events</div>
+          <div class="page-sub">Concerts and other occasions you can perform at</div>
+        </div>
+      </div>
+      <div id="eventList"><div class="ev-skel"></div></div>
+    </div>
+
+    <!-- ============ ONE EVENT ============ -->
+    <div id="eventView" class="hidden">
+      <button class="eb-back" onclick="goList()">← All events</button>
+      <div class="page-header">
+        <div>
+          <div class="page-title" id="eTitle">Event</div>
+        </div>
+      </div>
+      <div id="eHead"></div>
+      <div id="eBanner"></div>
+
+      <div id="doneCard"></div>
+
+      <div class="card eb-card" id="mineCard">
+        <h3>My performances</h3>
+        <div id="mineList"></div>
+        <button class="btn btn-primary" id="bookBtn" onclick="openForm(null)">＋ Book a performance</button>
+        <div class="form-hint" id="bookHint" style="margin-top:.5rem"></div>
+      </div>
+
+      <div class="card eb-card hidden" id="formCard">
+        <h3 id="formTitle">Book a performance</h3>
+        <div id="formMount"></div>
+      </div>
+
+      <div class="card eb-card">
+        <h3>Everyone's performances so far</h3>
+        <div class="form-hint" style="margin:-.3rem 0 .8rem">Updates automatically. Other students appear by first name and last initial. Your own performances are highlighted.</div>
+        <div class="ev-legend"><span><i class="own"></i>Yours</span><span><i></i>Booked</span><span><i class="free"></i>Free</span></div>
+        <div id="eGrid"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div id="toastWrap" class="toast-wrap"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/events-common.js"></script>
+<script>
+const PF = window.PFEvents;
+PF.injectStyles();
+
+let me = null;
+let myStudents = [];             // [{id, name}]
+let activeStudentId = null;
+let events = [];
+let grid = null;
+let currentId = null;
+let stopPoll = null;
+let form = null;
+let editing = null;              // booking being edited
+
+(async () => {
+  // A link in an email may be opened by someone who is not signed in yet:
+  // send them to login and bring them back here afterwards.
+  const session = await getSession();
+  if (!session) {
+    const back = 'event-book.html' + location.search;
+    location.replace('login.html?next=' + encodeURIComponent(back));
+    return;
+  }
+  me = await requireAuth(['student','teacher','admin','superuser']);
+  if (!me) return;
+
+  // Staff following the same link land on the staff view of the event
+  if (me.role !== 'student') {
+    location.replace('events.html' + location.search);
+    return;
+  }
+
+  renderTopNavUser(me);
+  if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
+
+  const { data, error } = await db.rpc('get_my_event_students');
+  myStudents = error ? [] : (data ?? []);
+  const remembered = sessionStorage.getItem('activeStudentId');
+  activeStudentId = (myStudents.find(s => s.id === remembered) ?? myStudents[0])?.id ?? null;
+
+  window.addEventListener('popstate', route);
+  await route();
+})();
+
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+function stopPolling() { if (stopPoll) { stopPoll(); stopPoll = null; } }
+
+async function route() {
+  const id = new URLSearchParams(location.search).get('event');
+  if (id) await showEvent(id); else await showList();
+}
+function goList()  { history.pushState({}, '', 'event-book.html'); route(); }
+function goEvent(id) { history.pushState({}, '', 'event-book.html?event=' + encodeURIComponent(id)); route(); }
+
+// ============================================================
+// LIST
+// ============================================================
+async function showList() {
+  stopPolling();
+  currentId = null; grid = null;
+  if (form) { form.destroy(); form = null; }
+  document.getElementById('eventView').classList.add('hidden');
+  document.getElementById('listView').classList.remove('hidden');
+  document.title = 'Events — Pathfinder Portal';
+  await loadList();
+  stopPoll = PF.poll(loadList, 30000);
+}
+
+async function loadList() {
+  const { data, error } = await db.rpc('list_events_for_me');
+  const box = document.getElementById('eventList');
+  if (error) {
+    box.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">Could not load events</div>
+      <div class="empty-state-text">Please try again in a moment.</div></div>`;
+    return;
+  }
+  events = data ?? [];
+  const today = toISODate(new Date());
+  const shown = events.filter(e => e.event_date >= today || e.my_count > 0);
+  if (!shown.length) {
+    box.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🎤</div><div class="empty-state-title">No events right now</div>
+      <div class="empty-state-text">When the studio plans a concert, it will appear here — and in an email.</div></div>`;
+    return;
+  }
+  box.innerHTML = shown.map(e => {
+    const cap = e.block_count * e.slots_per_block;
+    const state = e.status === 'open' ? 'Bookings open' : 'Bookings closed';
+    return `<div class="eb-list-row" onclick="goEvent('${e.id}')">
+      <div class="eb-list-main">
+        <div class="eb-list-name">${PF.esc(e.name)} <span class="ev-pill ${e.status}">${state}</span></div>
+        <div class="eb-list-meta">📅 ${PF.fmtDate(e.event_date)}, ${PF.timeRange(e)}
+          ${e.venue_name ? `<br>📍 ${PF.esc(e.venue_name)}${e.venue_address ? ', ' + PF.esc(e.venue_address) : ''}` : ''}
+          ${e.booking_deadline && e.status === 'open' ? `<br>⏳ Book by ${PF.fmtDate(e.booking_deadline, true)}` : ''}
+          <br>${e.booked_count} of ${cap} performances booked${e.my_count ? ` · <b style="color:var(--orange-dark)">you have ${e.my_count}</b>` : ''}</div>
+      </div>
+      <button class="btn ${e.status === 'open' && !e.my_count ? 'btn-primary' : 'btn-secondary'}">${e.status === 'open' ? (e.my_count ? 'View / change' : 'Book now') : 'View'}</button>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// ONE EVENT
+// ============================================================
+async function showEvent(id) {
+  stopPolling();
+  currentId = id; grid = null;
+  document.getElementById('listView').classList.add('hidden');
+  document.getElementById('eventView').classList.remove('hidden');
+  document.getElementById('formCard').classList.add('hidden');
+  document.getElementById('doneCard').innerHTML = '';
+  document.getElementById('eGrid').innerHTML = '<div class="ev-skel"></div><div class="ev-skel"></div>';
+  document.getElementById('eGrid')._evSig = null;
+  const ok = await loadGrid();
+  if (!ok) return;
+  stopPoll = PF.poll(loadGrid, 10000);
+}
+
+function isBookable(ev) {
+  if (ev.status !== 'open') return false;
+  if (ev.booking_deadline && ev.booking_deadline < toISODate(new Date())) return false;
+  return true;
+}
+
+async function loadGrid() {
+  const { data, error } = await db.rpc('get_event_grid', { p_event: currentId });
+  if (error || !data) {
+    stopPolling();
+    document.getElementById('eTitle').textContent = 'Event not available';
+    document.getElementById('eHead').innerHTML = '';
+    document.getElementById('mineCard').classList.add('hidden');
+    document.getElementById('eGrid').innerHTML =
+      `<div class="empty-state"><div class="empty-state-icon">🔍</div><div class="empty-state-title">We couldn't find that event</div>
+       <div class="empty-state-text">It may not be open yet, or it may belong to a different studio. <a href="event-book.html">See all events</a>.</div></div>`;
+    return false;
+  }
+  grid = data;
+  render();
+  if (form) form.setBookings(grid.bookings);
+  return true;
+}
+
+function myBookings() { return (grid?.bookings ?? []).filter(b => b.own); }
+
+function render() {
+  const ev = grid.event;
+  document.getElementById('eTitle').textContent = ev.name;
+  document.title = ev.name + ' — Pathfinder Portal';
+  document.getElementById('eHead').innerHTML = PF.eventHeaderHtml(ev);
+  document.getElementById('mineCard').classList.remove('hidden');
+
+  const open = isBookable(ev);
+  document.getElementById('eBanner').innerHTML = open ? '' :
+    `<div class="eb-banner">${ev.status === 'open'
+       ? 'The booking deadline has passed. You can still see the running order below — please contact the studio if you need to make a change.'
+       : 'Bookings for this event are closed. You can still see the running order below — please contact the studio if you need to make a change.'}</div>`;
+
+  // my performances
+  const mine = myBookings();
+  const nameOf = id => (myStudents.find(s => s.id === id) ?? {}).name ?? '';
+  const multi = myStudents.length > 1;
+  document.getElementById('mineList').innerHTML = mine.length
+    ? mine.map(b => {
+        const acc = b.accompaniment === 'peer' ? 'with ' + PF.esc(b.accompanist_name ?? 'a peer')
+          : b.accompaniment === 'teacher' ? 'with ' + (b.teacher_name ? PF.esc(b.teacher_name) : 'my teacher')
+          : b.accompaniment === 'backing_track' ? 'with a backing track' : 'unaccompanied';
+        return `<div class="eb-mine">
+          <div class="eb-mine-main">
+            <div class="eb-mine-slot">Block ${b.block} · ${PF.blockTimes(ev, b.block)} · slot #${b.position} (about ${PF.clock(PF.slotMinute(ev, b.block, b.position))})</div>
+            <b>${multi ? PF.esc(b.student_name) + ' — ' : ''}${PF.esc(b.instrument)}: ${PF.esc(b.piece)}</b>
+            <div style="color:var(--dark-grey)">${acc}${b.teacher_name && b.accompaniment !== 'teacher' ? ' · teacher ' + PF.esc(b.teacher_name) : ''}</div>
+          </div>
+          ${open ? `<button class="btn btn-secondary btn-sm" onclick="openForm('${b.id}')">Edit</button>
+                    <button class="btn btn-danger btn-sm" onclick="cancelMine('${b.id}')">Cancel booking</button>` : ''}
+        </div>`;
+      }).join('')
+    : '<div class="form-hint" style="margin-bottom:.8rem">You have not booked a performance yet.</div>';
+
+  // Can another performance be booked? Only if some student is under the limit.
+  const counts = {};
+  mine.forEach(b => { counts[b.student_id] = (counts[b.student_id] ?? 0) + 1; });
+  const canBook = open && myStudents.some(s => (counts[s.id] ?? 0) < ev.max_per_student);
+  const btn = document.getElementById('bookBtn');
+  btn.classList.toggle('hidden', !canBook);
+  document.getElementById('bookHint').textContent =
+    open && !canBook ? `Each student can book up to ${ev.max_per_student} performance${ev.max_per_student === 1 ? '' : 's'} for this event (one per instrument). Edit or cancel an existing one to change it.` : '';
+  if (!myStudents.length) {
+    btn.classList.add('hidden');
+    document.getElementById('bookHint').textContent = 'There is no active student on this login, so bookings are not available. Please contact the studio.';
+  }
+
+  PF.renderGrid(document.getElementById('eGrid'), grid, {
+    onFilled: b => { if (open && b.own) openForm(b.id); },
+    canClick: b => open && b.own,
+    mineLabel: 'You',
+  });
+}
+
+// ============================================================
+// BOOK / EDIT / CANCEL
+// ============================================================
+function openForm(bookingId) {
+  const ev = grid.event;
+  editing = bookingId ? myBookings().find(b => b.id === bookingId) : null;
+  document.getElementById('doneCard').innerHTML = '';
+  const counts = {};
+  myBookings().forEach(b => { counts[b.student_id] = (counts[b.student_id] ?? 0) + 1; });
+  // New booking: only offer students who still have room
+  const choices = editing ? myStudents : myStudents.filter(s => (counts[s.id] ?? 0) < ev.max_per_student);
+  if (!choices.length) { showToast('No student on this login can book another performance.', 'warning'); return; }
+
+  document.getElementById('formTitle').textContent = editing ? 'Change my booking' : 'Book a performance';
+  document.getElementById('formCard').classList.remove('hidden');
+  if (form) form.destroy();
+  form = PF.bookingForm({
+    mount: document.getElementById('formMount'),
+    event: ev, bookings: grid.bookings, students: choices, isAdmin: false, existing: editing,
+    defaultStudentId: choices.find(s => s.id === activeStudentId)?.id ?? choices[0].id,
+    loadOptions: async sid => {
+      const { data, error } = await db.rpc('get_event_form_options', { p_student: sid, p_event: ev.id });
+      if (error) throw error;
+      return data;
+    },
+    onSubmit: v => PF.submitBooking(db, ev.id, v, editing?.id),
+    onStale: loadGrid,
+    onCancel: closeForm,
+    onCancelBooking: b => cancelMine(b.id),
+    onDone: async (res, v) => {
+      closeForm();
+      await loadGrid();
+      const first = res.got_first_choice;
+      document.getElementById('doneCard').innerHTML = `<div class="ev-form-ok" style="font-size:.9rem">
+        🎉 <b>${editing ? 'Your booking has been updated.' : 'You are booked in!'}</b>
+        Block ${res.block} · ${PF.blockTimes(ev, res.block)}, slot #${res.position} (about ${PF.clock(PF.slotMinute(ev, res.block, res.position))}).
+        ${first ? '' : '<br>Your first choice was full, so we placed you in the next block you chose.'}
+        <br><span style="font-size:.8rem">The times are approximate — please arrive at the start of your block.</span></div>`;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+  });
+  document.getElementById('formCard').scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+}
+
+function closeForm() {
+  if (form) { form.destroy(); form = null; }
+  document.getElementById('formCard').classList.add('hidden');
+}
+
+async function cancelMine(id) {
+  const b = myBookings().find(x => x.id === id);
+  if (!b || !confirm(`Cancel ${b.student_name}'s performance of "${b.piece}"? The slot will be given up and you may not be able to get it back.`)) return;
+  const { error } = await db.rpc('cancel_event_booking', { p_booking: id });
+  if (error) { showToast(PF.errorText(error), 'error'); await loadGrid(); return; }
+  showToast('Your booking has been cancelled.');
+  if (editing && editing.id === id) closeForm();
+  document.getElementById('doneCard').innerHTML = '';
+  await loadGrid();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Events — Pathfinder Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/portal.css">
+  <style>
+    .evl-row {
+      display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+      padding: 0.95rem 1.15rem; margin-bottom: 0.7rem; cursor: pointer;
+      background: var(--white); border: 1px solid var(--border); border-radius: var(--r);
+      box-shadow: var(--shadow); transition: box-shadow .15s, border-color .15s;
+    }
+    .evl-row:hover { border-color: var(--orange); box-shadow: var(--shadow-h); }
+    .evl-date {
+      flex: 0 0 64px; text-align: center; line-height: 1.1; padding: .4rem 0;
+      background: var(--off-white); border-radius: var(--r-sm);
+    }
+    .evl-date b { display: block; font-size: 1.35rem; color: var(--orange); }
+    .evl-date span { font-size: .68rem; text-transform: uppercase; color: var(--dark-grey); font-weight: 700; letter-spacing: .04em; }
+    .evl-main { flex: 1 1 260px; min-width: 0; }
+    .evl-name { font-weight: 700; color: var(--charcoal); font-size: 1rem; display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+    .evl-meta { font-size: .8rem; color: var(--dark-grey); margin-top: .2rem; line-height: 1.5; }
+    .evl-fill { flex: 0 0 170px; }
+    .evl-fill .ev-meter { max-width: none; width: 100%; display: block; }
+    .evl-fill small { display: block; margin-top: .25rem; font-size: .74rem; color: var(--mid-grey); }
+    .evl-section { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; color: var(--mid-grey); margin: 1.2rem 0 .6rem; }
+    .ev-toolbar { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; align-items: center; }
+    .ev-back { background: none; border: none; color: var(--orange); font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; padding: 0; margin-bottom: .6rem; }
+    .ev-share { padding: .9rem 1.1rem; margin-bottom: 1rem; }
+    .ev-share-row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+    .ev-share-row input { flex: 1 1 280px; font-size: .8rem; }
+    .ev-tabs { display: inline-flex; border: 1.5px solid var(--light-grey); border-radius: var(--r-sm); overflow: hidden; }
+    .ev-tabs button { font: inherit; font-size: .8rem; font-weight: 600; padding: .4rem .9rem; border: none; background: #fff; color: var(--dark-grey); cursor: pointer; }
+    .ev-tabs button.on { background: var(--orange); color: #fff; }
+    .ev-table { width: 100%; border-collapse: collapse; font-size: .82rem; background: #fff; }
+    .ev-table th { text-align: left; font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--mid-grey); padding: .5rem .6rem; border-bottom: 2px solid var(--light-grey); }
+    .ev-table td { padding: .5rem .6rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .ev-table tr.own td { background: rgba(232,73,30,.06); }
+    .ev-table tr.blockrow td { background: var(--off-white); font-weight: 700; color: var(--charcoal); }
+    .ev-kv { display: grid; grid-template-columns: 130px 1fr; gap: .45rem .9rem; font-size: .86rem; }
+    .ev-kv dt { color: var(--mid-grey); font-weight: 600; font-size: .78rem; padding-top: .1rem; }
+    .ev-kv dd { color: var(--charcoal); word-break: break-word; }
+    .ev-preview { font-size: .78rem; line-height: 1.6; background: var(--off-white); border-radius: var(--r-sm); padding: .6rem .8rem; margin-bottom: .9rem; color: var(--dark-grey); }
+    .ev-preview b { color: var(--charcoal); } .ev-preview .warn { color: #b45309; font-weight: 600; }
+    .ev-stat { font-size: .82rem; color: var(--dark-grey); margin-bottom: .8rem; }
+    .ev-stat b { color: var(--charcoal); }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+<div class="portal-shell">
+
+  <nav class="topnav">
+    <a href="#" class="topnav-logo"><img src="../Logo_-_long.png" alt="Pathfinder Music Lessons"></a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">–</span>
+        </div>
+      </div>
+      <a href="change-password.html" class="btn-logout" style="text-decoration:none;">🔑 Password</a>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <main class="main">
+
+    <!-- ============ LIST ============ -->
+    <div id="listView">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Events</div>
+          <div class="page-sub" id="listSub">Concerts and other occasions students can perform at</div>
+        </div>
+        <button class="btn btn-primary hidden" id="newEventBtn" onclick="openEventModal()">＋ New event</button>
+      </div>
+      <div id="eventList"><div class="ev-skel"></div><div class="ev-skel"></div></div>
+    </div>
+
+    <!-- ============ DETAIL ============ -->
+    <div id="detailView" class="hidden">
+      <button class="ev-back no-print" onclick="goList()">← All events</button>
+      <div class="page-header">
+        <div>
+          <div class="page-title" id="dTitle">Event</div>
+          <div class="page-sub" id="dSub"></div>
+        </div>
+        <div class="ev-toolbar no-print" id="dActions"></div>
+      </div>
+
+      <div id="dHead"></div>
+
+      <div class="card ev-share hidden no-print" id="sharePanel">
+        <div style="font-size:.82rem;font-weight:700;color:var(--charcoal);margin-bottom:.4rem">Booking link for students</div>
+        <div class="ev-share-row">
+          <input class="form-input" id="shareUrl" readonly onclick="this.select()">
+          <button class="btn btn-secondary btn-sm" onclick="copyShare()">📋 Copy</button>
+          <button class="btn btn-primary btn-sm" onclick="sendInvitation()">✉️ Send invitation…</button>
+        </div>
+        <div class="form-hint" id="shareHint" style="margin-top:.4rem"></div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.6rem;margin-bottom:.7rem" class="no-print">
+        <div class="ev-stat" id="dStat" style="margin:0"></div>
+        <div class="ev-tabs">
+          <button id="tabGrid" class="on" onclick="setTab('grid')">Grid</button>
+          <button id="tabList" onclick="setTab('list')">Running order</button>
+        </div>
+      </div>
+      <div class="ev-legend no-print" id="dLegend"></div>
+
+      <div id="dGrid"></div>
+      <div id="dRun" class="hidden"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ============ MODAL: create / edit event ============ -->
+<div class="modal-overlay hidden" id="eventModal">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <div class="modal-title" id="eventModalTitle">New event</div>
+      <button class="modal-close" onclick="closeModal('eventModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Event name *</label>
+        <input class="form-input" id="evName" maxlength="120" placeholder="e.g. Year-end Students Concert">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description <span style="font-weight:400;color:var(--mid-grey)">(shown to students — optional)</span></label>
+        <textarea class="form-textarea" id="evDesc" maxlength="1000" style="min-height:64px" placeholder="e.g. All students welcome. Please arrive 15 minutes before your block."></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Date *</label><input class="form-input" type="date" id="evDate" onchange="updatePreview()"></div>
+        <div class="form-group"><label class="form-label">Studio</label><select class="form-select" id="evStudio"></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Starts *</label><input class="form-input" type="time" id="evStart" onchange="updatePreview()"></div>
+        <div class="form-group"><label class="form-label">Ends *</label><input class="form-input" type="time" id="evEnd" onchange="updatePreview()"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Venue name</label><input class="form-input" id="evVenue" maxlength="150" placeholder="e.g. Ringwood Arts Centre"></div>
+        <div class="form-group"><label class="form-label">Venue address</label><input class="form-input" id="evAddress" maxlength="300" placeholder="e.g. 5 Main St, Ringwood VIC 3134"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Block length (minutes)</label>
+          <input class="form-input" type="number" id="evBlock" min="10" max="480" step="5" value="60" oninput="updatePreview()">
+          <span class="form-hint">Students pick a block, e.g. 2:00 – 3:00 pm.</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Performances per block</label>
+          <input class="form-input" type="number" id="evSlots" min="1" max="60" value="12" oninput="updatePreview()">
+          <span class="form-hint">10–15 per hour is typical.</span>
+        </div>
+      </div>
+      <div class="ev-preview" id="evPreview">Fill in the date and times to see the layout.</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Most performances per student</label>
+          <input class="form-input" type="number" id="evMax" min="1" max="10" value="5">
+          <span class="form-hint">A student books one performance per instrument or type (e.g. Piano, and Band), up to this many in total.</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Book by <span style="font-weight:400;color:var(--mid-grey)">(optional)</span></label>
+          <input class="form-input" type="date" id="evDeadline">
+          <span class="form-hint">Last day students can book or change.</span>
+        </div>
+      </div>
+      <div class="form-group" style="max-width:260px">
+        <label class="form-label">Status</label>
+        <select class="form-select" id="evStatus">
+          <option value="draft">Draft — only admins can see it</option>
+          <option value="open">Open — students can book</option>
+          <option value="closed">Closed — students can only view</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('eventModal')">Cancel</button>
+      <button class="btn btn-primary" id="saveEventBtn" onclick="saveEvent()">Save event</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: add / edit a performance (admin) ============ -->
+<div class="modal-overlay hidden" id="bookModal">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <div class="modal-title" id="bookModalTitle">Add a performance</div>
+      <button class="modal-close" onclick="closeModal('bookModal')">×</button>
+    </div>
+    <div class="modal-body"><div id="bookFormMount"></div></div>
+  </div>
+</div>
+
+<!-- ============ MODAL: performance details ============ -->
+<div class="modal-overlay hidden" id="detailModal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title" id="detailModalTitle">Performance</div>
+      <button class="modal-close" onclick="closeModal('detailModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <dl class="ev-kv" id="detailBody"></dl>
+      <div id="movePanel" class="hidden" style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)">
+        <label class="form-label">Move to slot</label>
+        <select class="form-select" id="moveSel"></select>
+        <div class="form-hint" style="margin:.35rem 0 .6rem">Choosing a taken slot swaps the two performances.</div>
+        <button class="btn btn-primary btn-sm" onclick="doMove()">Move</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('movePanel').classList.add('hidden')">Never mind</button>
+      </div>
+    </div>
+    <div class="modal-footer" id="detailFooter"></div>
+  </div>
+</div>
+
+<div id="toastWrap" class="toast-wrap"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/events-common.js"></script>
+<script>
+const PF = window.PFEvents;
+PF.injectStyles();
+
+let me = null, isAdmin = false, isTeacher = false;
+let events = [];
+let grid = null;                 // current get_event_grid() result
+let currentId = null;
+let tab = 'grid';
+let stopPoll = null;
+let studios = [], myStudioIds = null;
+let editingId = null;            // event being edited (null = new)
+let bookingForm = null;
+let activeBooking = null;        // booking shown in the details modal
+let studentChoices = null;
+
+// ============================================================
+// START
+// ============================================================
+(async () => {
+  me = await requireAuth(['superuser','admin','teacher']);
+  if (!me) return;
+  isAdmin   = me.role === 'superuser' || me.role === 'admin';
+  isTeacher = me.role === 'teacher';
+  renderTopNavUser(me);
+  renderSidebar();
+  if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
+
+  if (isAdmin) {
+    document.getElementById('newEventBtn').classList.remove('hidden');
+    await loadStudios();
+  } else {
+    document.getElementById('listSub').textContent =
+      'Concerts and other occasions your students can perform at. You can see who is performing, and your own students are highlighted.';
+  }
+
+  window.addEventListener('popstate', route);
+  await route();
+})();
+
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+function renderSidebar() {
+  const item = (href, label, path, active) => `
+    <a class="nav-item ${active ? 'active' : ''}" href="${href}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${path}</svg>
+      ${label}
+    </a>`;
+  const I = {
+    people:  '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>',
+    person:  '<circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/>',
+    cal:     '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+    mail:    '<path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/>',
+    clipboard: '<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/>',
+    check:   '<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+    task:    '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+    inbox:   '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+    home:    '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    shield:  '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+    book:    '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
+    list:    '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
+    help:    '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+    ticket:  '<path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/>',
+    award:   '<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>',
+    star:    '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+    gift:  '<polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>',
+  };
+  let html;
+  if (isTeacher) {
+    html = `<div class="sidebar-section">Main</div>
+      ${item('dashboard-teacher.html','My Schedule',I.cal)}
+      ${item('my-students.html','My Students',I.people)}
+      ${item('tasks.html','My Tasks',I.task)}
+      ${item('events.html','Events',I.star,true)}
+      <div class="sidebar-section">Manuals</div>
+      ${item('manuals/index.html','How-To Guide',I.help)}`;
+  } else {
+    html = `<div class="sidebar-section">Front desk</div>
+      ${item('tasks.html','Tasks',I.task)}
+      ${item('enquiries.html','Enquiries',I.inbox)}
+      ${item('notifications.html','Notifications',I.mail)}
+      ${item('day-sheet.html','Day Sheet',I.clipboard)}
+      ${item('events.html','Events',I.star,true)}
+      ${item('vouchers.html','Vouchers',I.gift)}
+      <div class="sidebar-section">Teaching</div>
+      ${item('lessons.html','Lessons',I.cal)}
+      ${item('students.html','Students',I.people)}
+      ${item('teachers.html','Teachers',I.person)}
+      <div class="sidebar-section">Curriculum</div>
+      ${item('bok-artefacts.html','Artefact Library',I.book)}
+      <div class="sidebar-section">Reports</div>
+      ${item('attendance-report.html','Attendance',I.check)}
+      ${item('grading-report.html','Grading',I.award)}
+      ${item('credits.html','Credits',I.ticket)}
+      ${item('distribution-lists.html','Distribution Lists',I.list)}`;
+    if (me.role === 'superuser') {
+      html += `<div class="sidebar-section">Super User</div>
+        ${item('studios.html','Studios',I.home)}
+        ${item('admins.html','Admins',I.shield)}`;
+    }
+    html += `<div class="sidebar-section">Manuals</div>
+      ${item('manuals/index.html','How-To Guide',I.help)}`;
+  }
+  document.getElementById('sidebar').innerHTML = html;
+}
+
+// ============================================================
+// ROUTING (list <-> one event, via ?event=ID so refresh/back work)
+// ============================================================
+async function route() {
+  const id = new URLSearchParams(location.search).get('event');
+  if (id) await showEvent(id); else await showList();
+}
+
+function goList() {
+  history.pushState({}, '', 'events.html');
+  route();
+}
+
+function goEvent(id) {
+  history.pushState({}, '', 'events.html?event=' + encodeURIComponent(id));
+  route();
+}
+
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+function openModal(id)  { document.getElementById(id).classList.remove('hidden'); }
+
+function stopPolling() { if (stopPoll) { stopPoll(); stopPoll = null; } }
+
+// ============================================================
+// LIST
+// ============================================================
+async function showList() {
+  stopPolling();
+  currentId = null; grid = null;
+  document.getElementById('detailView').classList.add('hidden');
+  document.getElementById('listView').classList.remove('hidden');
+  await loadList();
+  stopPoll = PF.poll(loadList, 30000);
+}
+
+async function loadList() {
+  const { data, error } = await db.rpc('list_events_for_me');
+  if (error) {
+    document.getElementById('eventList').innerHTML =
+      `<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">Could not load events</div>
+       <div class="empty-state-text">${PF.esc(error.message)}. If this is the first time, the events database script has not been run yet.</div></div>`;
+    return;
+  }
+  events = data ?? [];
+  renderList();
+}
+
+function renderList() {
+  const box = document.getElementById('eventList');
+  if (!events.length) {
+    box.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🎤</div>
+      <div class="empty-state-title">No events yet</div>
+      <div class="empty-state-text">${isAdmin ? 'Create your first event — for example the year-end students concert.' : 'There are no events open right now.'}</div></div>`;
+    return;
+  }
+  const today = toISODate(new Date());
+  const upcoming = events.filter(e => e.event_date >= today);
+  const past     = events.filter(e => e.event_date <  today).reverse();
+  const row = e => {
+    const cap = e.block_count * e.slots_per_block;
+    const pct = cap ? Math.round(100 * e.booked_count / cap) : 0;
+    const [y, m, d] = e.event_date.split('-').map(Number);
+    const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m - 1];
+    return `<div class="evl-row" onclick="goEvent('${e.id}')">
+      <div class="evl-date"><b>${d}</b><span>${mon} ${y}</span></div>
+      <div class="evl-main">
+        <div class="evl-name">${PF.esc(e.name)} <span class="ev-pill ${e.status}">${e.status}</span></div>
+        <div class="evl-meta">${PF.fmtDate(e.event_date)} · ${PF.timeRange(e)}
+          ${e.venue_name ? `<br>📍 ${PF.esc(e.venue_name)}${e.venue_address ? ', ' + PF.esc(e.venue_address) : ''}` : ''}
+          <br>${e.block_count} block${e.block_count === 1 ? '' : 's'} of ${e.block_minutes} min · ${e.slots_per_block} per block</div>
+      </div>
+      <div class="evl-fill"><span class="ev-meter"><span style="width:${pct}%"></span></span>
+        <small>${e.booked_count} of ${cap} performances booked</small></div>
+    </div>`;
+  };
+  box.innerHTML =
+    (upcoming.length ? `<div class="evl-section" style="margin-top:0">Upcoming</div>${upcoming.map(row).join('')}` : '') +
+    (past.length ? `<div class="evl-section">Past</div>${past.map(row).join('')}` : '');
+}
+
+// ============================================================
+// DETAIL
+// ============================================================
+async function showEvent(id) {
+  stopPolling();
+  currentId = id; grid = null;
+  document.getElementById('listView').classList.add('hidden');
+  document.getElementById('detailView').classList.remove('hidden');
+  document.getElementById('dGrid').innerHTML = '<div class="ev-skel"></div><div class="ev-skel"></div>';
+  const ok = await loadGrid();
+  if (!ok) return;
+  stopPoll = PF.poll(loadGrid, 12000);
+}
+
+async function loadGrid() {
+  const { data, error } = await db.rpc('get_event_grid', { p_event: currentId });
+  if (error || !data) {
+    stopPolling();
+    document.getElementById('dTitle').textContent = 'Event not found';
+    document.getElementById('dSub').textContent = '';
+    document.getElementById('dActions').innerHTML = '';
+    document.getElementById('dHead').innerHTML = '';
+    document.getElementById('sharePanel').classList.add('hidden');
+    document.getElementById('dGrid').innerHTML =
+      `<div class="empty-state"><div class="empty-state-icon">🔍</div><div class="empty-state-title">That event is not available</div>
+       <div class="empty-state-text">It may have been deleted, or it is not open yet.</div></div>`;
+    return false;
+  }
+  grid = data;
+  renderDetail();
+  if (bookingForm) bookingForm.setBookings(grid.bookings);
+  return true;
+}
+
+function renderDetail() {
+  const ev = grid.event;
+  document.getElementById('dTitle').textContent = ev.name;
+  document.title = ev.name + ' — Pathfinder Portal';
+  document.getElementById('dSub').textContent = '';
+  document.getElementById('dHead').innerHTML = PF.eventHeaderHtml(ev);
+
+  const cap = ev.block_count * ev.slots_per_block;
+  const students = new Set(grid.bookings.map(b => b.student_id)).size;
+  document.getElementById('dStat').innerHTML =
+    `<b>${grid.bookings.length}</b> of ${cap} performances booked · <b>${students}</b> student${students === 1 ? '' : 's'} · <b>${cap - grid.bookings.length}</b> free`;
+
+  document.getElementById('dLegend').innerHTML = isAdmin
+    ? '<span><i></i>Booked — click for details</span><span><i class="free"></i>Free — click to add a performance</span>'
+    : '<span><i class="own"></i>Your students</span><span><i></i>Other performances</span><span><i class="free"></i>Free</span>';
+
+  // actions
+  if (isAdmin) {
+    const s = ev.status;
+    document.getElementById('dActions').innerHTML = `
+      ${s === 'draft'  ? '<button class="btn btn-primary btn-sm" onclick="setStatus(\'open\')">Open for booking</button>' : ''}
+      ${s === 'open'   ? '<button class="btn btn-secondary btn-sm" onclick="setStatus(\'closed\')">Close bookings</button>' : ''}
+      ${s === 'closed' ? '<button class="btn btn-secondary btn-sm" onclick="setStatus(\'open\')">Reopen bookings</button>' : ''}
+      <button class="btn btn-secondary btn-sm" onclick="openEventModal('${ev.id}')">✏️ Edit</button>
+      <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ Print</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteEvent()">Delete</button>`;
+    const panel = document.getElementById('sharePanel');
+    panel.classList.remove('hidden');
+    document.getElementById('shareUrl').value = PF.shareUrl(ev.id);
+    document.getElementById('shareHint').textContent = ev.status === 'open'
+      ? 'Students and parents sign in to the Portal and are taken straight to this event. The same link also appears on each student dashboard.'
+      : ev.status === 'draft'
+        ? 'This event is still a draft — students cannot see it or use the link until you open it for booking.'
+        : 'Bookings are closed — students can view the grid but not book or change.';
+  } else {
+    document.getElementById('dActions').innerHTML = '<button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ Print</button>';
+    document.getElementById('sharePanel').classList.add('hidden');
+  }
+
+  // grid
+  PF.renderGrid(document.getElementById('dGrid'), grid, {
+    clickEmpty: isAdmin && true,
+    onEmpty: (b, p) => openBookModal(null, { block: b, position: p }),
+    onFilled: bk => openDetailModal(bk),
+    canClick: bk => isAdmin || bk.detail,
+    mineLabel: 'Mine',
+  });
+  renderRunOrder();
+  setTab(tab, true);
+}
+
+function setTab(t, quiet) {
+  tab = t;
+  document.getElementById('tabGrid').classList.toggle('on', t === 'grid');
+  document.getElementById('tabList').classList.toggle('on', t === 'list');
+  document.getElementById('dGrid').classList.toggle('hidden', t !== 'grid');
+  document.getElementById('dRun').classList.toggle('hidden', t !== 'list');
+}
+
+function renderRunOrder() {
+  const ev = grid.event;
+  const rows = [];
+  let lastBlock = 0;
+  grid.bookings.forEach(b => {
+    if (b.block !== lastBlock) {
+      lastBlock = b.block;
+      rows.push(`<tr class="blockrow"><td colspan="${isAdmin ? 7 : 6}">Block ${b.block} · ${PF.blockTimes(ev, b.block)}</td></tr>`);
+    }
+    const acc = b.accompaniment === 'peer'
+      ? 'Peer' + (b.accompanist_name ? ': ' + PF.esc(b.accompanist_name) : '')
+      : PF.ACCOMP[b.accompaniment] ?? '';
+    rows.push(`<tr class="${b.own ? 'own' : ''}">
+      <td>~${PF.clock(PF.slotMinute(ev, b.block, b.position))}</td>
+      <td>#${b.position}</td>
+      <td><b>${PF.esc(b.student_name)}</b></td>
+      <td>${PF.esc(b.instrument)}</td>
+      <td>${PF.esc(b.piece)}</td>
+      <td>${PF.esc(acc)}</td>
+      ${isAdmin ? `<td>${PF.esc(b.teacher_name ?? '')}${b.notes ? `<div style="color:var(--mid-grey);font-size:.74rem">${PF.esc(b.notes)}</div>` : ''}</td>` : ''}
+    </tr>`);
+  });
+  document.getElementById('dRun').innerHTML = rows.length
+    ? `<table class="ev-table"><thead><tr><th>Time</th><th>Slot</th><th>Student</th><th>Instrument</th><th>Piece</th><th>Accompaniment</th>${isAdmin ? '<th>Teacher / notes</th>' : ''}</tr></thead><tbody>${rows.join('')}</tbody></table>`
+    : '<div class="empty-state"><div class="empty-state-text">No performances booked yet.</div></div>';
+}
+
+// ============================================================
+// SHARE
+// ============================================================
+async function copyShare() {
+  const el = document.getElementById('shareUrl');
+  try { await navigator.clipboard.writeText(el.value); showToast('Booking link copied.'); }
+  catch (_) { el.select(); showToast('Press Ctrl+C (Cmd+C on Mac) to copy the selected link.', 'warning'); }
+}
+
+function sendInvitation() {
+  const ev = grid.event;
+  const url = PF.shareUrl(ev.id);
+  const when = `${PF.fmtDate(ev.event_date)}, ${PF.timeRange(ev)}`;
+  const where = [ev.venue_name, ev.venue_address].filter(Boolean).join(', ');
+  const body =
+`Hi {{first_name}},
+
+We are holding **${ev.name}** on ${when}${where ? ' at ' + where : ''}.
+
+Would you like to perform? Please book your spot here — sign in with your usual Portal login:
+
+[Book your performance](${url})
+
+Choose up to three time blocks you would like, and the Portal will place you in the first one that still has room. You will see everyone's performances build up on the same page, and you can change or cancel your booking at any time while bookings are open.${ev.booking_deadline ? `\n\nPlease book by **${PF.fmtDate(ev.booking_deadline)}**.` : ''}
+
+We look forward to hearing you play!`;
+  sessionStorage.setItem('notifPrefill', JSON.stringify({
+    subject: `Book your performance: ${ev.name}`,
+    body,
+    studioId: ev.studio_id ?? null,
+  }));
+  location.href = 'notifications.html';
+}
+
+// ============================================================
+// STATUS / DELETE
+// ============================================================
+async function setStatus(status) {
+  const verb = { open: 'Open this event for booking?', closed: 'Close bookings? Students will still see the grid but cannot book, change or cancel.' }[status];
+  if (!confirm(verb)) return;
+  const { error } = await db.from('events').update({ status }).eq('id', currentId);
+  if (error) { showToast(PF.errorText(error), 'error'); return; }
+  showToast(status === 'open' ? 'Event is open for booking.' : 'Bookings closed.');
+  await loadGrid();
+}
+
+async function deleteEvent() {
+  const n = grid.bookings.length;
+  if (n > 0) {
+    showToast(`This event has ${n} booked performance${n === 1 ? '' : 's'}. Close bookings instead, or cancel the performances first.`, 'warning');
+    return;
+  }
+  if (!confirm('Delete this event permanently?')) return;
+  const { error } = await db.from('events').delete().eq('id', currentId);
+  if (error) { showToast(PF.errorText(error), 'error'); return; }
+  showToast('Event deleted.');
+  goList();
+}
+
+// ============================================================
+// CREATE / EDIT EVENT
+// ============================================================
+async function loadStudios() {
+  const { data } = await db.from('studios').select('id,name').eq('status', 'active').order('name');
+  studios = data ?? [];
+  if (me.role === 'admin') {
+    const { data: a } = await db.from('admins').select('studio_ids').eq('user_id', me.id).maybeSingle();
+    const ids = a?.studio_ids ?? [];
+    myStudioIds = ids.length ? ids : null;           // empty = all studios
+  }
+}
+
+function openEventModal(id) {
+  editingId = id ?? null;
+  const e = id ? grid.event : null;
+  document.getElementById('eventModalTitle').textContent = e ? 'Edit event' : 'New event';
+  const selectable = myStudioIds ? studios.filter(s => myStudioIds.includes(s.id)) : studios;
+  document.getElementById('evStudio').innerHTML =
+    '<option value="">All studios</option>' + selectable.map(s => `<option value="${s.id}">${PF.esc(s.name)}</option>`).join('');
+  const set = (k, v) => { document.getElementById(k).value = v ?? ''; };
+  set('evName', e?.name);        set('evDesc', e?.description);
+  set('evDate', e?.event_date);  set('evStart', e?.start_time);  set('evEnd', e?.end_time);
+  set('evVenue', e?.venue_name); set('evAddress', e?.venue_address);
+  set('evBlock', e?.block_minutes ?? 60);  set('evSlots', e?.slots_per_block ?? 12);
+  set('evMax', e?.max_per_student ?? 5);   set('evDeadline', e?.booking_deadline);
+  set('evStatus', e?.status ?? 'draft');
+  set('evStudio', e ? (e.studio_id ?? '') : (selectable.length === 1 ? selectable[0].id : ''));
+  updatePreview();
+  openModal('eventModal');
+  setTimeout(() => document.getElementById('evName').focus(), 50);
+}
+
+function updatePreview() {
+  const box = document.getElementById('evPreview');
+  const start = document.getElementById('evStart').value, end = document.getElementById('evEnd').value;
+  const bm = parseInt(document.getElementById('evBlock').value, 10);
+  const sl = parseInt(document.getElementById('evSlots').value, 10);
+  if (!start || !end || !bm || !sl) { box.textContent = 'Fill in the start and end times to see the layout.'; return; }
+  if (PF.toMins(end) <= PF.toMins(start)) { box.innerHTML = '<span class="warn">The end time must be after the start time.</span>'; return; }
+  const ev = { start_time: start, end_time: end, block_minutes: bm, slots_per_block: sl };
+  const nb = PF.blockCount(start, end, bm);
+  const blocks = [];
+  for (let b = 1; b <= Math.min(nb, 8); b++) blocks.push(PF.blockTimes(ev, b));
+  const per = bm / sl;
+  const warns = [];
+  if ((PF.toMins(end) - PF.toMins(start)) % bm !== 0) warns.push(`The last block is shorter (${PF.blockTimes(ev, nb)}) but still has ${sl} slots.`);
+  if (per < 3) warns.push(`That is only about ${per.toFixed(1)} minutes per performance — is that enough?`);
+  box.innerHTML = `<b>${nb} block${nb === 1 ? '' : 's'}</b> of ${bm} min × <b>${sl}</b> performances = <b>${nb * sl} performances</b>, about ${per % 1 ? per.toFixed(1) : per} min each.<br>
+    ${blocks.map((t, i) => `Block ${i + 1}: ${t}`).join(' · ')}${nb > 8 ? ' · …' : ''}
+    ${warns.map(w => `<br><span class="warn">⚠ ${w}</span>`).join('')}`;
+}
+
+async function saveEvent() {
+  const v = id => document.getElementById(id).value.trim();
+  const payload = {
+    name: v('evName'), description: v('evDesc') || null,
+    event_date: v('evDate'), start_time: v('evStart'), end_time: v('evEnd'),
+    venue_name: v('evVenue') || null, venue_address: v('evAddress') || null,
+    block_minutes: parseInt(v('evBlock'), 10), slots_per_block: parseInt(v('evSlots'), 10),
+    max_per_student: parseInt(v('evMax'), 10), booking_deadline: v('evDeadline') || null,
+    studio_id: v('evStudio') || null, status: v('evStatus'),
+  };
+  const bad = [];
+  if (!payload.name) bad.push('a name');
+  if (!payload.event_date) bad.push('a date');
+  if (!payload.start_time || !payload.end_time) bad.push('start and end times');
+  else if (PF.toMins(payload.end_time) <= PF.toMins(payload.start_time)) bad.push('an end time after the start time');
+  if (!(payload.block_minutes >= 10 && payload.block_minutes <= 480)) bad.push('a block length of 10–480 minutes');
+  if (!(payload.slots_per_block >= 1 && payload.slots_per_block <= 60)) bad.push('1–60 performances per block');
+  if (!(payload.max_per_student >= 1 && payload.max_per_student <= 10)) bad.push('1–10 performances per student');
+  if (payload.booking_deadline && payload.event_date && payload.booking_deadline > payload.event_date) bad.push('a booking deadline on or before the event date');
+  if (bad.length) { showToast('Please enter ' + bad.join(', ') + '.', 'warning'); return; }
+
+  if (editingId && grid.bookings.length && (payload.event_date !== grid.event.event_date
+      || payload.start_time !== grid.event.start_time || payload.end_time !== grid.event.end_time)) {
+    if (!confirm(`${grid.bookings.length} performance(s) are already booked. Changing the date or times moves them all with the blocks — students are not told automatically. Continue?`)) return;
+  }
+
+  const btn = document.getElementById('saveEventBtn');
+  btn.disabled = true;
+  let res;
+  if (editingId) res = await db.from('events').update(payload).eq('id', editingId).select('id').maybeSingle();
+  else           res = await db.from('events').insert(payload).select('id').single();
+  btn.disabled = false;
+  if (res.error || !res.data) {
+    showToast(PF.errorText(res.error ?? 'Could not save — you may not have access to that studio.'), 'error');
+    return;
+  }
+  closeModal('eventModal');
+  showToast(editingId ? 'Event updated.' : 'Event created.');
+  if (editingId) await loadGrid();
+  else goEvent(res.data.id);
+}
+
+// ============================================================
+// ADD / EDIT A PERFORMANCE (admin)
+// ============================================================
+async function loadStudentChoices() {
+  if (studentChoices) return studentChoices;
+  const { data } = await db.from('students')
+    .select('id,user_id,first_name,last_name,status,studio_id').in('status', ['active', 'trial']);
+  const rows = data ?? [];
+  const missing = rows.filter(s => !(s.first_name || s.last_name)).map(s => s.user_id);
+  const prof = {};
+  if (missing.length) {
+    const { data: ps } = await db.from('profiles').select('id,first_name,last_name').in('id', missing);
+    (ps ?? []).forEach(p => { prof[p.id] = p; });
+  }
+  studentChoices = rows.map(s => ({
+    id: s.id, studio_id: s.studio_id,
+    name: (`${s.first_name ?? prof[s.user_id]?.first_name ?? ''} ${s.last_name ?? prof[s.user_id]?.last_name ?? ''}`).trim() || 'Student',
+  })).sort((a, b) => a.name.localeCompare(b.name));
+  return studentChoices;
+}
+
+async function openBookModal(existing, slot) {
+  const ev = grid.event;
+  const all = await loadStudentChoices();
+  const list = all.filter(s => !ev.studio_id || !s.studio_id || s.studio_id === ev.studio_id);
+  document.getElementById('bookModalTitle').textContent = existing ? 'Edit performance' : 'Add a performance';
+  closeModal('detailModal');
+  openModal('bookModal');
+  if (bookingForm) bookingForm.destroy();
+  bookingForm = PF.bookingForm({
+    mount: document.getElementById('bookFormMount'),
+    event: ev, bookings: grid.bookings, students: list, isAdmin: true, existing,
+    prefillBlock: slot?.block,
+    loadOptions: async sid => {
+      const { data, error } = await db.rpc('get_event_form_options', { p_student: sid, p_event: ev.id });
+      if (error) throw error;
+      return data;
+    },
+    onSubmit: v => PF.submitBooking(db, ev.id, v, existing?.id),
+    onStale: loadGrid,
+    onCancel: () => closeModal('bookModal'),
+    onDone: async (res) => {
+      // An admin who clicked a particular empty slot wants it THERE.
+      let note = '';
+      if (!existing && slot && (res.block !== slot.block || res.position !== slot.position)) {
+        const mv = await db.rpc('move_event_booking', { p_booking: res.booking_id, p_block: slot.block, p_position: slot.position, p_swap: false });
+        if (mv.error) note = ` It was placed in block ${res.block}, slot #${res.position} (${PF.errorText(mv.error)})`;
+      }
+      closeModal('bookModal');
+      showToast((existing ? 'Performance updated.' : 'Performance added.') + note);
+      await loadGrid();
+    },
+  });
+}
+
+// ============================================================
+// PERFORMANCE DETAILS (+ move / cancel for admins)
+// ============================================================
+function openDetailModal(b) {
+  activeBooking = b;
+  const ev = grid.event;
+  const prefs = (b.preferred_blocks ?? []).map((n, i) => `${['1st', '2nd', '3rd'][i]}: Block ${n} (${PF.blockTimes(ev, n)})`).join('<br>');
+  const acc = b.accompaniment === 'peer'
+    ? 'A peer' + (b.accompanist_name ? ' — ' + PF.esc(b.accompanist_name) : '')
+    : PF.ACCOMP[b.accompaniment] ?? '';
+  document.getElementById('detailModalTitle').textContent = b.student_name;
+  document.getElementById('detailBody').innerHTML = `
+    <dt>Slot</dt><dd>Block ${b.block} · ${PF.blockTimes(ev, b.block)} · slot #${b.position} (about ${PF.clock(PF.slotMinute(ev, b.block, b.position))})</dd>
+    <dt>Instrument</dt><dd>${PF.esc(b.instrument)}</dd>
+    <dt>Piece</dt><dd>${PF.esc(b.piece)}</dd>
+    <dt>Teacher</dt><dd>${PF.esc(b.teacher_name ?? '—')}</dd>
+    <dt>Accompaniment</dt><dd>${PF.esc(acc)}</dd>
+    ${prefs ? `<dt>Preferred blocks</dt><dd>${prefs}</dd>` : ''}
+    ${b.notes ? `<dt>Comments</dt><dd style="white-space:pre-line">${PF.esc(b.notes)}</dd>` : ''}
+    ${b.created_at ? `<dt>Booked</dt><dd>${new Date(b.created_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}</dd>` : ''}`;
+  document.getElementById('movePanel').classList.add('hidden');
+  document.getElementById('detailFooter').innerHTML = isAdmin
+    ? `<button class="btn btn-danger" onclick="cancelBooking()">Cancel this booking</button>
+       <button class="btn btn-secondary" onclick="showMove()">Move…</button>
+       <button class="btn btn-primary" onclick="editBooking()">Edit</button>`
+    : `<button class="btn btn-ghost" onclick="closeModal('detailModal')">Close</button>`;
+  openModal('detailModal');
+}
+
+function editBooking() { openBookModal(activeBooking, null); }
+
+function showMove() {
+  const ev = grid.event;
+  const at = new Map(grid.bookings.map(b => [b.block + ':' + b.position, b]));
+  let html = '';
+  for (let blk = 1; blk <= ev.block_count; blk++) {
+    html += `<optgroup label="Block ${blk} · ${PF.blockTimes(ev, blk)}">`;
+    for (let p = 1; p <= ev.slots_per_block; p++) {
+      const o = at.get(blk + ':' + p);
+      const here = o && o.id === activeBooking.id;
+      html += `<option value="${blk}:${p}" ${here ? 'selected' : ''}>#${p} · ~${PF.clock(PF.slotMinute(ev, blk, p))} — ${here ? 'current slot' : o ? PF.esc(o.student_name) + ' (swap)' : 'free'}</option>`;
+    }
+    html += '</optgroup>';
+  }
+  document.getElementById('moveSel').innerHTML = html;
+  document.getElementById('movePanel').classList.remove('hidden');
+}
+
+async function doMove() {
+  const [blk, pos] = document.getElementById('moveSel').value.split(':').map(Number);
+  if (blk === activeBooking.block && pos === activeBooking.position) { closeModal('detailModal'); return; }
+  const { error } = await db.rpc('move_event_booking', { p_booking: activeBooking.id, p_block: blk, p_position: pos, p_swap: true });
+  if (error) { showToast(PF.errorText(error), 'error'); await loadGrid(); return; }
+  closeModal('detailModal');
+  showToast('Performance moved.');
+  await loadGrid();
+}
+
+async function cancelBooking() {
+  if (!confirm(`Cancel ${activeBooking.student_name}'s booking? The slot becomes free.`)) return;
+  const { error } = await db.rpc('cancel_event_booking', { p_booking: activeBooking.id });
+  if (error) { showToast(PF.errorText(error), 'error'); return; }
+  closeModal('detailModal');
+  showToast('Booking cancelled.');
+  await loadGrid();
+}
+
+// Close a modal by clicking the dark backdrop
+document.querySelectorAll('.modal-overlay').forEach(o =>
+  o.addEventListener('mousedown', e => { if (e.target === o) o.classList.add('hidden'); }));
+</script>
+</body>
+</html>

@@ -138,6 +138,18 @@ stand, and they take it from there.
 </p>
 </div>
 
+<h2 id="events">Events</h2>
+<p>
+<strong>Events</strong> in the sidebar shows concerts the studio is running.
+Open one to see the programme: every block and slot, with who is performing,
+the instrument and the piece. <strong>Your own students are highlighted</strong>
+and you can click them to see the full details — the piece, who is
+accompanying, and any comments the family left. Other teachers' students show
+as a first name and last initial only. The page is read-only for teachers:
+bookings, moves and cancellations are done by the studio admins. It updates
+automatically, and <strong>🖨️ Print</strong> gives you a copy for the day.
+</p>
+
 <h2 id="password">Changing your password</h2>
 <p>
 Use the <strong>🔑 Password</strong> link in the top bar at any time. If

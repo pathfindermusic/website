@@ -63,6 +63,8 @@
     .students-table tr:last-child td { border-bottom: none; }
     .students-table tr:hover td { background: var(--off-white); }
     .student-name { font-weight: 600; color: var(--charcoal); }
+    .student-link { color: inherit; text-decoration: none; cursor: pointer; }
+    .student-link:hover, .student-link:focus-visible { color: var(--orange); text-decoration: underline; }
     .student-email { font-size: 0.78rem; color: var(--mid-grey); }
     .instrument-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; }
     .instrument-tag {
@@ -132,6 +134,32 @@
     .import-row:last-child { border-bottom: none; }
     .import-status-ok  { color: var(--present); font-size: 0.75rem; }
     .import-status-err { color: var(--absent-nc); font-size: 0.75rem; }
+
+    /* View Tasks (student modal) */
+    #viewTasksBtn:disabled {
+      background: var(--light-grey); color: var(--mid-grey);
+      border-color: transparent; cursor: not-allowed; opacity: 0.8;
+    }
+    .stask-sum { padding: 0.7rem 1rem; font-size: 0.8rem; color: var(--mid-grey); border-bottom: 1px solid var(--border); }
+    .stask-row {
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem;
+      padding: 0.7rem 1rem; border-bottom: 1px solid var(--border);
+      cursor: pointer; transition: background 0.12s;
+    }
+    .stask-row:last-child { border-bottom: none; }
+    .stask-row:hover { background: var(--off-white); }
+    .stask-title { font-size: 0.9rem; font-weight: 500; color: var(--charcoal); line-height: 1.4; }
+    .stask-row.done .stask-title { color: var(--mid-grey); }
+    .stask-row.cancelled .stask-title { text-decoration: line-through; color: var(--mid-grey); }
+    .stask-meta { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.15rem; font-size: 0.78rem; color: var(--mid-grey); }
+    .stask-overdue { color: #dc2626; font-weight: 600; }
+    .stask-pill {
+      flex-shrink: 0; font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.06em; padding: 0.2rem 0.55rem; border-radius: 999px; margin-top: 0.1rem;
+    }
+    .stask-pill.open      { background: rgba(232,73,30,0.1); color: var(--orange-dark); }
+    .stask-pill.done      { background: #e3f4e8; color: #1e7a3c; }
+    .stask-pill.cancelled { background: var(--light-grey); color: var(--dark-grey); }
   </style>
 </head>
 <body>
@@ -171,6 +199,14 @@
     <a class="nav-item" href="day-sheet.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
       Day Sheet
+    </a>
+    <a class="nav-item" href="events.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      Events
+    </a>
+    <a class="nav-item" href="vouchers.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+      Vouchers
     </a>
     <div class="sidebar-section">Teaching</div>
     <a class="nav-item" href="lessons.html">
@@ -390,9 +426,27 @@
         </div>
       </div>
     </div>
+    <div class="modal-footer" style="justify-content:space-between;">
+      <button class="btn btn-secondary" type="button" id="viewTasksBtn" onclick="openStudentTasks()"
+              style="display:none;" disabled>View Tasks</button>
+      <div class="flex gap-1" style="margin-left:auto;">
+        <button class="btn btn-ghost" onclick="closeStudentModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveStudent()">Save Student</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TASKS ABOUT THIS STUDENT (opened from the Student modal's View Tasks button) -->
+<div class="modal-overlay hidden" id="studentTasksModal">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <span class="modal-title" id="studentTasksTitle">Tasks</span>
+      <button class="modal-close" onclick="closeStudentTasks()">✕</button>
+    </div>
+    <div class="modal-body" id="studentTasksBody" style="padding:0;max-height:60vh;overflow-y:auto;"></div>
     <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeStudentModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveStudent()">Save Student</button>
+      <button class="btn btn-ghost" onclick="closeStudentTasks()">Close</button>
     </div>
   </div>
 </div>
@@ -432,6 +486,7 @@
       <span class="modal-title" id="procTitle">Checklist</span>
       <button class="modal-close" onclick="closeProcess()">✕</button>
     </div>
+    <div id="procSync" class="chk-note" style="display:none;padding:0.5rem 1.25rem 0;"></div>
     <div class="modal-body" id="procBody"></div>
     <div class="modal-footer" style="justify-content:space-between;">
       <div class="flex gap-1">
@@ -701,7 +756,8 @@ function renderStudents(students) {
 
     return `<tr>
       <td>
-        <div class="student-name">${studentName}</div>
+        <div class="student-name"><a href="#" class="student-link" title="Open this student"
+             onclick="event.preventDefault();openStudentByIndex(${allStudents.indexOf(s)})">${studentName}</a></div>
         <div class="student-email">${p.email ?? ''}</div>
       </td>
       <td class="text-sm">${allStudiosMap[s.studio_id] ?? '–'}</td>
@@ -1089,21 +1145,79 @@ async function offerStartProcess(studentId) {
   } catch (err) { showToast(err.message, 'error'); }
 }
 
-async function openProcess(studentId) {
+// The checklist opens at once from the data already on the page. The
+// housekeeping below (re-dating tasks, the confirmation-email safety net)
+// used to run BEFORE the modal appeared — a chain of sequential database
+// calls with no timeout and no feedback, so on a slow connection the
+// badge looked dead and every extra click started another chain. It now
+// runs behind the open modal, once per student at a time, with a time
+// limit, and repaints the checklist if it changed anything.
+const procHousekeeping = {};          // studentId -> true while running
+const PROC_HOUSEKEEPING_MS = 25000;
+
+function withTimeout(promise, ms) {
+  let timer;
+  const limit = new Promise((_, rej) => {
+    timer = setTimeout(() => rej(new Error('timed out')), ms);
+  });
+  return Promise.race([promise, limit]).finally(() => clearTimeout(timer));
+}
+
+function setProcSync(text) {
+  const el = document.getElementById('procSync');
+  if (!el) return;
+  el.textContent = text || '';
+  el.style.display = text ? '' : 'none';
+}
+
+function procModalShowing(studentId) {
+  const m = document.getElementById('procModal');
+  return !m.classList.contains('hidden') && m.dataset.studentId === studentId;
+}
+
+function openProcess(studentId) {
   const entry = procByStudent[studentId];
   if (!entry) return;
 
-  // Normally the email goes when the lesson is created. This is the
-  // safety net for when that didn't happen — a lesson added before the
-  // process existed, or a send that failed.
   try {
-    await realignProcessTasks(studentId);
-    const r = await maybeSendConfirmation(studentId, currentProfile.id);
-    if (r === 'sent') {
-      showToast('Confirmation email sent to the student.', 'success');
-      await loadStudents();
-    }
-  } catch (_) { /* opening a checklist must never fail on an email */ }
+    paintProcess(studentId);
+  } catch (e) {
+    console.error('[checklist] could not open', e);
+    showToast('Could not open the checklist: ' + (e?.message ?? e), 'error');
+    return;
+  }
+  document.getElementById('procModal').classList.remove('hidden');
+  runProcessHousekeeping(studentId);
+}
+
+// Normally the confirmation email goes when the lesson is created. This
+// is the safety net for when that didn't happen — a lesson added before
+// the process existed, or a send that failed.
+async function runProcessHousekeeping(studentId) {
+  if (procHousekeeping[studentId]) return;     // already running — don't stack
+  procHousekeeping[studentId] = true;
+  if (procModalShowing(studentId)) setProcSync('Checking the latest details…');
+  try {
+    await withTimeout((async () => {
+      await realignProcessTasks(studentId);
+      const r = await maybeSendConfirmation(studentId, currentProfile.id);
+      if (r === 'sent') {
+        showToast('Confirmation email sent to the student.', 'success');
+        await loadStudents();
+      }
+    })(), PROC_HOUSEKEEPING_MS);
+    if (procModalShowing(studentId) && procByStudent[studentId]) paintProcess(studentId);
+  } catch (e) {
+    // The checklist is already open and usable; this is only housekeeping
+    console.warn('[checklist] background check did not finish', e);
+  } finally {
+    delete procHousekeeping[studentId];
+    if (procModalShowing(studentId)) setProcSync('');
+  }
+}
+
+function paintProcess(studentId) {
+  const entry = procByStudent[studentId];
   const s = allStudents.find(x => x.id === studentId);
   const name = `${s?.first_name ?? s?.profiles?.first_name ?? ''} ${s?.last_name ?? s?.profiles?.last_name ?? ''}`.trim();
 
@@ -1155,7 +1269,6 @@ async function openProcess(studentId) {
   }
 
   renderProcessBody(studentId);
-  document.getElementById('procModal').classList.remove('hidden');
 }
 
 function renderProcessBody(studentId) {
@@ -1620,6 +1733,8 @@ function openStudentModal(student = null) {
   }
   updateNotesCount();
   document.getElementById('studentModal').classList.remove('hidden');
+  studentFormBaseline = studentFormSnapshot();
+  refreshViewTasksButton(student ? student.id : null);
 }
 
 // Live "n / 50" under Additional Notes. The input's maxlength does the
@@ -1629,7 +1744,108 @@ function updateNotesCount() {
   document.getElementById('sAdditionalNotesCount').textContent = el.value.length;
 }
 
-function closeStudentModal() { document.getElementById('studentModal').classList.add('hidden'); }
+function closeStudentModal() {
+  document.getElementById('studentModal').classList.add('hidden');
+  closeStudentTasks();
+  viewTasksStudentId = null;
+}
+
+// ---- View Tasks ----
+// Every task about this student, open and closed. "Subject" is how the
+// Tasks page links a task to a student (tasks.subject_type/subject_id).
+// Clicking one hands its id to the Tasks page, the same way the "ending"
+// button on the student list does, and that page opens the task's modal.
+let viewTasksStudentId = null;
+let studentFormBaseline = '';
+
+function studentFormSnapshot() {
+  return Array.from(document.querySelectorAll('#studentModal input, #studentModal select, #studentModal textarea'))
+    .map(el => (el.type === 'checkbox' ? el.checked : el.value)).join('\u0001');
+}
+
+function escTask(v) {
+  return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Greyed out (and not clickable) unless the student has at least one task.
+async function refreshViewTasksButton(studentId) {
+  const btn = document.getElementById('viewTasksBtn');
+  viewTasksStudentId = studentId;
+  if (!studentId) { btn.style.display = 'none'; return; }   // Add Student: nothing to show yet
+  btn.style.display = '';
+  btn.disabled = true;
+  btn.textContent = 'View Tasks';
+  btn.title = 'Checking for tasks…';
+  const { count, error } = await db.from('tasks')
+    .select('id', { count: 'exact', head: true })
+    .eq('subject_type', 'student').eq('subject_id', studentId);
+  if (viewTasksStudentId !== studentId) return;             // the modal moved on while we asked
+  if (error) { btn.title = 'Could not check for tasks'; return; }
+  btn.disabled = !count;
+  btn.textContent = count ? `View Tasks (${count})` : 'View Tasks';
+  btn.title = count ? 'Open and closed tasks about this student' : 'No tasks about this student';
+}
+
+async function openStudentTasks() {
+  const studentId = viewTasksStudentId;
+  if (!studentId) return;
+  const name = `${document.getElementById('sFirstName').value} ${document.getElementById('sLastName').value}`.trim();
+  document.getElementById('studentTasksTitle').textContent = name ? `Tasks — ${name}` : 'Tasks';
+  const body = document.getElementById('studentTasksBody');
+  body.innerHTML = '<div class="stask-sum">Loading…</div>';
+  document.getElementById('studentTasksModal').classList.remove('hidden');
+
+  const { data, error } = await db.from('tasks').select('*')
+    .eq('subject_type', 'student').eq('subject_id', studentId);
+  if (viewTasksStudentId !== studentId) return;
+  if (error) { body.innerHTML = `<div class="stask-sum" style="color:#dc2626;">${escTask(error.message)}</div>`; return; }
+
+  const all    = data ?? [];
+  const open   = all.filter(t => t.status === 'open')
+    .sort((a, b) => (a.due_date ?? '9999') < (b.due_date ?? '9999') ? -1 : (a.due_date ?? '9999') > (b.due_date ?? '9999') ? 1 : 0);
+  const closed = all.filter(t => t.status !== 'open')
+    .sort((a, b) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')));
+  if (!all.length) {
+    body.innerHTML = '<div class="stask-sum">No tasks about this student.</div>';
+    return;
+  }
+
+  const today = toISODate(new Date());
+  const row = t => {
+    const isOpen = t.status === 'open', isDone = t.status === 'done', isCancelled = t.status === 'cancelled';
+    const overdue = isOpen && t.due_date && t.due_date < today;
+    const bits = [];
+    if (t.due_date) {
+      const d = formatShortDate(parseLocalDate(t.due_date));
+      bits.push(overdue ? `<span class="stask-overdue">Overdue · ${d}</span>`
+                        : (isOpen && t.due_date === today ? '<span class="stask-overdue">Due today</span>' : `<span>Due ${d}</span>`));
+    }
+    if (t.kind === 'waitlist') bits.push('<span>Waiting list</span>');
+    if (t.recurring_task_id)   bits.push('<span>🔁 Recurring</span>');
+    if (t.created_at)          bits.push(`<span>Created ${formatShortDate(new Date(t.created_at))}</span>`);
+    const label = isCancelled ? 'Cancelled' : isDone ? 'Done' : 'Open';
+    return `<div class="stask-row ${isCancelled ? 'cancelled' : isDone ? 'done' : ''}" onclick="goToStudentTask('${escTask(t.id)}')">
+      <div>
+        <div class="stask-title">${escTask(t.title)}</div>
+        <div class="stask-meta">${bits.join('')}</div>
+      </div>
+      <span class="stask-pill ${isCancelled ? 'cancelled' : isDone ? 'done' : 'open'}">${label}</span>
+    </div>`;
+  };
+  body.innerHTML =
+    `<div class="stask-sum">${open.length} open · ${closed.length} closed — click a task to open it</div>` +
+    open.map(row).join('') + closed.map(row).join('');
+}
+
+function closeStudentTasks() { document.getElementById('studentTasksModal').classList.add('hidden'); }
+
+// Leaves this page, so don't lose anything typed into the student form.
+function goToStudentTask(taskId) {
+  if (studentFormSnapshot() !== studentFormBaseline &&
+      !confirm('You have unsaved changes to this student.\n\nOpen the task anyway and lose them?')) return;
+  sessionStorage.setItem('openTaskId', taskId);
+  window.location.href = 'tasks.html';
+}
 
 // ---- Save student ----
 async function saveStudent() {
@@ -2140,6 +2356,7 @@ async function confirmImport() {
 
 document.getElementById('procModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeProcess(); });
 document.getElementById('studentModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeStudentModal(); });
+document.getElementById('studentTasksModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeStudentTasks(); });
 document.getElementById('importModal').addEventListener('click',  e => { if (e.target === e.currentTarget) closeImportModal(); });
 
 function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }

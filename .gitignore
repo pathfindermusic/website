@@ -13,3 +13,11 @@ node_modules/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Private studio tool: a separate business, kept out of this repository
+Private studio/
+Claude outputs/Code.gs
+Claude outputs/INSTALL.md
+Claude outputs/Private-Studio-Manager.xlsx
+Claude outputs/Sample-invoice.pdf
+Claude outputs/appsscript.json

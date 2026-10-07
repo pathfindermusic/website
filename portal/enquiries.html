@@ -260,6 +260,8 @@ function renderSidebar() {
     help:  '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
     ticket:'<path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/>',
     award: '<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>',
+    star:  '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+    gift:  '<polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>',
   };
   const it = (h,l,p,a) => `<a class="nav-item ${a?'active':''}" href="${h}">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${p}</svg>${l}</a>`;
@@ -271,6 +273,8 @@ function renderSidebar() {
     ${it('enquiries.html','Enquiries',I.inbox,true)}
     ${it('notifications.html','Notifications',I.mail)}
     ${it('day-sheet.html','Day Sheet',I.clipboard)}
+    ${it('events.html','Events',I.star)}
+    ${it('vouchers.html','Vouchers',I.gift)}
     <div class="sidebar-section">Teaching</div>
     ${it('lessons.html','Lessons',I.cal)}
     ${it('students.html','Students',I.people)}

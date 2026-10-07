@@ -86,6 +86,41 @@ This page is informational only — your grade is set by your teacher after a
 lesson, not something you record yourself.
 </p>
 
+<h2 id="events">Concerts and events</h2>
+<p>
+When the studio holds a concert, a card called <strong>Upcoming events — book
+your performance</strong> appears at the top of your dashboard (and you'll
+usually get an email with a link too). <strong>Events</strong> in the sidebar
+lists everything on offer.
+</p>
+<p><strong>To book a performance:</strong></p>
+<ul>
+<li>Press <strong>Book now</strong>, then <strong>＋ Book a performance</strong>.
+If you have more than one child on your login, choose who is performing.</li>
+<li>Choose the <strong>instrument</strong> (or type a performance type such as
+Voice, or choose <strong>Band</strong>) — you can book <strong>one performance
+per instrument</strong>, so a student who plays guitar and is also in a band
+can make two bookings. An instrument you've already booked shows as
+“already booked”. Then choose the <strong>teacher</strong> — the teacher list follows the
+instrument — then type the <strong>name of the piece</strong>.</li>
+<li>Choose the <strong>accompaniment</strong>: your teacher, a peer (type their
+name), a backing track, or none.</li>
+<li>Choose up to <strong>three preferred time blocks</strong>. Only blocks with
+room are offered. You'll be placed in the first one that still has a place and
+told straight away which block and roughly what time. Add any comments for the
+studio at the bottom.</li>
+</ul>
+<p>
+Under <strong>My performances</strong> you can <strong>Edit</strong> or
+<strong>Cancel booking</strong> until bookings close (inside Edit there is also a
+red <strong>Cancel this booking</strong> button). Below that is the
+programme so far: it updates by itself, your own performances are highlighted,
+and other students appear only as a first name and last initial. The times
+shown are approximate — please arrive at the start of your block. If your
+preferred blocks are all full, you'll be asked to choose again; if bookings
+have closed or you need a change, contact the studio.
+</p>
+
 <h2 id="family">Multiple children on one login</h2>
 <p>
 If your family has more than one child taking lessons and they share a

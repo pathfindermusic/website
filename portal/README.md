@@ -1857,6 +1857,197 @@ of the Student modal on `students.html`, below Parent / Guardian.
   chars typed → 50, update payload, blank on Add); **not yet tested
   live**.
 
+## Student modal: "View Tasks" (Oct 2026)
+
+(Also on `students.html`: the student's name in the list is a link
+(`.student-link`) that opens the same Edit modal as the Edit button, via
+`openStudentByIndex()`.)
+
+A **View Tasks** button in the footer of the Edit Student modal
+(`students.html`) lists every task about that student, open and closed, and
+jumps to the one you click.
+- **Which tasks:** `tasks` rows with `subject_type = 'student'` and
+  `subject_id = students.id` — the same link the Tasks page uses for its
+  subject name. Open and closed (`done`, `cancelled`) both included.
+- **Button state:** `refreshViewTasksButton()` runs a head-only count query
+  when the modal opens. Zero tasks (or the query still running / failed) →
+  the button is **disabled and greyed** (`#viewTasksBtn:disabled`); otherwise
+  it reads "View Tasks (n)". Hidden on **Add Student** (nothing to show yet).
+  A token (`viewTasksStudentId`) stops a slow answer for the previous student
+  updating the current one.
+- **List:** second modal `#studentTasksModal`, stacked over the student
+  modal. Open tasks first (soonest due first, undated last), then closed ones
+  newest first. Each row: title, due date (overdue / due today in red),
+  Waiting list / Recurring markers, created date, and an Open / Done /
+  Cancelled pill. A line at the top gives the open/closed counts.
+- **Opening a task:** clicking a row sets `sessionStorage.openTaskId` and
+  navigates to `tasks.html`, which opens that task's modal on load — the same
+  hand-off the "ending" button on the student list (`openEndTask()`) already
+  uses. `tasks.html` switches its status filter to All when the task is
+  closed. If the student form has **unsaved changes**, the page asks before
+  leaving (`studentFormSnapshot()` compared with the baseline taken when the
+  modal opened).
+- **Visibility:** whatever the Tasks page would show this admin (RLS on
+  `tasks`); the count and the list use the same rule, so they always agree.
+- No database change. Tested against a stubbed Supabase in jsdom (button
+  states, ordering, escaping, unsaved-changes prompt, hand-off key);
+  **not yet tested live**.
+
+## Events (Oct 2026) — year-end concert booking
+
+Admins create an **event** (name, date, start/end, venue, block length, slots
+per block); students book a performance by ranking up to three **blocks**; the
+Portal places them in the first block with room and everyone sees the grid fill
+in. Pages: `events.html` (admins and teachers), `event-book.html` (students),
+shared code in `js/events-common.js`; database in `supabase/events.sql`.
+
+- **Model.** An event is split into `ceil((end − start) / block_minutes)`
+  blocks, each with `slots_per_block` numbered slots. Block *i* starts at
+  `start + (i − 1) × block_minutes`; slot *p* is shown at roughly
+  `block start + (p − 1) × block_minutes / slots_per_block` (always labelled
+  "about" — it is a guide, students are told to arrive at the start of their
+  block). Times are local wall-clock `date` + `time`, not `timestamptz`.
+  Defaults: 60-min blocks, 12 per block, overall cap of 5 performances per
+  student (1–10).
+- **One performance per instrument.** A student (or parent) can book once per
+  instrument — Guitar, Piano, Band and so on — which covers students with
+  several individual pieces and a band slot. Students can cancel their own
+  booking from **My performances** ("Cancel booking") or from inside the edit
+  form ("Cancel this booking") until bookings close; admins can always cancel.
+- **Tables.** `events` and `event_bookings`. A partial unique index
+  `(event_id, assigned_block, assigned_position) WHERE status = 'booked'` is the
+  last line of defence against two performances in one slot; cancelled rows
+  stay (history) and free their slot. Position 1000 is reserved as a parking
+  slot while two performances swap.
+- **Capacity is enforced in the database, not the page.** `submit_event_booking`
+  locks the event row (`FOR UPDATE`), so two families pressing Submit together
+  can't be given the same slot (tested with 10 simultaneous requests for 3
+  places: exactly 3 succeed, 7 get `none_available`). It checks: caller is the
+  student's own login (active/trial) or an admin in scope; event is `open` and
+  before `booking_deadline` (Melbourne date; admins bypass); the per-student
+  limit (admins bypass); 1–3 distinct valid blocks. Placement = first preferred
+  block with a free slot, lowest free slot number. **Editing** keeps the current
+  slot if the preferences are unchanged (so an admin's manual move survives a
+  student fixing a typo); otherwise it re-places, counting the booking's own
+  seat as free; if nothing fits it errors and changes nothing.
+- **Privacy is enforced in the database.** Students and teachers have **no**
+  table access (RLS: admins only). Everything goes through `SECURITY DEFINER`
+  functions: `list_events_for_me()`, `get_event_grid()`, `get_my_event_students()`,
+  `get_event_form_options()`, `submit_event_booking()`, `cancel_event_booking()`,
+  `move_event_booking()` (admin only; `p_swap` swaps with whoever is there).
+  `get_event_grid` masks by role: admins see everything; a teacher sees full
+  detail for their own students (via `student_teachers` or the booking's
+  teacher) and masked rows for others; a student sees their own family's
+  bookings in full and everyone else as "Ava L." + instrument + piece +
+  accompaniment *type* — never the teacher, comments, peer's name or
+  preferences. Draft events are invisible to non-admins; events are scoped to
+  the event's studio (NULL = all studios).
+- **Layout guard.** A trigger on `events` refuses an edit that would leave a
+  booked performance outside the new blocks/slots (`layout_conflict`) — move or
+  cancel them first.
+- **"Real time" is polling**, every 10–12 s while the tab is visible
+  (`PF.poll`), not Supabase Realtime: Realtime honours RLS, and students have
+  no table access, so it would show them nothing. The grid skips re-rendering
+  when nothing changed, so the page never flickers.
+- **Booking form** (`PF.bookingForm`) is one component used by the student page
+  and the admin "add / edit performance" modal. Instruments and teachers come
+  from `get_event_form_options` (the student's `student_instruments` +
+  `student_teachers` **plus the teachers and instruments of their active lesson
+  series**, private (`lessons.student_id`) or group (`lesson_students`), via the
+  internal `_event_student_teachers()` — many students only have the series, no
+  `student_teachers` row; the teacher list narrows to those who teach the chosen
+  instrument; "Someone else / not sure" allows free text, and left blank is
+  saved as "Not sure"). Siblings on one login get a
+  picker; the active child follows `sessionStorage.activeStudentId`.
+- **Admins** click a free slot to add a performance *in that slot* (the booking
+  is made, then moved there), click a booked slot for details / Edit / Move
+  (taken target = swap) / Cancel, switch between **Grid** and **Running order**
+  (printable), and Open / Close bookings. Close = students can still view but
+  not book, change or cancel. Delete is only allowed with no bookings.
+- **Sharing.** The event page shows the booking link
+  (`event-book.html?event=<id>`) with **Copy** and **Send invitation…**, which
+  stores a drafted subject/body in `sessionStorage.notifPrefill` and opens
+  Notifications (`applyPrefill()` in `notifications.html` ticks the event's
+  studio and fills the message; the admin still reviews and sends it). The body
+  uses `{{first_name}}` and a Markdown link, which `send-email.js` already
+  understands. The same link appears on the student dashboard
+  ("Upcoming events" card) and in the student sidebar.
+- **Login return.** `event-book.html` sends a signed-out visitor to
+  `login.html?next=event-book.html?event=<id>`; `login.html` honours `next` only
+  if it matches that exact page + a UUID (`safeNext()`), so it cannot become an
+  open redirect. Staff following the link are sent to `events.html` for the same
+  event. A user forced to change their password first loses the `next`.
+- **Not built (ideas):** automatic emailing of a confirmation when a booking is
+  made; waiting list when a block is full; per-event "accompanist/venue
+  equipment" fields; exporting the running order to PDF/CSV (use Print for now).
+- **Tests run:** unit tests for the slot/time maths (node); 83 database checks
+  on a local Postgres 16 with stand-in tables (RLS, privacy masks, limits,
+  deadline, swap, layout guard, 10-way race); jsdom runs of the admin, teacher
+  and student pages against that database (create → open → book → move →
+  cancel, sibling picker, live update, closed event, other-studio isolation,
+  login `next`, notification prefill). **Not yet tested live** — run the SQL
+  first, then follow the go-live checks in the hand-over notes.
+
+## Gift vouchers (Oct 2026) — front-desk PDF vouchers
+
+Admins issue a gift voucher on demand and the Portal emails it as a PDF.
+Page: `vouchers.html` (Front desk → Vouchers, admins/superusers only). PDF
+drawing: `js/voucher-pdf.js` + `fonts/Inter-*.ttf` + `img/voucher-logo.png`.
+Email: `netlify/functions/send-voucher.js`. Database: `supabase/gift-vouchers.sql`
+(migration 43).
+
+- **Flow.** New voucher → form (studio, recipient, subject, purchaser, date,
+  value, message) → **Preview** (the real PDF in an iframe) → **Send**. Send
+  inserts the register row, rebuilds the PDF from what the database stored, then
+  calls the function. If the email fails, the row is kept (`emailed_at` null,
+  `email_error` set; the page offers *Retry* and the register shows "Not sent"),
+  so a retry never inserts twice.
+- **PDF is drawn in the browser** (jsPDF 2.5.1 from jsDelivr, A4 landscape,
+  vector, text stays selectable) so the preview *is* the attachment. Fonts are
+  Inter subsets (Latin + Latin Extended, ~80 KB each) embedded as TrueType;
+  characters outside them (emoji) are stripped, not printed as boxes
+  (`PFVoucher.clean`). The logo is `img/voucher-logo.png`, the site logo with
+  its orange background keyed out to transparency so it sits on charcoal.
+  Layout is auto-fitting: the headline shrinks to two lines (18 pt minimum), the
+  message box sizes to the text (7 pt minimum, then an ellipsis).
+- **Voucher numbers** are `PF-XXXX-XXXX` from an alphabet without 0/O/1/I/L,
+  random (not sequential, so not guessable), generated in the browser so the
+  preview shows the final number; `UNIQUE` + a format `CHECK` in the database,
+  and the page picks a new number and retries on the (very unlikely) collision.
+- **Expiry** is `purchase_date + 1 year`, set by the insert trigger (29 Feb →
+  28 Feb) — the browser shows the same date but never decides it. Purchase date
+  cannot be in the future. *Expired* is derived on the page (`issued` and past
+  `expires_on`), not stored.
+- **What can change.** A trigger freezes everything the PDF printed (number,
+  subject, value, names, message, dates, studio). Only contact emails, status and
+  the email-tracking columns can change. Status: `issued → redeemed | void`;
+  `void` is final. There is **no delete** (privileges revoked) — mistakes are
+  voided so the number stays on record. RLS: admins and superusers only; teachers
+  and students cannot see the table.
+- **Email.** `send-voucher.js` uses Resend's *single-message* endpoint because
+  the batch endpoint `send-email.js` uses does not support attachments. From and
+  Reply-To = issuing studio's email; To = recipient; Cc = purchaser (only if an
+  address was recorded and differs from the recipient); Bcc = the studio. Subject
+  `Your Voucher for {subject}`; body is short and upbeat and uses the same
+  branded shell copied from `send-email.js`. Unlike `send-email.js`, this
+  function **verifies the caller**: it checks the Supabase access token and that
+  the profile is an active admin/superuser. It also refuses void, redeemed or
+  expired vouchers, checks the attachment really is a PDF (≤ 3 MB), sends an
+  `Idempotency-Key` (a double-click can't mail twice), stamps
+  `emailed_at/emailed_to/send_count`, and writes an `email_log` row
+  (`recipient_mode = 'voucher'`). A resend to a corrected address updates the
+  stored recipient email.
+- **Student link.** Choosing a student in the picker records
+  `recipient_student_id`; overwriting the name unlinks it (the voucher is then
+  for someone else). Picker data comes from `students` (active/trial/prospective),
+  email = the student's contact email, else the parent's.
+- **Tested** against a local Postgres (guard trigger, RLS, privileges, leap day,
+  idempotent re-run), the function with a mocked Resend (auth, status gating,
+  attachment, cc/bcc, failure handling) and the page in jsdom with a fake
+  database (picker, validation, preview, save-then-fail-then-retry, resend,
+  redeem, expiry, number clash). **Not yet tested live** — run the SQL first,
+  then send a voucher to yourself.
+
 ## Traps that have already cost time
 
 - **Check which environment you're looking at.** Local dev runs against the same
@@ -1920,9 +2111,32 @@ of the Student modal on `students.html`, below Parent / Guardian.
   student list genuinely is "who currently has lessons with this teacher"),
   so don't reflexively copy that pattern onto anything answering "what does
   this student play" instead of "who currently has lessons with X."
+- **Grading report "Show ungraded students" uses `student_instruments` to
+  decide which instruments count (Oct 2026).** It builds (student, instrument)
+  pairs from the lesson roster, and `lessons.instrument` is whatever the Add
+  Lesson dropdown said — which defaults to the *teacher's* first instrument
+  and is never checked against the student. A guitar student with a
+  guitar-and-piano teacher could therefore sit on a Piano lesson and be listed
+  as "Piano — not yet graded". The report now drops any instrument the student
+  has no `student_instruments` row for. A student with no `student_instruments`
+  rows at all keeps the old lesson-derived behaviour, so a gap in that table
+  can't hide anyone. The underlying mislabelled lesson is not corrected.
 
 ## Known limitations & open decisions
 
+- **The private (acquired) studio is deliberately *not* in the Portal.** It
+  needs its own admins/teachers/students, invisible to Pathfinder admins and
+  vice versa. That isn't achievable by a UI default: most tables' RLS is
+  role-based only (see migration 27, "studio is a UI default, not a database
+  boundary"), `get_my_studio_ids()` treats an admin with empty `studio_ids` as
+  all studios, views and service-key Netlify functions bypass RLS, and the
+  Pathfinder name/domain is hardcoded across pages and emails. Doing it safely
+  means end-to-end re-testing the whole Portal, which was judged too much risk
+  while the Portal is still new to users. Instead the studio has a separate
+  tool: a Google Sheet + Apps Script ("Private Studio Manager" — students,
+  teachers, lessons timetable, attendance, GST invoices, bulk email), kept out
+  of this repo (`Private studio/` is in `.gitignore`). Revisit only if the
+  studio needs the full Portal feature set.
 - **One role per account.** Miranda teaches *and* administers; ~3 such cases.
   Workaround is a separate email per role. Proper fix is `role` → `roles[]`
   plus RLS and login changes.
@@ -2006,6 +2220,20 @@ Run in order. All are re-runnable.
 40. `phase12-waiting-list.sql` — `tasks.waitlist_teacher_id`/`waitlist_day_of_week`/
     `waitlist_time_from`/`waitlist_time_to`/`waitlisted_at` (see Waiting list
     section above)
+41. `events.sql` — `events`, `event_bookings`, `event_block_count()`, layout-guard
+    trigger, admin-only RLS, and the seven booking functions (see Events
+    section above). Run statement by statement, **before** deploying
+    `events.html` / `event-book.html` / the updated dashboard
+42. `events-per-instrument.sql` — one performance **per instrument** per student
+    (case-insensitive; "Band" is always offered as its own instrument). Raises
+    `instrument_booked`; admins bypass it. `max_per_student` becomes an overall
+    cap (default 5, allowed 1–10) and events still on the old default of 1 are
+    lifted to 5. Fresh installs already get this from `events.sql`. Run
+    statement by statement **before** deploying the matching pages
+43. `gift-vouchers.sql` — `gift_vouchers` register, insert/update guard trigger,
+    admin-only RLS, table privileges (see Gift vouchers section above). Run
+    statement by statement **before** deploying `vouchers.html`,
+    `js/voucher-pdf.js` and the `send-voucher` function
 
 *(Several migrations applied between 27 and 35 — schedule performance
 indexes, BoK grading, fortnightly lessons, recurring tasks, and others —
@@ -2042,7 +2270,7 @@ newest-first. Worth watching before acting.
 automatic follow-up tasks, three distinct exits, converted history, and
 duplicate detection against existing and past students.
 
-**Navigation is grouped** as Teaching (Schedule, Lessons, Students, Teachers),
+**Navigation is grouped** (Events joined Front desk in Oct 2026) as Teaching (Schedule, Lessons, Students, Teachers),
 Front desk (Enquiries, Tasks, Notifications), Reports, and Super User. Teacher
 pages are ungrouped — three items don't need it.
 
