@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Ticket Sales — Pathfinder Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/portal.css">
+  <style>
+    .tabs { display: flex; gap: .25rem; border-bottom: 2px solid var(--border); margin-bottom: 1.1rem; }
+    .tab-btn { font: inherit; font-size: .86rem; font-weight: 600; color: var(--mid-grey); background: none; border: none;
+      padding: .6rem 1rem; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+    .tab-btn:hover { color: var(--charcoal); }
+    .tab-btn.on { color: var(--orange); border-bottom-color: var(--orange); }
+
+    .t-table { width: 100%; border-collapse: collapse; font-size: .845rem; }
+    .t-table th { text-align: left; font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .07em;
+      color: var(--mid-grey); padding: 0 1rem .6rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .t-table td { padding: .75rem 1rem; border-bottom: 1px solid var(--border); color: var(--dark-grey); vertical-align: top; }
+    .t-table tr:last-child td { border-bottom: none; }
+    .t-table tbody tr.click:hover td { background: var(--off-white); cursor: pointer; }
+    .t-no { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 600; color: var(--charcoal); font-size: .8rem; white-space: nowrap; }
+    .t-name { font-weight: 600; color: var(--charcoal); }
+    .t-sub { font-size: .76rem; color: var(--mid-grey); }
+    .t-num { text-align: right; white-space: nowrap; }
+    .tpill { display: inline-block; font-size: .7rem; font-weight: 600; padding: .12rem .55rem; border-radius: 99px; white-space: nowrap; }
+    .tpill.paid { background: #dcfce7; color: #16a34a; }
+    .tpill.pending { background: #fef3c7; color: #b45309; }
+    .tpill.failed { background: #fee2e2; color: #dc2626; }
+    .tpill.abandoned { background: #eee; color: #777; }
+    .tpill.refunded { background: #ede9fe; color: #6d28d9; }
+    .tpill.valid { background: #dcfce7; color: #16a34a; }
+    .tpill.used { background: #e0e7ff; color: #4338ca; }
+    .tpill.void { background: #fee2e2; color: #dc2626; }
+    .tpill.unsent { background: #fef3c7; color: #b45309; }
+    .t-search { min-width: 240px; background-image: none; padding-right: .75rem; }
+
+    .sales-bar { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; font-size: .84rem; color: var(--dark-grey);
+      background: var(--off-white); border: 1px solid var(--border); border-radius: var(--r-sm); padding: .6rem .9rem; margin-bottom: 1rem; }
+    .sales-bar b { color: var(--charcoal); }
+    .warn-box { background: #fef3c7; color: #92400e; font-size: .82rem; border-radius: var(--r-sm); padding: .6rem .8rem; margin-bottom: .9rem; }
+    .form-error-box { background: #fee2e2; color: #b91c1c; font-size: .82rem; border-radius: var(--r-sm); padding: .6rem .8rem; margin-bottom: .9rem; }
+
+    .kv { display: grid; grid-template-columns: 120px 1fr; gap: .45rem .85rem; font-size: .86rem; margin-bottom: 1rem; }
+    .kv dt { color: var(--mid-grey); font-size: .78rem; padding-top: .1rem; }
+    .kv dd { margin: 0; color: var(--charcoal); word-break: break-word; }
+    .tk-list { border: 1px solid var(--border); border-radius: var(--r-sm); margin-bottom: 1rem; }
+    .tk-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .5rem .75rem; font-size: .84rem; border-bottom: 1px solid var(--border); }
+    .tk-row:last-child { border-bottom: none; }
+    .tk-row a { color: var(--orange); text-decoration: none; font-size: .78rem; }
+    .check-row { display: flex; align-items: center; gap: .5rem; font-size: .84rem; }
+
+    /* door check-in */
+    .ci-box { background: var(--white); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 1.25rem; max-width: 720px; }
+    .ci-input-row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+    .ci-input { flex: 1; min-width: 220px; font-size: 1.15rem; padding: .8rem 1rem; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      text-transform: uppercase; letter-spacing: .04em; }
+    .ci-result { margin-top: 1.1rem; border-radius: var(--r); overflow: hidden; border: 2px solid var(--border); }
+    .ci-banner { padding: 1.1rem 1.25rem; font-weight: 800; font-size: 1.5rem; letter-spacing: .02em; }
+    .ci-banner small { display: block; font-size: .85rem; font-weight: 500; margin-top: .25rem; letter-spacing: 0; }
+    .ci-ok { border-color: #16a34a; } .ci-ok .ci-banner { background: #16a34a; color: #fff; }
+    .ci-ready { border-color: #2563eb; } .ci-ready .ci-banner { background: #2563eb; color: #fff; }
+    .ci-bad { border-color: #dc2626; } .ci-bad .ci-banner { background: #dc2626; color: #fff; }
+    .ci-warn { border-color: #d97706; } .ci-warn .ci-banner { background: #d97706; color: #fff; }
+    .ci-grey { border-color: #777; } .ci-grey .ci-banner { background: #777; color: #fff; }
+    .ci-detail { padding: 1rem 1.25rem; font-size: .92rem; }
+    .ci-detail .perf { font-size: 1.35rem; font-weight: 800; color: var(--charcoal); }
+    .ci-actions { display: flex; gap: .6rem; flex-wrap: wrap; padding: 0 1.25rem 1.1rem; }
+    .ci-big { font-size: 1.05rem; padding: .75rem 1.6rem; }
+    .ci-hist { margin-top: 1.25rem; font-size: .82rem; }
+    .ci-hist h4 { font-size: .72rem; text-transform: uppercase; letter-spacing: .07em; color: var(--mid-grey); margin-bottom: .4rem; }
+    .ci-hist div { padding: .3rem 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; gap: 1rem; }
+    @media (max-width: 640px) { .t-hide-sm { display: none; } .kv { grid-template-columns: 1fr; } }
+    @media print { .sidebar, .topnav, .filters-bar, .tabs, .no-print { display: none !important; } .main { margin: 0 !important; } }
+  </style>
+</head>
+<body>
+<div class="portal-shell">
+
+  <nav class="topnav">
+    <a href="#" class="topnav-logo"><img src="../Logo_-_long.png" alt="Pathfinder Music Lessons"></a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">–</span>
+        </div>
+      </div>
+      <a href="change-password.html" class="btn-logout" style="text-decoration:none;">🔑 Password</a>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <aside class="sidebar" id="sidebar"><!-- injected --></aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Ticket sales</div>
+        <div class="page-sub" id="pageSub">Loading…</div>
+      </div>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap" class="no-print">
+        <a class="btn btn-secondary btn-sm" id="evLink" href="events.html">← Events</a>
+      </div>
+    </div>
+
+    <div class="filters-bar no-print" id="evBar">
+      <select class="filter-select" id="evSel" onchange="pickEvent(this.value)" style="min-width:260px"></select>
+    </div>
+
+    <div id="setupBox" class="warn-box hidden"></div>
+    <div id="main" class="hidden">
+
+      <div class="sales-bar" id="salesBar"></div>
+
+      <div class="stats-row" id="stats"></div>
+
+      <div class="tabs no-print">
+        <button class="tab-btn on" data-tab="orders" onclick="setTab('orders')">Orders</button>
+        <button class="tab-btn" data-tab="door" onclick="setTab('door')">Door check-in</button>
+        <button class="tab-btn" data-tab="perf" onclick="setTab('perf')">By performer</button>
+      </div>
+
+      <!-- ===== ORDERS ===== -->
+      <div id="tab-orders">
+        <div class="filters-bar no-print">
+          <input class="filter-select t-search" type="search" id="filterText" placeholder="Search order, name, email, performer or ticket…" oninput="renderOrders()">
+          <select class="filter-select" id="filterStatus" onchange="renderOrders()">
+            <option value="paid">Paid</option>
+            <option value="attention">Needs attention</option>
+            <option value="refunded">Refunded</option>
+            <option value="all">Everything</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="exportCsv()">⬇ Export CSV</button>
+          <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ Print</button>
+        </div>
+        <div class="card">
+          <div style="overflow-x:auto;">
+            <table class="t-table">
+              <thead><tr>
+                <th>Order</th><th>Purchaser</th><th>Performer</th><th class="t-num">Tickets</th><th class="t-num">Total</th>
+                <th>Status</th><th class="t-hide-sm">When</th><th class="t-hide-sm">Admitted</th>
+              </tr></thead>
+              <tbody id="oBody"><tr><td colspan="8"><div class="loading"><div class="spinner"></div> Loading…</div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== DOOR ===== -->
+      <div id="tab-door" class="hidden">
+        <div class="ci-box">
+          <div class="ci-input-row">
+            <input class="form-input ci-input" id="ciInput" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false"
+                   placeholder="Scan or type TK-XXXX-XXXX" onkeydown="if(event.key==='Enter'){event.preventDefault();ciGo();}">
+            <button class="btn btn-primary ci-big" onclick="ciGo()">Look up</button>
+          </div>
+          <label class="check-row" style="margin-top:.8rem">
+            <input type="checkbox" id="ciAuto"> <span><b>Admit automatically</b> when a valid ticket is entered or scanned (for a busy door)</span>
+          </label>
+          <div class="form-hint" style="margin-top:.35rem">Tip: each ticket's QR code opens this page. Scan with a phone camera, or use a USB barcode/QR scanner into the box above.</div>
+          <div id="ciResult"></div>
+          <div class="ci-hist hidden" id="ciHist"></div>
+        </div>
+      </div>
+
+      <!-- ===== BY PERFORMER ===== -->
+      <div id="tab-perf" class="hidden">
+        <div class="card">
+          <div style="overflow-x:auto;">
+            <table class="t-table">
+              <thead><tr><th>Performer</th><th class="t-num">Orders</th><th class="t-num">Tickets sold</th><th class="t-num">Admitted</th></tr></thead>
+              <tbody id="pBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <p class="form-hint" style="margin-top:.6rem">Counts paid orders only. Names are grouped ignoring capital letters and extra spaces; check for spelling variants (e.g. “Sam Smith” and “Samuel Smith”) that belong together.</p>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- ============ ORDER DETAIL ============ -->
+<div class="modal-overlay hidden" id="detModal">
+  <div class="modal" style="max-width:620px;">
+    <div class="modal-header">
+      <span class="modal-title" id="dTitle">Order</span>
+      <button class="modal-close" onclick="closeModal('detModal')">✕</button>
+    </div>
+    <div class="modal-body" id="dBody"></div>
+    <div class="modal-footer" id="dFoot" style="flex-wrap:wrap;gap:.5rem;"></div>
+  </div>
+</div>
+
+<!-- ============ RESEND ============ -->
+<div class="modal-overlay hidden" id="resendModal">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <span class="modal-title">Email the tickets again</span>
+      <button class="modal-close" onclick="closeModal('resendModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="rErr" class="form-error-box hidden"></div>
+      <div class="form-group">
+        <label class="form-label">Send to</label>
+        <input class="form-input" type="email" id="rTo">
+        <span class="form-hint">Change this if the first address was wrong — the order is updated to match.</span>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Purchaser</label><input class="form-input" id="rName" maxlength="120"></div>
+        <div class="form-group"><label class="form-label">Performer</label><input class="form-input" id="rPerf" maxlength="120"></div>
+      </div>
+      <span class="form-hint">Correcting a name rebuilds the tickets with the new name. Tickets already sent keep their numbers (they are not cancelled).</span>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('resendModal')">Cancel</button>
+      <button class="btn btn-primary" id="rSend" onclick="doResend()">Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ REFUND ============ -->
+<div class="modal-overlay hidden" id="refundModal">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-header">
+      <span class="modal-title">Mark order as refunded</span>
+      <button class="modal-close" onclick="closeModal('refundModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="warn-box"><b>Refund the money in MYeWAY first.</b> This button does not move any money — it only cancels the tickets in the Portal so they can't be used at the door. It can't be undone.</div>
+      <div class="form-group">
+        <label class="form-label">Note <span class="text-muted" style="font-weight:400;">(optional)</span></label>
+        <input class="form-input" id="fnNote" maxlength="400" placeholder="e.g. Parent couldn't attend — refunded 12 Dec">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('refundModal')">Cancel</button>
+      <button class="btn btn-danger" id="fnGo" onclick="doRefund()">Mark refunded &amp; void tickets</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/events-common.js"></script>
+<script>
+const PF = window.PFEvents;
+const TZ = 'Australia/Melbourne';
+let me = null;
+let events = [];
+let ev = null;                  // the selected event row
+let orders = [];
+let tickets = [];
+let tab = 'orders';
+let openOrderId = null;
+let resendId = null, refundId = null;
+let history_ = [];
+let stopPoll = null;
+let lastCi = null;              // last check-in lookup { text, data }
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money = c => '$' + (c / 100).toFixed(2);
+const validEmail = a => { const s = String(a ?? '').trim(); return !!s && s.length <= 254 && !/\s/.test(s) && /^[^@]+@[^@.]+(\.[^@.]+)+$/.test(s); };
+const when = ts => ts ? new Date(ts).toLocaleString('en-AU', { timeZone: TZ, day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '';
+const clock = ts => ts ? new Date(ts).toLocaleTimeString('en-AU', { timeZone: TZ, hour: 'numeric', minute: '2-digit' }) : '';
+const closeModal = id => $(id).classList.add('hidden');
+const openModal  = id => $(id).classList.remove('hidden');
+function toggleSidebar() { $('sidebar').classList.toggle('open'); }
+function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } }
+
+(async () => {
+  // A scanned ticket QR code lands here. Signed out? Go through the login
+  // page and come straight back to this ticket.
+  if (!(await getSession())) {
+    const t = new URLSearchParams(location.search).get('ticket') || '';
+    location.href = 'login.html' + (/^TK-[2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}$/i.test(t)
+      ? '?next=' + encodeURIComponent('ticket-sales.html?ticket=' + t) : '');
+    return;
+  }
+  me = await requireAuth(['superuser', 'admin']);
+  if (!me) return;
+  renderTopNavUser(me);
+  renderSidebar();
+  if (window.innerWidth < 900) $('menuToggle').style.display = '';
+  $('ciAuto').checked = store('pf_ci_auto') === '1';
+  $('ciAuto').addEventListener('change', () => store('pf_ci_auto', $('ciAuto').checked ? '1' : '0'));
+
+  const { data, error } = await db.from('events')
+    .select('id,name,event_date,start_time,studio_id,tickets_enabled,ticket_price_cents,status')
+    .order('event_date', { ascending: false });
+  if (error) {
+    showSetup(/ticket|column/i.test(error.message)
+      ? 'The ticket-sales database script has not been run yet (ticket-sales.sql).'
+      : 'Could not load events: ' + esc(error.message));
+    return;
+  }
+  events = data ?? [];
+  if (!events.length) { showSetup('There are no events yet. Create the concert under Events first.'); return; }
+  $('evSel').innerHTML = events.map(e => `<option value="${e.id}">${esc(e.name)} — ${PF.fmtDate(e.event_date, true)}${e.tickets_enabled ? '' : ' (online sales off)'}</option>`).join('');
+
+  const qs = new URLSearchParams(location.search);
+  // a ticket link names no event: open the nearest upcoming one that sells tickets
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: TZ });
+  const wanted = qs.get('event');
+  const def = events.find(e => e.id === wanted)
+    || events.filter(e => e.tickets_enabled && e.event_date >= today).sort((a, b) => a.event_date.localeCompare(b.event_date))[0]
+    || events.find(e => e.tickets_enabled) || events[0];
+  $('evSel').value = def.id;
+  await pickEvent(def.id, true);
+
+  const t = qs.get('ticket');
+  if (t) { setTab('door'); $('ciInput').value = t; await ciGo(); }
+  window.addEventListener('keydown', e => { if (tab === 'door' && document.activeElement === document.body && e.key.length === 1) $('ciInput').focus(); });
+})();
+
+function showSetup(html) {
+  $('setupBox').innerHTML = html; $('setupBox').classList.remove('hidden');
+  $('pageSub').textContent = '';
+  $('evBar').classList.add('hidden');
+}
+
+async function pickEvent(id, first) {
+  ev = events.find(e => e.id === id);
+  if (!ev) return;
+  $('pageSub').textContent = `${ev.name} · ${PF.fmtDate(ev.event_date)}`;
+  $('evLink').href = `events.html?event=${ev.id}`;
+  history.replaceState({}, '', `ticket-sales.html?event=${ev.id}`);
+  $('main').classList.remove('hidden');
+  $('oBody').innerHTML = '<tr><td colspan="8"><div class="loading"><div class="spinner"></div> Loading…</div></td></tr>';
+  if (stopPoll) stopPoll();
+  await load();
+  stopPoll = PF.poll(load, 30000);
+}
+
+async function load() {
+  if (!ev) return;
+  const [o, t] = await Promise.all([
+    db.from('ticket_orders').select('*').eq('event_id', ev.id).order('created_at', { ascending: false }).limit(2000),
+    db.from('tickets').select('*').eq('event_id', ev.id).order('seq').limit(5000),
+  ]);
+  if (o.error || t.error) {
+    const m = (o.error ?? t.error).message;
+    showSetup(/relation|does not exist|schema cache/i.test(m)
+      ? 'The ticket-sales database script has not been run yet (ticket-sales.sql).' : 'Could not load ticket sales: ' + esc(m));
+    $('main').classList.add('hidden');
+    return;
+  }
+  orders = o.data ?? []; tickets = t.data ?? [];
+  render();
+}
+
+function ticketsOf(orderId) { return tickets.filter(t => t.order_id === orderId); }
+
+function render() {
+  renderBar(); renderStats(); renderOrders(); renderPerf();
+  if (openOrderId && !$('detModal').classList.contains('hidden')) renderDetail();
+}
+
+function renderBar() {
+  $('salesBar').innerHTML = ev.tickets_enabled
+    ? `🟢 Online sales are <b>on</b> at <b>${money(ev.ticket_price_cents)}</b> per ticket. The public page is <a href="../tickets.html" target="_blank" rel="noopener" style="color:var(--orange)">pathfindermusiclessons.com.au/tickets</a>. Change the price or switch sales off under <a href="events.html?event=${ev.id}" style="color:var(--orange)">Events → Edit</a>.`
+    : `⚪ Online sales are <b>off</b> for this event. Switch them on under <a href="events.html?event=${ev.id}" style="color:var(--orange)">Events → Edit → Sell tickets online</a>.`;
+}
+
+function renderStats() {
+  const paid = orders.filter(o => o.status === 'paid');
+  const sold = paid.reduce((n, o) => n + o.quantity, 0);
+  const revenue = paid.reduce((n, o) => n + o.total_cents, 0);
+  const admitted = tickets.filter(t => t.status === 'used').length;
+  const attention = orders.filter(needsAttention).length;
+  const card = (icon, label, value, sub) => `<div class="stat-card"><div class="stat-card-top"><span class="stat-label">${label}</span><span class="stat-icon">${icon}</span></div><div class="stat-value">${value}</div><div class="stat-sub">${sub}</div></div>`;
+  $('stats').innerHTML =
+    card('🎟️', 'Tickets sold', sold, `${paid.length} order${paid.length === 1 ? '' : 's'}`) +
+    card('💵', 'Takings', money(revenue), 'paid orders, before any card fees') +
+    card('🚪', 'Admitted', `${admitted}<span style="font-size:1rem;font-weight:600;color:var(--mid-grey)"> / ${sold}</span>`, sold ? `${sold - admitted} still to arrive` : '—') +
+    card('⚠️', 'Needs attention', attention, attention ? 'unconfirmed, failed or not emailed' : 'all good');
+}
+
+function needsAttention(o) {
+  if (o.status === 'paid') return !o.emailed_at;
+  if (o.status === 'pending') return Date.now() - Date.parse(o.created_at) > 10 * 60000;   // pending for >10 min
+  return o.status === 'failed';
+}
+
+const STATUS = { paid: 'Paid', pending: 'Awaiting payment', failed: 'Failed', abandoned: 'Abandoned', refunded: 'Refunded' };
+
+function renderOrders() {
+  const q = $('filterText').value.trim().toLowerCase();
+  const f = $('filterStatus').value;
+  const byOrderTickets = {};
+  tickets.forEach(t => { (byOrderTickets[t.order_id] ??= []).push(t); });
+  const rows = orders.filter(o => {
+    if (f === 'paid' && o.status !== 'paid') return false;
+    if (f === 'refunded' && o.status !== 'refunded') return false;
+    if (f === 'attention' && !needsAttention(o)) return false;
+    if (!q) return true;
+    const hay = [o.order_no, o.purchaser_name, o.purchaser_email, o.performer_name, ...(byOrderTickets[o.id] ?? []).map(t => t.ticket_no)].join(' ').toLowerCase();
+    return hay.includes(q);
+  });
+  $('oBody').innerHTML = rows.length ? rows.map(o => {
+    const ts = byOrderTickets[o.id] ?? [];
+    const used = ts.filter(t => t.status === 'used').length;
+    return `<tr class="click" onclick="openOrder('${o.id}')">
+      <td><span class="t-no">${esc(o.order_no)}</span></td>
+      <td><div class="t-name">${esc(o.purchaser_name)}</div><div class="t-sub">${esc(o.purchaser_email)}</div></td>
+      <td>${esc(o.performer_name)}</td>
+      <td class="t-num">${o.quantity}</td>
+      <td class="t-num">${money(o.total_cents)}</td>
+      <td><span class="tpill ${o.status}">${STATUS[o.status]}</span>${o.status === 'paid' && !o.emailed_at ? ' <span class="tpill unsent">not emailed</span>' : ''}</td>
+      <td class="t-hide-sm"><div>${when(o.paid_at ?? o.created_at)}</div></td>
+      <td class="t-hide-sm">${o.status === 'paid' ? `${used} / ${o.quantity}` : '—'}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">🎟️</div><h3>${orders.length ? 'No orders match' : 'No orders yet'}</h3><p>${orders.length ? 'Try a different filter.' : 'Orders appear here as soon as someone starts buying tickets.'}</p></div></td></tr>`;
+}
+
+function renderPerf() {
+  const m = new Map();
+  orders.filter(o => o.status === 'paid').forEach(o => {
+    const key = o.performer_name.toLowerCase().replace(/\s+/g, ' ').trim();
+    const r = m.get(key) ?? { name: o.performer_name, orders: 0, sold: 0, used: 0 };
+    r.orders++; r.sold += o.quantity;
+    r.used += ticketsOf(o.id).filter(t => t.status === 'used').length;
+    m.set(key, r);
+  });
+  const rows = [...m.values()].sort((a, b) => b.sold - a.sold || a.name.localeCompare(b.name));
+  $('pBody').innerHTML = rows.length
+    ? rows.map(r => `<tr><td class="t-name">${esc(r.name)}</td><td class="t-num">${r.orders}</td><td class="t-num">${r.sold}</td><td class="t-num">${r.used}</td></tr>`).join('')
+    : '<tr><td colspan="4"><div class="empty-state"><p>No paid orders yet.</p></div></td></tr>';
+}
+
+function setTab(t) {
+  tab = t;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  ['orders', 'door', 'perf'].forEach(x => $('tab-' + x).classList.toggle('hidden', x !== t));
+  if (t === 'door') setTimeout(() => $('ciInput').focus(), 50);
+}
+
+// ============================================================
+// ORDER DETAIL + ACTIONS
+// ============================================================
+function openOrder(id) { openOrderId = id; renderDetail(); openModal('detModal'); }
+
+function renderDetail() {
+  const o = orders.find(x => x.id === openOrderId);
+  if (!o) { closeModal('detModal'); return; }
+  const ts = ticketsOf(o.id);
+  $('dTitle').textContent = `Order ${o.order_no}`;
+  $('dBody').innerHTML = `
+    <dl class="kv">
+      <dt>Status</dt><dd><span class="tpill ${o.status}">${STATUS[o.status]}</span>${o.status_note ? `<div class="t-sub" style="margin-top:.25rem">${esc(o.status_note)}</div>` : ''}</dd>
+      <dt>Purchaser</dt><dd>${esc(o.purchaser_name)}<div class="t-sub"><a href="mailto:${esc(o.purchaser_email)}" style="color:inherit">${esc(o.purchaser_email)}</a></div></dd>
+      <dt>Performer</dt><dd><b>${esc(o.performer_name)}</b></dd>
+      <dt>Tickets</dt><dd>${o.quantity} × ${money(o.unit_price_cents)} = <b>${money(o.total_cents)}</b></dd>
+      <dt>Started</dt><dd>${when(o.created_at)}</dd>
+      ${o.paid_at ? `<dt>Paid</dt><dd>${when(o.paid_at)}</dd>` : ''}
+      ${o.eway_transaction_id ? `<dt>eWAY transaction</dt><dd class="t-no">${esc(o.eway_transaction_id)}</dd>` : ''}
+      ${o.status === 'failed' || o.status === 'pending' ? `<dt>eWAY says</dt><dd>${esc([o.eway_response_code, o.eway_message].filter(Boolean).join(' — ') || 'No payment attempt recorded.')}</dd>` : ''}
+      ${o.status === 'paid' ? `<dt>Email</dt><dd>${o.emailed_at ? `Sent to ${esc(o.emailed_to)} · ${when(o.emailed_at)}${o.send_count > 1 ? ` · sent ${o.send_count} times` : ''}` : `<span class="tpill unsent">not emailed yet</span>`}${o.email_error ? `<div class="t-sub" style="color:#b91c1c">${esc(o.email_error)}</div>` : ''}</dd>` : ''}
+    </dl>
+    ${ts.length ? `<div class="tk-list">${ts.map(t => `
+      <div class="tk-row"><span><span class="t-no">${esc(t.ticket_no)}</span> <span class="t-sub">· ticket ${t.seq} of ${o.quantity}</span></span>
+        <span><span class="tpill ${t.status}">${t.status === 'used' ? 'Admitted ' + clock(t.used_at) : t.status === 'void' ? 'Void' : 'Not yet used'}</span>
+        ${t.status !== 'void' ? ` <a href="#" onclick="event.preventDefault();toDoor('${t.ticket_no}')">Check in →</a>` : ''}</span></div>`).join('')}</div>` : ''}`;
+  const b = [];
+  if (o.status === 'paid') {
+    b.push(`<button class="btn btn-primary btn-sm" onclick="openResend('${o.id}')">✉️ ${o.emailed_at ? 'Email again' : 'Email tickets'}…</button>`);
+    b.push(`<button class="btn btn-danger btn-sm" onclick="openRefund('${o.id}')">Mark refunded…</button>`);
+  } else if (o.status !== 'refunded') {
+    b.push(`<button class="btn btn-primary btn-sm" id="chkBtn" onclick="checkPayment('${o.id}')">🔄 Check payment with eWAY</button>`);
+  }
+  b.push(`<button class="btn btn-secondary btn-sm" onclick="closeModal('detModal')">Close</button>`);
+  $('dFoot').innerHTML = b.join('');
+}
+
+function toDoor(no) { closeModal('detModal'); setTab('door'); $('ciInput').value = no; ciGo(); }
+
+async function authHeaders() {
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) throw new Error('Your session has expired — please sign in again.');
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` };
+}
+async function callAdmin(payload) {
+  const res = await fetch('/.netlify/functions/ticket-admin', { method: 'POST', headers: await authHeaders(), body: JSON.stringify(payload) });
+  let j = {}; try { j = await res.json(); } catch (_) {}
+  if (!res.ok) throw new Error(j.error || `The server answered ${res.status}.`);
+  return j;
+}
+
+async function checkPayment(id) {
+  const btn = $('chkBtn'); if (btn) { btn.disabled = true; btn.textContent = 'Asking eWAY…'; }
+  try {
+    const j = await callAdmin({ action: 'check', orderId: id });
+    showToast(j.message, j.state === 'paid' ? 'success' : 'warning');
+    await load();
+  } catch (e) { showToast(e.message, 'error'); await load(); }
+}
+
+function openResend(id) {
+  const o = orders.find(x => x.id === id); if (!o) return;
+  resendId = id;
+  $('rTo').value = o.purchaser_email; $('rName').value = o.purchaser_name; $('rPerf').value = o.performer_name;
+  $('rErr').classList.add('hidden');
+  openModal('resendModal');
+}
+async function doResend() {
+  const o = orders.find(x => x.id === resendId); if (!o) return;
+  const to = $('rTo').value.trim(), name = $('rName').value.trim(), perf = $('rPerf').value.trim();
+  const err = m => { $('rErr').textContent = m; $('rErr').classList.remove('hidden'); };
+  if (!validEmail(to)) return err('Please enter a valid email address.');
+  if (!name || !perf) return err('Both names are needed.');
+  const btn = $('rSend'); btn.disabled = true; btn.textContent = 'Sending…';
+  try {
+    const j = await callAdmin({ action: 'resend', orderId: o.id, to, purchaserName: name, performerName: perf });
+    closeModal('resendModal');
+    showToast(`Tickets emailed to ${j.to}.`, 'success');
+    await load();
+  } catch (e) { err(e.message); }
+  btn.disabled = false; btn.textContent = 'Send';
+}
+
+function openRefund(id) { refundId = id; $('fnNote').value = ''; openModal('refundModal'); }
+async function doRefund() {
+  const btn = $('fnGo'); btn.disabled = true;
+  try {
+    await callAdmin({ action: 'refund', orderId: refundId, note: $('fnNote').value });
+    closeModal('refundModal');
+    showToast('Order marked as refunded; its tickets are void.', 'success');
+    await load();
+  } catch (e) { showToast(e.message, 'error'); }
+  btn.disabled = false;
+}
+
+// ============================================================
+// DOOR CHECK-IN
+// ============================================================
+async function rpcCheckIn(text, action) {
+  const { data, error } = await db.rpc('ticket_check_in', { p_ticket: text, p_action: action });
+  if (error) throw error;
+  return data;
+}
+
+async function ciGo() {
+  const text = $('ciInput').value.trim();
+  if (!text) return;
+  const box = $('ciResult');
+  box.innerHTML = '<div class="loading" style="padding:1rem"><div class="spinner"></div> Looking up…</div>';
+  try {
+    let d = await rpcCheckIn(text, 'lookup');
+    const wrongEvent = d.event && ev && d.event.id !== ev.id;
+    let admitted = false;
+    if ($('ciAuto').checked && d.result === 'lookup' && d.ticket?.status === 'valid' && !wrongEvent) {
+      d = await rpcCheckIn(text, 'use');
+      admitted = true;
+    }
+    lastCi = { text, data: d };
+    showCi(d, { wrongEvent, admitted });
+    if (d.result === 'ok') addHist(d);
+    if (d.result !== 'not_found') load();
+  } catch (e) {
+    box.innerHTML = `<div class="ci-result ci-bad"><div class="ci-banner">Error<small>${esc(e.message)}</small></div></div>`;
+  }
+  $('ciInput').select();
+}
+
+function showCi(d, { wrongEvent, admitted } = {}) {
+  const box = $('ciResult');
+  const o = d.order, t = d.ticket;
+  let cls = 'ci-grey', head = '', sub = '', actions = '';
+  switch (d.result) {
+    case 'not_found':   cls = 'ci-bad';  head = 'Ticket not found'; sub = 'Check the number and try again.'; break;
+    case 'not_allowed': cls = 'ci-bad';  head = 'Not allowed'; sub = 'This ticket is for an event you can’t manage.'; break;
+    case 'bad_action':  cls = 'ci-bad';  head = 'Error'; break;
+    case 'void':        cls = 'ci-bad';  head = 'VOID — do not admit'; sub = 'The order for this ticket was refunded.'; break;
+    case 'already_used':cls = 'ci-bad';  head = 'ALREADY USED'; sub = `Admitted at ${clock(t.used_at)} (${when(t.used_at)})`; break;
+    case 'ok':          cls = 'ci-ok';   head = '✓ ADMITTED'; sub = `Ticket ${t.seq} of ${o.quantity} · ${d.seats_used} of ${o.quantity} in this order now admitted`;
+      actions = `<button class="btn btn-secondary" onclick="ciUndo()">Undo</button>`; break;
+    case 'undone':      cls = 'ci-grey'; head = 'Admission undone'; sub = 'The ticket is valid again.'; break;
+    default:            // lookup
+      if (t.status === 'used') { cls = 'ci-warn'; head = 'Already admitted'; sub = `Used at ${clock(t.used_at)} (${when(t.used_at)})`; actions = `<button class="btn btn-secondary" onclick="ciUndo()">Undo admission</button>`; }
+      else { cls = 'ci-ready'; head = 'VALID TICKET'; sub = `Ticket ${t.seq} of ${o.quantity} · ${d.seats_used} of ${o.quantity} admitted so far`;
+        actions = `<button class="btn btn-primary ci-big" onclick="ciAdmit()">Admit</button>`; }
+  }
+  if (wrongEvent && (d.result === 'lookup' || d.result === 'ok')) {
+    cls = 'ci-warn'; head = '⚠ DIFFERENT EVENT'; sub = `This ticket is for “${d.event.name}”, not “${ev.name}”.` + (admitted ? ' (not admitted)' : '');
+    actions = `<button class="btn btn-secondary" onclick="ciSwitchEvent('${d.event.id}')">Switch to that event</button>`;
+  }
+  const remaining = o && t && t.status === 'valid' ? ticketsOf(orderIdByNo(o.order_no)).filter(x => x.status === 'valid' && x.ticket_no !== t.ticket_no).length : 0;
+  if (remaining > 0 && (d.result === 'lookup' || d.result === 'ok') && !wrongEvent) {
+    actions += ` <button class="btn btn-secondary" onclick="ciAdmitParty()">Admit the other ${remaining} in this order too</button>`;
+  }
+  box.innerHTML = `<div class="ci-result ${cls}">
+      <div class="ci-banner">${head}${sub ? `<small>${esc(sub)}</small>` : ''}</div>
+      ${o ? `<div class="ci-detail">
+        <div class="t-sub">Performer</div><div class="perf">${esc(o.performer_name)}</div>
+        <div style="margin-top:.5rem">${esc(o.purchaser_name)} · <span class="t-no">${esc(t.ticket_no)}</span> · order <span class="t-no">${esc(o.order_no)}</span></div>
+      </div>` : ''}
+      ${actions ? `<div class="ci-actions">${actions}</div>` : ''}
+    </div>`;
+}
+
+function orderIdByNo(no) { return orders.find(o => o.order_no === no)?.id; }
+
+async function ciAdmit() {
+  if (!lastCi) return;
+  try {
+    const d = await rpcCheckIn(lastCi.data.ticket.ticket_no, 'use');
+    lastCi = { text: lastCi.text, data: d };
+    showCi(d); if (d.result === 'ok') addHist(d);
+    load();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+async function ciUndo() {
+  if (!lastCi) return;
+  try {
+    const d = await rpcCheckIn(lastCi.data.ticket.ticket_no, 'undo');
+    lastCi = { text: lastCi.text, data: d };
+    showCi(d); load();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+async function ciAdmitParty() {
+  if (!lastCi) return;
+  const oid = orderIdByNo(lastCi.data.order.order_no);
+  const fresh = await db.from('tickets').select('ticket_no,status').eq('order_id', oid).eq('status', 'valid');
+  let n = 0;
+  for (const t of fresh.data ?? []) {
+    try { const d = await rpcCheckIn(t.ticket_no, 'use'); if (d.result === 'ok') { n++; lastCi = { text: t.ticket_no, data: d }; addHist(d); } } catch (_) {}
+  }
+  await load();
+  if (lastCi) showCi(lastCi.data);
+  showToast(`${n} ticket${n === 1 ? '' : 's'} admitted.`, 'success');
+}
+function ciSwitchEvent(id) { $('evSel').value = id; pickEvent(id).then(() => ciGo()); }
+
+function addHist(d) {
+  history_.unshift({ at: new Date().toISOString(), no: d.ticket.ticket_no, perf: d.order.performer_name, who: d.order.purchaser_name });
+  history_ = history_.slice(0, 10);
+  const h = $('ciHist');
+  h.classList.remove('hidden');
+  h.innerHTML = '<h4>Admitted in this session</h4>' + history_.map(x => `<div><span>${esc(x.perf)} <span class="t-sub">· ${esc(x.who)}</span></span><span class="t-no">${clock(x.at)} · ${esc(x.no)}</span></div>`).join('');
+}
+
+// ============================================================
+// CSV
+// ============================================================
+function exportCsv() {
+  const cell = v => {
+    let s = String(v ?? '');
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;        // stop spreadsheets running formulas
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const head = ['Order', 'Status', 'Started', 'Paid', 'Purchaser', 'Email', 'Performer', 'Tickets', 'Total', 'Admitted', 'Ticket numbers'];
+  const rows = orders.map(o => {
+    const ts = ticketsOf(o.id);
+    return [o.order_no, STATUS[o.status], when(o.created_at), when(o.paid_at), o.purchaser_name, o.purchaser_email, o.performer_name,
+            o.quantity, (o.total_cents / 100).toFixed(2), ts.filter(t => t.status === 'used').length, ts.map(t => t.ticket_no).join(' ')];
+  });
+  const csv = [head, ...rows].map(r => r.map(cell).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = `ticket-orders-${ev.event_date}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+// ============================================================
+// SIDEBAR (same as Events, with Events highlighted)
+// ============================================================
+function renderSidebar() {
+  const item = (href, label, path, active) => `
+    <a class="nav-item ${active ? 'active' : ''}" href="${href}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${path}</svg>
+      ${label}
+    </a>`;
+  const I = {
+    people:  '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>',
+    person:  '<circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/>',
+    cal:     '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+    mail:    '<path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/>',
+    clipboard: '<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/>',
+    check:   '<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+    task:    '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+    inbox:   '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+    home:    '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    shield:  '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+    book:    '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
+    list:    '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
+    help:    '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+    ticket:  '<path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/>',
+    award:   '<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>',
+    star:    '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+    gift:  '<polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>',
+  };
+  let html = `<div class="sidebar-section">Front desk</div>
+      ${item('tasks.html','Tasks',I.task)}
+      ${item('enquiries.html','Enquiries',I.inbox)}
+      ${item('notifications.html','Notifications',I.mail)}
+      ${item('day-sheet.html','Day Sheet',I.clipboard)}
+      ${item('events.html','Events',I.star,true)}
+      ${item('vouchers.html','Vouchers',I.gift)}
+      <div class="sidebar-section">Teaching</div>
+      ${item('lessons.html','Lessons',I.cal)}
+      ${item('students.html','Students',I.people)}
+      ${item('teachers.html','Teachers',I.person)}
+      <div class="sidebar-section">Curriculum</div>
+      ${item('bok-artefacts.html','Artefact Library',I.book)}
+      <div class="sidebar-section">Reports</div>
+      ${item('attendance-report.html','Attendance',I.check)}
+      ${item('grading-report.html','Grading',I.award)}
+      ${item('credits.html','Credits',I.ticket)}
+      ${item('distribution-lists.html','Distribution Lists',I.list)}`;
+  if (me.role === 'superuser') {
+    html += `<div class="sidebar-section">Super User</div>
+      ${item('studios.html','Studios',I.home)}
+      ${item('admins.html','Admins',I.shield)}
+      ${item('teacher-utilisation.html','Teachers utilisation','<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>')}`;
+  }
+  html += `<div class="sidebar-section">Manuals</div>
+      ${item('manuals/index.html','How-To Guide',I.help)}`;
+  $('sidebar').innerHTML = html;
+}
+</script>
+</body>
+</html>

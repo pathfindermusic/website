@@ -198,16 +198,22 @@
 
   // A link in an email (e.g. an event booking link) sends people here
   // with ?next=event-book.html?event=... — honour it for that one page
-  // only, so this can never become an open redirect.
+  // only, so this can never become an open redirect. The same goes for a
+  // scanned concert-ticket QR code: ?next=ticket-sales.html?ticket=TK-XXXX-XXXX
+  // (door staff only).
+  const TICKET_NEXT = /^ticket-sales\.html\?ticket=TK-[2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}$/i;
   function safeNext() {
     const n = new URLSearchParams(window.location.search).get('next') || '';
+    if (TICKET_NEXT.test(n)) return n;
     return /^event-book\.html(\?event=[0-9a-f-]{36})?$/i.test(n) ? n : null;
   }
 
   function redirectByRole(role) {
     const next = safeNext();
-    if (next && role === 'student') { window.location.href = next; return; }
-    if (next && role !== 'student') {
+    if (next && TICKET_NEXT.test(next)) {
+      if (role === 'admin' || role === 'superuser') { window.location.href = next; return; }
+    } else if (next && role === 'student') { window.location.href = next; return; }
+    else if (next) {
       // staff following a student booking link get the staff view of the same event
       window.location.href = next.replace('event-book.html', 'events.html'); return;
     }

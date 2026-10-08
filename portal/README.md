@@ -2192,6 +2192,113 @@ tables as the signed-in superuser: `teacher_availability`, `schedule_view` and
   display, CSV file name, non-superuser). **Not yet tested live** against the
   real data.
 
+## Concert ticket sales (Oct 2026, migration #46) — verified server-side, not a pay button
+
+Replaces the six fixed-amount eWAY "Pay Now" buttons on `/tickets`. A visitor
+gives their name, email, **performer** (free text) and a **quantity**; the server
+works out the total from the event's price, asks eWAY for a hosted payment page for
+exactly that amount, and — when eWAY sends the visitor back — **asks eWAY whether it
+was approved** before issuing anything. Tickets are PDFs (one page per seat, unique
+`TK-XXXX-XXXX` number, QR code, performer's name) attached to the email.
+
+**Why not the old Pay Now button?** `eCrypt.js` buttons run in the browser: the amount
+is editable (`data-allowedit`), and nothing on our side learns whether a payment
+succeeded — the emailed receipt was the "ticket". The new flow uses eWAY's **Rapid API
+Responsive Shared Page** with our secret key on the server.
+
+**Pieces**
+
+| What | Where |
+| --- | --- |
+| Database | `supabase/ticket-sales.sql` — `events.tickets_enabled / ticket_price_cents / ticket_info`, `ticket_orders`, `tickets`, guard triggers, admin-read RLS, `ticket_issue_order()` (service role only), `ticket_check_in()` (admins) |
+| Public pages | `/tickets.html` (form), `/ticket-result.html` (where eWAY returns the buyer). The old `thank-you-ticket-purchase.html` is kept for old receipts |
+| Functions | `ticket-event` (public read), `ticket-checkout` (creates order + eWAY page), `ticket-confirm` (verify + issue + email), `ticket-admin` (resend / check / refund; admin bearer token), `reconcile-ticket-orders` (scheduled every 10 min) |
+| Shared code | `netlify/functions/lib/tickets.js` (eWAY client, `settleOrder`, PDF with `pdf-lib` + `qrcode`, email shell). `lib/` has no `index.js`/`lib.js`, so Netlify bundles it but doesn't deploy it as a function |
+| Dependencies | repo-root `package.json` (`pdf-lib`, `qrcode`) — Netlify installs these at build; the rest of the site still needs no build |
+| Admin UI | `portal/ticket-sales.html` (orders, door check-in, by performer, CSV); `events.html` edit form has **Sell tickets online** + price + note |
+
+**Flow and why it is safe**
+
+1. `ticket-checkout` validates, rate-limits (8 orders / 10 min per network address,
+   hashed), ignores the hidden `website` honeypot, inserts the order `pending` with
+   `total = quantity × event price`, calls eWAY `POST /AccessCodesShared` with
+   `TotalAmount`, `InvoiceReference = order_no`, `RedirectUrl = /ticket-result.html`,
+   and stores the returned `AccessCode`.
+2. eWAY redirects to `ticket-result.html?AccessCode=…` (no other query string, so
+   the append is unambiguous). The page posts the code to `ticket-confirm`, which
+   finds the order **by access code** and calls eWAY `GET /AccessCode/{code}`.
+3. `settleOrder()` issues tickets only if `TransactionStatus === true`, the response
+   code is approved (`00/08/11/16`; `10` partial approval is refused), the
+   **amount equals the order total** and the invoice reference matches. A mismatch
+   marks the order `failed` with a note and issues nothing.
+4. `ticket_issue_order()` flips `pending|failed|abandoned → paid` and inserts the
+   tickets in **one statement**; of any number of concurrent callers (return page
+   refresh, scheduled job, admin button) exactly one gets `true`, and only that caller
+   sends the email. Resend also gets an `Idempotency-Key`.
+5. A declined payment becomes `failed`; "Try again" on the result page calls
+   `ticket-checkout` with `retryAccessCode`, which creates a **new order** (so every
+   eWAY access code maps to exactly one order).
+6. `reconcile-ticket-orders` covers buyers who never come back: it settles `pending`
+   orders older than 5 minutes (issuing + emailing if eWAY says paid), marks orders
+   with no attempt after 3 hours `abandoned`, and re-sends any `paid` order whose
+   email never went out.
+
+**Door check-in.** The QR code encodes
+`{SITE_URL}/portal/ticket-sales.html?ticket=TK-…`. A phone camera opens it; if signed
+out, `ticket-sales.html` sends the user through `login.html?next=ticket-sales.html?ticket=…`
+(`safeNext()` allows exactly that shape, **for admins/superusers only**). `ticket_check_in()`
+(`lookup` / `use` / `undo`) accepts a bare number or a whole pasted URL, admits with an
+atomic `UPDATE … WHERE status='valid'`, and refuses tickets of events the caller can't manage.
+
+**Environment variables (Netlify → Site settings → Environment)**
+
+| Variable | Value |
+| --- | --- |
+| `EWAY_API_KEY`, `EWAY_API_PASSWORD` | MYeWAY → My Account → **API Key** (a *Rapid API* key + password — not the Pay Now public key `epk-…`, which stays in the old pages only) |
+| `EWAY_ENDPOINT` | `sandbox` while testing, then `production`. Required — there is deliberately no default. In sandbox the ticket page shows a "Test mode" banner |
+| `SITE_URL` | optional; default `https://www.pathfindermusiclessons.com.au` (used for eWAY return links and QR codes — set it to a deploy-preview URL when testing there) |
+| `TICKETS_FROM_EMAIL` | optional; default `admin@pathfindermusiclessons.com.au` (must be on the domain verified in Resend) |
+| `TICKETS_BCC` | optional; comma-separated addresses copied on every ticket email (default: nobody) |
+
+`SUPABASE_URL`, `SUPABASE_SERVICE_KEY` and `RESEND_API_KEY` are the existing ones.
+
+**Go-live checklist**
+
+1. Run `ticket-sales.sql` statement by statement **before** pushing.
+2. Create the Rapid API key in MYeWAY **sandbox**, add the env vars with
+   `EWAY_ENDPOINT=sandbox`, deploy, and buy a ticket with an eWAY test card
+   (e.g. `4444333322221111`, any future expiry, CVN 123). Confirm: payment page
+   opens with the right amount, you land on the thank-you page, the PDF arrives,
+   QR opens the check-in page, a second scan says **already used**.
+3. **Unverified against live eWAY** (the endpoints were written from the Rapid API
+   docs; everything below is the first thing to check in the sandbox): the path
+   `/AccessCodesShared` and field `SharedPaymentUrl`; the result path
+   `GET /AccessCode/{code}` (with `POST /GetAccessCodeResult` as an automatic
+   fallback on 404/405); the shape of `TransactionStatus`/`ResponseCode`/`TotalAmount`
+   in that response; that `Customer.Country` is accepted. Failures show up in the
+   Netlify function log (`ticket-checkout: eWAY …`, `ticket-confirm: settle …`).
+4. Switch to `EWAY_ENDPOINT=production` with the live key, make one real $15
+   purchase, then **mark it refunded** in MYeWAY and on the Ticket sales page.
+5. Tick **Sell tickets online** on the concert (Events → Edit), then update the
+   link/QR you publish to point at `/tickets`.
+
+**Known limits.** No seat cap (not asked for). The PDF uses the standard Helvetica
+font, so characters outside Western European alphabets print as `?` on the PDF only
+(the email and admin pages show the full name); embedding a Unicode font would fix it.
+Quantity is capped at 10 per order (`MAX_PER_ORDER` in `lib/tickets.js`; the table
+allows 20). "Mark refunded" does not call eWAY — refund in MYeWAY first. Phone
+payments are not captured by this flow. Events with orders can't be deleted
+(`ticket_orders.event_id` has no cascade).
+
+**Tests run.** SQL on a local Postgres 16 (constraints, issue idempotence, check-in
+paths, locking and refund trigger); 79 end-to-end function checks over a real Postgres
+with fake eWAY/Resend servers (validation, server-side price, honeypot, rate limit,
+concurrent confirm → one email, decline + retry, amount mismatch, eWAY outage,
+reconcile issue/abandon/re-email, admin resend/check/refund and studio scoping);
+34 jsdom checks for the two public pages; 39 for `ticket-sales.html`; 12 for the
+`events.html` additions; 10 for the login redirect; a bundling check with esbuild;
+PDFs rendered and inspected. **Not yet tested against real eWAY or Resend.**
+
 ## Traps that have already cost time
 
 - **Check which environment you're looking at.** Local dev runs against the same
@@ -2378,6 +2485,10 @@ Run in order. All are re-runnable.
     admin-only RLS, table privileges (see Gift vouchers section above). Run
     statement by statement **before** deploying `vouchers.html`,
     `js/voucher-pdf.js` and the `send-voucher` function
+46. `ticket-sales.sql` — `events.tickets_enabled/ticket_price_cents/ticket_info`,
+    `ticket_orders`, `tickets`, guard triggers, admin-read RLS, `ticket_issue_order()`,
+    `ticket_check_in()` (see Concert ticket sales section above). Run statement by
+    statement **before** deploying the ticket pages and functions
 
 *(Several migrations applied between 27 and 35 — schedule performance
 indexes, BoK grading, fortnightly lessons, recurring tasks, and others —

@@ -331,6 +331,65 @@ redeems a voucher, and check it here.
 </p>
 </div>
 
+<h3 id="ticket-sales">Concert Ticket Sales</h3>
+<p>
+Concert tickets are sold online on the public <strong>Tickets</strong> page of
+the website. A parent enters their name, email, the performer they are coming to
+see and how many tickets they want, pays on eWAY's secure page, and the Portal
+checks with eWAY that the payment really went through before it emails their
+tickets. Each ticket is a PDF page with the event, the performer's name, a
+unique ticket number and a QR code. You don't need to do anything for a normal
+sale.
+</p>
+<p><strong>Switch sales on.</strong> Open the concert under
+<strong>Events</strong>, press <strong>✏️ Edit</strong>, tick
+<strong>Sell tickets online</strong> and set the price (the usual $15.00). You can
+add a short note that appears on the ticket page and on every ticket (for
+example “Doors open 12:30 PM”). The event must be <em>Open</em> or
+<em>Closed</em>, not <em>Draft</em>. Tickets stop selling by themselves once the
+event date has passed; untick the box to stop sooner. Then press
+<strong>🎟️ Ticket sales</strong> on the event page.</p>
+<p><strong>Orders.</strong> The Ticket sales page shows tickets sold, takings, how
+many people have been admitted and anything that <em>needs attention</em>. Click
+an order to see its tickets and what happened to the payment.</p>
+<ul>
+<li><strong>Email tickets / Email again…</strong> sends the PDF again. Use it when
+the parent can't find the email — you can correct a mistyped email address or a
+misspelt name first; the tickets are rebuilt with the corrected names.</li>
+<li><strong>Check payment with eWAY</strong> (for orders still “Awaiting payment”
+or “Failed”) asks eWAY again. If the parent did pay but closed the page before
+being sent back, this issues and emails their tickets. The Portal also does this
+automatically every ten minutes.</li>
+<li><strong>Mark refunded…</strong> — refund the money in <strong>MYeWAY</strong>
+first, then press this so the tickets are cancelled and can't be used at the
+door. It doesn't move any money itself.</li>
+</ul>
+<p><strong>By performer</strong> shows how many tickets each student has sold, and
+<strong>Export CSV</strong> downloads all orders for a spreadsheet.</p>
+<p><strong>On the night — Door check-in.</strong> Open the
+<strong>Door check-in</strong> tab on a phone, tablet or laptop that is signed in
+to the Portal. Scan a ticket's QR code with the phone's camera (it opens the
+Portal and shows the ticket), or type or scan the ticket number into the box.
+The page shows the performer, the purchaser and a colour: <span style="color:#2563eb"><strong>blue</strong></span> = valid, press
+<strong>Admit</strong>; <span style="color:#dc2626"><strong>red</strong></span> = already used,
+void (refunded) or not found — don't admit. Tick <strong>Admit automatically</strong>
+for a busy door and valid tickets are admitted the moment they are scanned.
+A family arriving together can be admitted in one go with <strong>Admit the other
+… in this order too</strong>. <strong>Undo</strong> reverses a mistake.
+A ticket can be admitted only once, even if two devices scan it at the same
+moment.</p>
+<div class="callout callout-tip">
+<strong>Good to know</strong>
+<p>
+Tickets are only issued after eWAY confirms the payment, so a screenshot of a
+“thank you” page is not a ticket. Letters outside the usual Western alphabet
+(for example Chinese characters) are shown as “?” on the PDF itself; the email
+and this page show the name in full. Tickets can't be sold by phone through this
+page — if you take a phone payment, issue those tickets yourself as you did
+before.
+</p>
+</div>
+
 <h2 id="teaching">Teaching</h2>
 <p>
 Teaching covers the actual timetable: scheduling lessons, managing the

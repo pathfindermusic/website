@@ -1,0 +1,286 @@
+<!DOCTYPE html><html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Your Tickets | Pathfinder Music Lessons</title>
+<meta name="description" content="Payment result for your Pathfinder Music Lessons concert tickets.">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --orange: #E8491E; --orange-light: #FF6B45; --orange-dark: #C23A14;
+  --charcoal: #1C1C1E; --charcoal-mid: #2C2C2E; --charcoal-light: #3A3A3C;
+  --white: #FFFFFF; --off-white: #F7F7F7; --light-grey: #EBEBEB;
+  --mid-grey: #999999; --dark-grey: #555555;
+  --border-l: rgba(0,0,0,0.09); --border-d: rgba(255,255,255,0.1);
+  --shadow: 0 2px 16px rgba(0,0,0,0.07); --shadow-h: 0 6px 28px rgba(0,0,0,0.13);
+  --r: 8px; --r-sm: 5px;
+}
+html { scroll-behavior: smooth; }
+body { font-family: 'Inter', sans-serif; background: var(--white); color: var(--charcoal); line-height: 1.6; overflow-x: hidden; }
+/* NAV */
+nav { position: sticky; top: 0; z-index: 100; background: var(--charcoal); padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 66px; border-bottom: 3px solid var(--orange); }
+.logo-img { height: 34px; width: auto; display: block; }
+.nav-links { display: flex; align-items: center; gap: 1.4rem; list-style: none; }
+.nav-links a { color: rgba(255,255,255,0.68); text-decoration: none; font-size: 0.78rem; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; transition: color 0.18s; white-space: nowrap; }
+.nav-links a:hover, .nav-links a.active { color: var(--white); }
+.nav-links a.active { color: var(--orange); }
+.nav-cta { background: var(--orange) !important; color: var(--white) !important; padding: 0.42rem 1rem; border-radius: var(--r-sm); font-weight: 600 !important; white-space: nowrap; }
+.nav-cta:hover { background: var(--orange-light) !important; }
+.nav-toggle { display: none; flex-direction: column; gap: 5px; cursor: pointer; background: none; border: none; padding: 4px; }
+.nav-toggle span { display: block; width: 22px; height: 2px; background: var(--white); border-radius: 2px; }
+/* PAGE HEADER */
+.page-header { position: relative; padding: 4.5rem 2rem 3.5rem; overflow: hidden; background: var(--charcoal); border-bottom: 3px solid var(--orange); }
+.ph-content { position: relative; z-index: 2; max-width: 1100px; margin: 0 auto; }
+.page-header h1 { font-size: clamp(2.25rem, 5.5vw, 3.75rem); font-weight: 800; line-height: 1.05; color: var(--white); margin-bottom: 0.85rem; }
+.page-header p { color: rgba(255,255,255,0.62); font-size: 1rem; max-width: 560px; line-height: 1.7; }
+/* SHARED LAYOUT */
+.container { max-width: 1100px; margin: 0 auto; }
+section { padding: 4.5rem 2rem; }
+.sec-label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--orange); margin-bottom: 0.6rem; }
+.sec-title { font-size: clamp(1.6rem, 3.2vw, 2.4rem); font-weight: 800; line-height: 1.1; margin-bottom: 1.1rem; color: var(--charcoal); }
+.sec-body { color: var(--dark-grey); font-size: 0.975rem; line-height: 1.78; }
+.dark-sec { background: var(--charcoal); }
+.dark-sec .sec-title { color: var(--white); }
+.dark-sec .sec-body { color: rgba(255,255,255,0.6); }
+.off-sec { background: var(--off-white); }
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.875rem; font-weight: 700; padding: 0.75rem 1.6rem; border-radius: var(--r-sm); text-decoration: none; border: none; cursor: pointer; transition: background 0.18s, transform 0.14s, border-color 0.18s; letter-spacing: 0.02em; white-space: nowrap; }
+.btn-orange { background: var(--orange); color: var(--white); }
+.btn-orange:hover { background: var(--orange-light); transform: translateY(-1px); }
+.btn-outline-dark { background: transparent; color: var(--charcoal); border: 2px solid var(--charcoal); }
+.btn-outline-dark:hover { background: var(--charcoal); color: var(--white); }
+.btn-outline-white { background: transparent; color: var(--white); border: 2px solid rgba(255,255,255,0.38); }
+.btn-outline-white:hover { background: rgba(255,255,255,0.1); border-color: var(--white); }
+/* CARDS */
+.card { background: var(--white); border: 1px solid var(--border-l); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
+.card:hover { transform: translateY(-3px); box-shadow: var(--shadow-h); }
+/* FORM */
+.f-grid { display: grid; gap: 0.85rem; }
+.f-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; }
+.f-group { display: flex; flex-direction: column; gap: 0.35rem; }
+.f-group label { font-size: 0.8rem; font-weight: 600; color: var(--charcoal); }
+.f-group input, .f-group select, .f-group textarea { background: var(--off-white); border: 1.5px solid var(--light-grey); border-radius: var(--r-sm); color: var(--charcoal); font-family: 'Inter', sans-serif; font-size: 0.925rem; padding: 0.7rem 0.9rem; width: 100%; transition: border-color 0.18s; -webkit-appearance: none; }
+.f-group input:focus, .f-group select:focus, .f-group textarea:focus { outline: none; border-color: var(--orange); background: var(--white); }
+.f-group textarea { resize: vertical; min-height: 110px; }
+/* FOOTER */
+footer { background: var(--charcoal); padding: 3.5rem 2rem 2rem; border-top: 3px solid var(--orange); }
+.footer-logo { height: 36px; width: auto; margin-bottom: 1rem; display: block; }
+.f-grid-footer { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 3rem; margin-bottom: 2.5rem; }
+.f-desc { font-size: 0.85rem; color: rgba(255,255,255,0.42); line-height: 1.7; }
+.f-col h4 { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.16em; color: var(--orange); margin-bottom: 0.9rem; }
+.f-col ul { list-style: none; display: flex; flex-direction: column; gap: 0.55rem; }
+.f-col ul a { font-size: 0.85rem; color: rgba(255,255,255,0.48); text-decoration: none; transition: color 0.18s; }
+.f-col ul a:hover { color: var(--white); }
+.f-bottom { border-top: 1px solid var(--border-d); padding-top: 1.25rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; color: rgba(255,255,255,0.28); }
+/* RESPONSIVE */
+@media (max-width: 1040px) { .nav-links { gap: 0.9rem; } .nav-links a { font-size: 0.72rem; } }
+@media (max-width: 900px) {
+  .nav-links { display: none; }
+  .nav-links.open { display: flex; flex-direction: column; position: fixed; top: 66px; left: 0; right: 0; background: var(--charcoal-mid); border-bottom: 2px solid var(--orange); padding: 1.5rem 2rem; gap: 1.1rem; z-index: 99; }
+  .nav-links.open a { font-size: 0.95rem; color: var(--white); }
+  .nav-toggle { display: flex; }
+  .f-grid-footer { grid-template-columns: 1fr; gap: 1.75rem; }
+  .f-bottom { flex-direction: column; gap: 0.5rem; text-align: center; }
+  .f-row { grid-template-columns: 1fr; }
+}
+/* PAGE-SPECIFIC */
+
+.rs-wrap{background:var(--off-white);border-top:1px solid var(--border-l);padding:3.5rem 2rem 4.5rem;min-height:50vh;}
+.rs-card{max-width:680px;margin:0 auto;background:var(--white);border:1.5px solid var(--border-l);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;}
+.rs-top{padding:2rem 2rem 1.5rem;text-align:center;border-bottom:1px solid var(--border-l);}
+.rs-icon{width:64px;height:64px;border-radius:50%;margin:0 auto 1rem;display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:800;color:#fff;background:var(--orange);}
+.rs-icon.ok{background:#2e9e5b;}
+.rs-icon.bad{background:#c0392b;}
+.rs-icon.wait{background:var(--charcoal);}
+.rs-top h2{font-size:1.6rem;font-weight:800;line-height:1.2;margin-bottom:0.5rem;}
+.rs-top p{color:var(--dark-grey);font-size:0.95rem;line-height:1.7;}
+.rs-body{padding:1.5rem 2rem 2rem;}
+.rs-sum{background:var(--off-white);border:1px solid var(--border-l);border-radius:var(--r-sm);padding:1.1rem 1.25rem;}
+.rs-row{display:flex;justify-content:space-between;gap:1rem;font-size:0.9rem;padding:0.4rem 0;}
+.rs-row+.rs-row{border-top:1px solid var(--border-l);}
+.rs-row span:first-child{color:var(--mid-grey);flex-shrink:0;}
+.rs-row span:last-child{font-weight:600;text-align:right;}
+.rs-note{font-size:0.85rem;color:var(--dark-grey);line-height:1.7;margin-top:1.1rem;}
+.rs-warn{background:#fff7e0;border:1px solid #f1d98a;color:#7a5b00;border-radius:var(--r-sm);padding:0.8rem 1rem;font-size:0.85rem;line-height:1.6;margin-top:1rem;}
+.rs-actions{display:flex;gap:0.75rem;flex-wrap:wrap;justify-content:center;margin-top:1.4rem;}
+.tk-err{background:#fdecea;border:1px solid #f5c2bd;color:#9b2a1d;border-radius:var(--r-sm);padding:0.75rem 0.95rem;font-size:0.85rem;line-height:1.5;}
+.spin{width:34px;height:34px;border:4px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:sp .9s linear infinite;}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media(max-width:700px){.rs-wrap{padding:2rem 1rem 3rem;}.rs-top,.rs-body{padding-left:1.25rem;padding-right:1.25rem;}}
+
+</style>
+</head><body>
+<nav>
+  <a href="index.html"><img src="Logo_-_long.png" alt="Pathfinder Music Lessons" class="logo-img"></a>
+  <ul class="nav-links" id="nl">
+    <li><a href="teachers.html">Our Teachers</a></li>
+    <li><a href="pricing.html">Pricing</a></li>
+    <li><a href="gift-vouchers.html">Gift Vouchers</a></li>
+    <li><a href="events.html">Events</a></li>
+    <li><a href="student-concerts.html">Student Concerts</a></li>
+    <li><a href="student-portal.html">Student Portal</a></li>
+    <li><a href="careers.html">Careers</a></li>
+    <li><a href="studios.html">Studios</a></li>
+    <li><a href="index.html#contact" class="nav-cta">Book a Lesson</a></li>
+  </ul>
+  <button class="nav-toggle" id="nt" aria-label="Menu"><span></span><span></span><span></span></button>
+</nav>
+
+<div class="page-header">
+  <div class="ph-content">
+    <p class="sec-label">Concert tickets</p>
+    <h1>Payment Result</h1>
+  </div>
+</div>
+
+<div class="rs-wrap">
+  <div class="rs-card" id="card">
+    <div class="rs-top">
+      <div class="rs-icon wait"><div class="spin"></div></div>
+      <h2>Checking your payment…</h2>
+      <p>Please don't close this page. This only takes a moment.</p>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="container">
+    <div class="f-grid-footer">
+      <div><img src="Logo_-_long.png" alt="Pathfinder Music Lessons" class="footer-logo"><p class="f-desc">Music lessons for students of all ages in Kilsyth and Ringwood. Guitar, drums, piano, singing, violin and more — from bedroom to stage.</p></div>
+      <div class="f-col"><h4>Pages</h4><ul>
+        <li><a href="teachers.html">Our Teachers</a></li>
+        <li><a href="pricing.html">Pricing</a></li>
+        <li><a href="gift-vouchers.html">Gift Vouchers</a></li>
+        <li><a href="events.html">Events</a></li>
+        <li><a href="student-concerts.html">Student Concerts</a></li>
+        <li><a href="student-portal.html">Student Portal</a></li>
+        <li><a href="careers.html">Careers</a></li>
+        <li><a href="studios.html">Studios</a></li>
+      </ul></div>
+      <div class="f-col"><h4>Contact</h4><ul>
+        <li><a href="tel:0434198929">Kilsyth: 0434 198 929</a></li>
+        <li><a href="tel:0489930719">Ringwood: 0489 930 719</a></li>
+        <li><a href="mailto:kilsyth@pathfindermusiclessons.com.au">kilsyth@pathfindermusiclessons.com.au</a></li>
+        <li><a href="mailto:ringwood@pathfindermusiclessons.com.au">ringwood@pathfindermusiclessons.com.au</a></li>
+      </ul></div>
+    </div>
+    <div class="f-bottom">
+      <span>© 2026 Pathfinder Music Lessons. All rights reserved.</span>
+      <a href="#top" style="color:var(--orange);text-decoration:none;">Back to top ↑</a>
+    </div>
+  </div>
+</footer>
+<script>
+const nt=document.getElementById("nt"),nl=document.getElementById("nl");
+nt.addEventListener("click",()=>nl.classList.toggle("open"));
+document.querySelectorAll("a[href^=\"#\"]").forEach(a=>a.addEventListener("click",()=>nl.classList.remove("open")));
+</script>
+<script>
+(function () {
+  var API = '/.netlify/functions/';
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function money(c) { return '$' + (c / 100).toFixed(2); }
+  function fmtDate(d) {
+    var p = String(d).slice(0, 10).split('-').map(Number);
+    return new Date(Date.UTC(p[0], p[1] - 1, p[2])).toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+  }
+  function fmtTime(t) {
+    if (!t) return '';
+    var p = String(t).split(':').map(Number), h = p[0];
+    return (((h + 11) % 12) + 1) + ':' + String(p[1]).padStart(2, '0') + ' ' + (h < 12 ? 'AM' : 'PM');
+  }
+  var card = $('card');
+
+  // eWAY appends ?AccessCode=... (any capitalisation)
+  var code = '';
+  new URLSearchParams(location.search).forEach(function (v, k) { if (k.toLowerCase() === 'accesscode') code = v; });
+
+  function top(kind, icon, title, text) {
+    return '<div class="rs-top"><div class="rs-icon ' + kind + '">' + icon + '</div><h2>' + title + '</h2>' + (text ? '<p>' + text + '</p>' : '') + '</div>';
+  }
+  function summary(j) {
+    var o = j.order, e = j.event;
+    var rows = [
+      ['Event', esc(e.name)],
+      ['Date', esc(fmtDate(e.date)) + ', ' + esc(fmtTime(e.startTime))],
+    ];
+    if (e.venueName || e.venueAddress) rows.push(['Venue', esc([e.venueName, e.venueAddress].filter(Boolean).join(', '))]);
+    rows.push(['Performer', esc(o.performer)]);
+    rows.push(['Tickets', o.quantity + ' × ' + money(o.totalCents / o.quantity) + ' = ' + money(o.totalCents)]);
+    rows.push(['Order number', esc(o.orderNo)]);
+    return '<div class="rs-sum">' + rows.map(function (r) { return '<div class="rs-row"><span>' + r[0] + '</span><span>' + r[1] + '</span></div>'; }).join('') + '</div>';
+  }
+  function show(html) { card.innerHTML = html; window.scrollTo(0, 0); }
+
+  function render(j) {
+    var first = (j.order.purchaserName || '').trim().split(/\s+/)[0] || 'there';
+    if (j.state === 'paid') {
+      var n = j.order.quantity;
+      show(top('ok', '✓', 'Thank you, ' + esc(first) + '!', 'Your payment was successful.') +
+        '<div class="rs-body">' + summary(j) +
+        (j.emailed
+          ? '<p class="rs-note">📧 We\'ve emailed your ' + (n === 1 ? 'ticket' : n + ' tickets') + ' (a PDF with ' + (n === 1 ? 'a QR code' : 'one page and QR code per person') + ' and <b>' + esc(j.order.performer) + '</b>\'s name on it) to <b>' + esc(j.order.emailMasked) + '</b>. It usually arrives within a minute — if you can\'t see it, please check your junk or spam folder.</p>'
+          : '<div class="rs-warn"><b>Your payment is confirmed, but your tickets haven\'t been emailed yet.</b> We\'ll keep trying automatically and they should reach <b>' + esc(j.order.emailMasked) + '</b> within about 15 minutes. If they don\'t, contact us and quote order <b>' + esc(j.order.orderNo) + '</b>.</div>') +
+        '<p class="rs-note">Bring your tickets to the door — on your phone or printed. Each ticket is scanned on entry and can be used once.<br>We\'re looking forward to seeing you there!</p>' +
+        '<div class="rs-actions"><a class="btn btn-outline-dark" href="index.html">Back to our website</a></div></div>');
+    } else if (j.state === 'failed') {
+      show(top('bad', '!', j.retryable ? 'Your payment didn\'t go through' : 'We need to look into your payment',
+        j.retryable ? 'Nothing has been charged for this attempt. This can happen if the card details were entered incorrectly or the bank declined the payment.'
+                    : 'Something about this payment didn\'t match your order, so we haven\'t issued any tickets yet. Please contact us and quote order <b>' + esc(j.order.orderNo) + '</b> — if you were charged we\'ll sort it out straight away.') +
+        '<div class="rs-body">' + summary(j) +
+        '<div class="rs-actions">' + (j.retryable ? '<button class="btn btn-orange" id="retry">Try the payment again</button>' : '') +
+        '<a class="btn btn-outline-dark" href="tickets.html">Start a new order</a></div><div class="tk-err" id="err" style="display:none"></div></div>');
+      var rb = $('retry');
+      if (rb) rb.addEventListener('click', retry);
+    } else if (j.state === 'refunded') {
+      show(top('wait', 'i', 'This order was refunded', 'The tickets for order ' + esc(j.order.orderNo) + ' are no longer valid. You\'re welcome to place a new order.') +
+        '<div class="rs-body"><div class="rs-actions"><a class="btn btn-orange" href="tickets.html">Buy tickets</a></div></div>');
+    } else {
+      show(top('wait', '…', 'We\'re still confirming your payment', 'This sometimes takes a few minutes. You don\'t need to do anything: as soon as your payment is confirmed your tickets will be emailed to <b>' + esc(j.order.emailMasked) + '</b>.') +
+        '<div class="rs-body">' + summary(j) +
+        '<p class="rs-note">Haven\'t paid yet, or closed the payment page by mistake? No problem — <a href="tickets.html" style="color:var(--orange)">start a new order</a>. If you were charged and don\'t receive your tickets within 15 minutes, contact us and quote order <b>' + esc(j.order.orderNo) + '</b>.</p></div>');
+    }
+  }
+
+  async function retry() {
+    var b = $('retry'); b.disabled = true; b.textContent = 'Taking you to the payment page…';
+    try {
+      var r = await fetch(API + 'ticket-checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ retryAccessCode: code }) });
+      var j = await r.json().catch(function () { return {}; });
+      if (!r.ok || !j.url) throw new Error(j.error || 'Something went wrong.');
+      location.href = j.url;
+    } catch (e) {
+      b.disabled = false; b.textContent = 'Try the payment again';
+      var er = $('err'); er.textContent = e.message; er.className = 'tk-err show'; er.style.display = 'block'; er.style.marginTop = '1rem';
+    }
+  }
+
+  function problem(title, text) {
+    show(top('bad', '!', title, text) + '<div class="rs-body"><div class="rs-actions"><a class="btn btn-orange" href="tickets.html">Go to the ticket page</a></div></div>');
+  }
+
+  var tries = 0;
+  async function check() {
+    try {
+      var r = await fetch(API + 'ticket-confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accessCode: code }) });
+      var j = await r.json().catch(function () { return {}; });
+      if (r.status === 404) return problem('We couldn\'t find that order', 'If you\'ve just paid, please wait a minute and refresh this page.');
+      if (!r.ok) throw new Error(j.error || 'error');
+      if (j.state === 'pending' && ++tries < 8) {
+        if (tries === 1) render(j);
+        return setTimeout(check, 5000);
+      }
+      render(j);
+    } catch (e) {
+      if (++tries < 4) return setTimeout(check, 4000);
+      problem('We couldn\'t check your payment just now', 'If you were charged, your tickets will be emailed to you shortly. Otherwise please contact us with your payment receipt and we\'ll help.');
+    }
+  }
+
+  if (!code) problem('Nothing to show here', 'This page is where you\'re brought back to after paying. To buy tickets, please use the ticket page.');
+  else check();
+})();
+</script>
+</body></html>

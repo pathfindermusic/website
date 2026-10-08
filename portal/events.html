@@ -232,6 +232,25 @@
           <option value="closed">Closed — students can only view</option>
         </select>
       </div>
+      <div id="evTixSection" class="hidden" style="border-top:1px solid var(--border);margin-top:.9rem;padding-top:.9rem">
+        <label style="display:flex;align-items:center;gap:.5rem;font-size:.88rem;cursor:pointer">
+          <input type="checkbox" id="evTix" onchange="tixToggle()"> <b>Sell tickets online</b>
+        </label>
+        <div class="form-hint" style="margin:.25rem 0 .6rem">Shows this event on the public Tickets page (pathfindermusiclessons.com.au/tickets) until its date has passed. The event must be <b>Open</b> or <b>Closed</b>, not Draft. Sales and check-in are managed on the Ticket sales page.</div>
+        <div id="evTixBox" class="hidden">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Price per ticket ($)</label>
+              <input class="form-input" type="number" id="evTixPrice" min="1" max="1000" step="0.01" value="15.00">
+              <span class="form-hint">Charged through eWAY; the total is worked out on the server.</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Note on the ticket page and tickets <span style="font-weight:400;color:var(--mid-grey)">(optional)</span></label>
+            <input class="form-input" id="evTixInfo" maxlength="500" placeholder="e.g. Doors open 12:30 PM. Free parking behind the centre.">
+          </div>
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('eventModal')">Cancel</button>
@@ -308,6 +327,7 @@ let studentChoices = null;
   if (isAdmin) {
     document.getElementById('newEventBtn').classList.remove('hidden');
     await loadStudios();
+    await probeTickets();
   } else {
     document.getElementById('listSub').textContent =
       'Concerts and other occasions your students can perform at. You see your own students\' performances, and the ones you are asked to accompany.';
@@ -530,6 +550,7 @@ function renderDetail() {
       ${s === 'draft'  ? '<button class="btn btn-primary btn-sm" onclick="setStatus(\'open\')">Open for booking</button>' : ''}
       ${s === 'open'   ? '<button class="btn btn-secondary btn-sm" onclick="setStatus(\'closed\')">Close bookings</button>' : ''}
       ${s === 'closed' ? '<button class="btn btn-secondary btn-sm" onclick="setStatus(\'open\')">Reopen bookings</button>' : ''}
+      ${tixAvailable ? `<a class="btn btn-secondary btn-sm" href="ticket-sales.html?event=${ev.id}">🎟️ Ticket sales</a>` : ''}
       <button class="btn btn-secondary btn-sm" onclick="openEventModal('${ev.id}')">✏️ Edit</button>
       <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ Print</button>
       <button class="btn btn-danger btn-sm" onclick="deleteEvent()">Delete</button>`;
@@ -758,9 +779,43 @@ function openEventModal(id) {
   set('evMax', e?.max_per_student ?? 5);   set('evDeadline', e?.booking_deadline);
   set('evStatus', e?.status ?? 'draft');
   set('evStudio', e ? (e.studio_id ?? '') : (selectable.length === 1 ? selectable[0].id : ''));
+  loadTicketFields(id);
   updatePreview();
   openModal('eventModal');
   setTimeout(() => document.getElementById('evName').focus(), 50);
+}
+
+// ---- online ticket sales (columns added by ticket-sales.sql) ----
+// The columns are read straight from the events table because the grid
+// function doesn't return them. If the script hasn't been run the whole
+// section stays hidden and saving works exactly as before.
+let tixAvailable = false;     // the columns exist
+let tixLoaded = false;        // the open form holds the event's real values
+async function probeTickets() {
+  const { error } = await db.from('events').select('tickets_enabled').limit(1);
+  tixAvailable = !error;
+}
+function tixToggle() {
+  document.getElementById('evTixBox').classList.toggle('hidden', !document.getElementById('evTix').checked);
+}
+async function loadTicketFields(id) {
+  const sec = document.getElementById('evTixSection');
+  tixLoaded = false;
+  sec.classList.toggle('hidden', !tixAvailable);
+  if (!tixAvailable) return;
+  document.getElementById('evTix').checked = false;
+  document.getElementById('evTixPrice').value = '15.00';
+  document.getElementById('evTixInfo').value = '';
+  tixToggle();
+  if (!id) { tixLoaded = true; return; }
+  const { data, error } = await db.from('events').select('tickets_enabled,ticket_price_cents,ticket_info').eq('id', id).maybeSingle();
+  if (editingId !== id) return;                         // the form was closed or reopened meanwhile
+  if (error || !data) { sec.classList.add('hidden'); return; }
+  document.getElementById('evTix').checked = !!data.tickets_enabled;
+  document.getElementById('evTixPrice').value = (data.ticket_price_cents / 100).toFixed(2);
+  document.getElementById('evTixInfo').value = data.ticket_info ?? '';
+  tixToggle();
+  tixLoaded = true;
 }
 
 function updatePreview() {
@@ -793,6 +848,11 @@ async function saveEvent() {
     max_per_student: parseInt(v('evMax'), 10), booking_deadline: v('evDeadline') || null,
     studio_id: v('evStudio') || null, status: v('evStatus'),
   };
+  if (tixAvailable && tixLoaded) {
+    payload.tickets_enabled = document.getElementById('evTix').checked;
+    payload.ticket_price_cents = Math.round(parseFloat(document.getElementById('evTixPrice').value) * 100);
+    payload.ticket_info = document.getElementById('evTixInfo').value.trim() || null;
+  }
   const bad = [];
   if (!payload.name) bad.push('a name');
   if (!payload.event_date) bad.push('a date');
@@ -802,6 +862,10 @@ async function saveEvent() {
   if (!(payload.slots_per_block >= 1 && payload.slots_per_block <= 60)) bad.push('1–60 performances per block');
   if (!(payload.max_per_student >= 1 && payload.max_per_student <= 10)) bad.push('1–10 performances per student');
   if (payload.booking_deadline && payload.event_date && payload.booking_deadline > payload.event_date) bad.push('a booking deadline on or before the event date');
+  if (payload.tickets_enabled) {
+    if (!(payload.ticket_price_cents >= 100 && payload.ticket_price_cents <= 100000)) bad.push('a ticket price between $1.00 and $1,000.00');
+    if (payload.status === 'draft') bad.push('a status of Open or Closed (a Draft event can\'t sell tickets)');
+  }
   if (bad.length) { showToast('Please enter ' + bad.join(', ') + '.', 'warning'); return; }
 
   if (editingId && grid.bookings.length && (payload.event_date !== grid.event.event_date

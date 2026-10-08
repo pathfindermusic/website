@@ -64,3 +64,17 @@
 # ------------------------------------------------------------
 [functions."lapse-waiting-list"]
   schedule = "0 18 * * *"
+
+# ------------------------------------------------------------
+# Concert tickets — safety net for payments
+#
+# Every 10 minutes: asks eWAY about orders that were started but
+# never confirmed (a buyer who paid and then closed the page before
+# being sent back to the website), issues and emails their tickets,
+# tidies up orders nobody finished paying for, and retries any ticket
+# email that failed to send.
+#
+# Needs the EWAY_* environment variables, like the ticket functions.
+# ------------------------------------------------------------
+[functions."reconcile-ticket-orders"]
+  schedule = "*/10 * * * *"

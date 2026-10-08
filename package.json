@@ -1,0 +1,9 @@
+{
+  "name": "pathfinder-netlify-functions",
+  "private": true,
+  "description": "Dependencies for the Netlify functions (ticket PDFs and QR codes). The marketing site and the Portal are static pages and need no build.",
+  "dependencies": {
+    "pdf-lib": "1.17.1",
+    "qrcode": "1.5.4"
+  }
+}
