@@ -107,6 +107,18 @@ footer { background: var(--charcoal); padding: 3.5rem 2rem 2rem; border-top: 3px
 .notify-form input::placeholder{color:rgba(255,255,255,0.4);}
 .notify-success{display:none;margin-top:1rem;color:var(--orange);font-size:0.875rem;}
 @media(max-width:900px){.event-types,.past-grid{grid-template-columns:1fr;} .notify-form{flex-direction:column;}}
+.feat{position:relative;display:grid;grid-template-columns:1fr auto;gap:1.5rem 2.5rem;align-items:center;background:var(--charcoal);color:var(--white);border-radius:var(--r);border-left:6px solid var(--orange);padding:2.25rem 2.5rem;margin-bottom:1.25rem;box-shadow:var(--shadow-h);}
+.feat-badge{display:inline-block;font-size:0.68rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;background:var(--orange);color:var(--white);padding:0.25rem 0.7rem;border-radius:3px;margin-bottom:0.85rem;}
+.feat h2{font-size:clamp(1.5rem,3vw,2.1rem);font-weight:800;line-height:1.1;margin-bottom:0.75rem;}
+.feat-lines{display:flex;flex-direction:column;gap:0.5rem;margin-bottom:0.9rem;}
+.feat-line{display:flex;gap:0.65rem;font-size:0.95rem;color:rgba(255,255,255,0.88);line-height:1.5;}
+.feat-line small{display:block;color:rgba(255,255,255,0.52);font-size:0.82rem;}
+.feat-desc{color:rgba(255,255,255,0.62);font-size:0.9rem;line-height:1.7;max-width:620px;}
+.feat-cta{text-align:center;}
+.feat-price{font-size:0.82rem;color:rgba(255,255,255,0.6);margin-bottom:0.7rem;}
+.feat-price b{display:block;font-size:2rem;font-weight:800;color:var(--white);line-height:1.1;}
+.feat-cta .btn{padding:0.95rem 2.1rem;font-size:1rem;}
+@media(max-width:900px){.feat{grid-template-columns:1fr;padding:1.75rem 1.5rem;}.feat-cta{text-align:left;}}
 </style>
 </head><body>
 <nav>
@@ -128,7 +140,7 @@ footer { background: var(--charcoal); padding: 3.5rem 2rem 2rem; border-top: 3px
   <div class="ph-content">
     <p class="sec-label">Live at Pathfinder</p>
     <h1>Events, Workshops &amp; Masterclasses</h1>
-    <p>Student concerts every 6 months, plus special workshops and masterclasses throughout the year. Ticket links are posted here as soon as they're announced.</p>
+    <p id="hdrIntro">Student concerts every 6 months, plus special workshops and masterclasses throughout the year. Our year-end student concert is on sale now &mdash; grab your tickets below.</p>
   </div>
 </div>
 <section>
@@ -137,7 +149,17 @@ footer { background: var(--charcoal); padding: 3.5rem 2rem 2rem; border-top: 3px
       <div class="etype"><div class="etype-icon">🎤</div><h3>Student Concerts</h3><p>Held every 6 months, our student concerts are a chance for musicians of all levels to perform on stage in front of a real audience — a milestone moment and a lot of fun for everyone involved.</p></div>
       <div class="etype"><div class="etype-icon">🎸</div><h3>Workshops &amp; Masterclasses</h3><p>We host special workshops and masterclasses on technique, theory, recording, songwriting and more — run by our teachers and visiting professionals. Open to students and the wider community.</p></div>
     </div>
-    <div class="empty-state">
+    <div id="liveEvents">
+      <div class="feat">
+        <div>
+          <span class="feat-badge">Tickets on sale now</span>
+          <h2>Year-End Student Concert</h2>
+          <p class="feat-desc">Join us to celebrate a year of music-making. Our students take the stage to perform for family and friends &mdash; a milestone moment for every musician involved. Date, time, venue and ticket prices are on the ticket page.</p>
+        </div>
+        <div class="feat-cta"><a class="btn btn-orange" href="tickets.html">🎟️ Buy Tickets</a></div>
+      </div>
+    </div>
+    <div class="empty-state" id="emptyState" style="display:none">
       <div class="empty-icon">🎟️</div>
       <h2>No Events Scheduled Yet</h2>
       <p>We'll post ticket links for our next student concert and any upcoming workshops as soon as they're announced. Check back soon, or leave your email below and we'll let you know directly.</p>
@@ -200,4 +222,50 @@ nt.addEventListener("click",()=>nl.classList.toggle("open"));
 document.querySelectorAll("a[href^=\"#\"]").forEach(a=>a.addEventListener("click",()=>nl.classList.remove("open")));
 </script>
 <script>function handleNotify(e){e.preventDefault();document.getElementById('nSuccess').style.display='block';e.target.reset();}</script>
+<script>
+/* Pulls the concerts that are on sale from the ticketing system, so the date, venue and
+   price always match what is on the ticket page. If it can't load, the static card above stays. */
+(function () {
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function money(c) { return '$' + (c / 100).toFixed(2); }
+  function fmtDate(d) {
+    var p = String(d).slice(0, 10).split('-').map(Number);
+    return new Date(Date.UTC(p[0], p[1] - 1, p[2])).toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+  }
+  function fmtTime(t) {
+    if (!t) return '';
+    var p = String(t).split(':').map(Number), h = p[0];
+    return (((h + 11) % 12) + 1) + ':' + String(p[1]).padStart(2, '0') + ' ' + (h < 12 ? 'AM' : 'PM');
+  }
+  function card(e) {
+    var lines = '<div class="feat-line"><span>📅</span><div>' + esc(fmtDate(e.date)) +
+      (e.startTime ? '<small>Starts ' + esc(fmtTime(e.startTime)) + (e.endTime ? ' &middot; finishes about ' + esc(fmtTime(e.endTime)) : '') + '</small>' : '') + '</div></div>';
+    if (e.venueName || e.venueAddress) {
+      lines += '<div class="feat-line"><span>📍</span><div>' + esc(e.venueName || e.venueAddress) +
+        (e.venueName && e.venueAddress ? '<small>' + esc(e.venueAddress) + '</small>' : '') + '</div></div>';
+    }
+    if (e.info) lines += '<div class="feat-line"><span>ℹ️</span><div>' + esc(e.info) + '</div></div>';
+    var href = 'tickets.html?event=' + encodeURIComponent(e.id);
+    return '<div class="feat"><div><span class="feat-badge">Tickets on sale now</span><h2>' + esc(e.name) + '</h2>' +
+      '<div class="feat-lines">' + lines + '</div>' +
+      (e.description ? '<p class="feat-desc">' + esc(e.description) + '</p>' : '') + '</div>' +
+      '<div class="feat-cta"><div class="feat-price"><b>' + money(e.priceCents) + '</b>per ticket</div>' +
+      '<a class="btn btn-orange" href="' + href + '">🎟️ Buy Tickets</a></div></div>';
+  }
+  fetch('/.netlify/functions/ticket-event', { cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+    .then(function (j) {
+      var evs = (j && j.events) || [];
+      var live = document.getElementById('liveEvents');
+      if (!evs.length) {
+        live.style.display = 'none';
+        document.getElementById('emptyState').style.display = '';
+        document.getElementById('hdrIntro').textContent = "Student concerts every 6 months, plus special workshops and masterclasses throughout the year. Ticket links are posted here as soon as they're announced.";
+        return;
+      }
+      live.innerHTML = evs.map(card).join('');
+    })
+    .catch(function () { /* keep the static announcement */ });
+})();
+</script>
 </body></html>

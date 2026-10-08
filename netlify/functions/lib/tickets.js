@@ -84,7 +84,12 @@ function json(statusCode, obj) {
 // validation helpers
 // ------------------------------------------------------------
 const isUuid = (s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(s ?? ''));
-const isAccessCode = (s) => /^[A-Za-z0-9._~-]{8,300}$/.test(String(s ?? ''));
+// eWAY's access codes are long and can include characters such as + / =
+// (so don't be strict about the alphabet; they are always URL-encoded when
+// used in a query). A "+" that lost its encoding on the way back through
+// the browser arrives as a space, so put it back.
+const normAccessCode = (s) => String(s ?? '').trim().replace(/ /g, '+');
+const isAccessCode = (s) => /^[\x21-\x7E]{8,2000}$/.test(String(s ?? ''));
 
 function isValidEmail(addr) {
   const s = String(addr ?? '').trim();
@@ -283,7 +288,7 @@ async function ewayCreatePayment(cfg, { order, event }) {
 // Ask eWAY what became of an access code.
 async function ewayGetResult(cfg, accessCode) {
   let res = await ewayCall(cfg, 'GET', `/AccessCode/${encodeURIComponent(accessCode)}`);
-  if (res.status === 404 || res.status === 405) {
+  if (!res.ok) {
     res = await ewayCall(cfg, 'POST', '/GetAccessCodeResult', { AccessCode: accessCode });
   }
   if (!res.ok || !res.json) {
@@ -599,7 +604,7 @@ async function settleAndDeliver(cfg, db, order) {
 
 module.exports = {
   TZ, MAX_PER_ORDER, APPROVED_CODES,
-  ConfigError, loadConfig, json, isUuid, isAccessCode, isValidEmail, cleanText, maskEmail,
+  ConfigError, loadConfig, json, isUuid, isAccessCode, normAccessCode, isValidEmail, cleanText, maskEmail,
   newOrderNo, randomCode, todayMelbourne, money, formatDateLong, formatTime, firstName, onSale, EVENT_COLS,
   makeDb, canManage,
   ewayCreatePayment, ewayGetResult,

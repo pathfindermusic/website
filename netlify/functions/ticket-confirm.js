@@ -22,7 +22,8 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body || '{}'); }
   catch { return T.json(400, { error: 'Invalid request.' }); }
-  if (!T.isAccessCode(body.accessCode)) return T.json(400, { error: 'This page needs a payment reference. Please use the link from the payment page.' });
+  const accessCode = T.normAccessCode(body.accessCode);
+  if (!T.isAccessCode(accessCode)) return T.json(400, { error: 'This page needs a payment reference. Please use the link from the payment page.' });
 
   let cfg;
   try { cfg = T.loadConfig(); }
@@ -30,7 +31,7 @@ exports.handler = async (event) => {
   const db = T.makeDb(cfg);
 
   try {
-    const order = await db.orderByCode(body.accessCode);
+    const order = await db.orderByCode(accessCode);
     if (!order) return T.json(404, { error: 'We could not find an order for this payment.' });
 
     let res;

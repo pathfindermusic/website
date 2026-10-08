@@ -195,7 +195,12 @@ document.querySelectorAll("a[href^=\"#\"]").forEach(a=>a.addEventListener("click
 
   // eWAY appends ?AccessCode=... (any capitalisation)
   var code = '';
-  new URLSearchParams(location.search).forEach(function (v, k) { if (k.toLowerCase() === 'accesscode') code = v; });
+  // read it by hand: URLSearchParams would turn a "+" inside the code into a space
+  location.search.replace(/^\?/, '').split('&').forEach(function (kv) {
+    var i = kv.indexOf('=');
+    if (i < 0 || kv.slice(0, i).toLowerCase() !== 'accesscode') return;
+    try { code = decodeURIComponent(kv.slice(i + 1)); } catch (e) { code = kv.slice(i + 1); }
+  });
 
   function top(kind, icon, title, text) {
     return '<div class="rs-top"><div class="rs-icon ' + kind + '">' + icon + '</div><h2>' + title + '</h2>' + (text ? '<p>' + text + '</p>' : '') + '</div>';

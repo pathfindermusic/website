@@ -45,8 +45,9 @@ exports.handler = async (event) => {
     let ev, name, email, performer, quantity;
 
     if (body.retryAccessCode !== undefined) {
-      if (!T.isAccessCode(body.retryAccessCode)) return T.json(400, { error: 'Invalid request.' });
-      const prev = await db.orderByCode(body.retryAccessCode);
+      const retryCode = T.normAccessCode(body.retryAccessCode);
+      if (!T.isAccessCode(retryCode)) return T.json(400, { error: 'Invalid request.' });
+      const prev = await db.orderByCode(retryCode);
       if (!prev) return T.json(404, { error: 'We could not find that order.' });
       if (prev.status === 'paid') return T.json(409, { error: 'That order has already been paid.', code: 'already_paid' });
       if (prev.status === 'refunded') return T.json(409, { error: 'That order was refunded.' });
