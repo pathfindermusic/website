@@ -1857,6 +1857,25 @@ of the Student modal on `students.html`, below Parent / Guardian.
   chars typed → 50, update payload, blank on Add); **not yet tested
   live**.
 
+## Recurring tasks: optional description (Oct 2026, migration #44)
+
+The recurring-task editor (tasks.html → 🔁 Recurring tasks → New rule / Edit)
+has a **Description** box under Title. It is stored in
+`recurring_tasks.description` (nullable, ≤ 1000 chars) and shown, truncated,
+in the rule list. When `generate-recurring-tasks.js` creates a task from the
+rule it also inserts the description as a `task_notes` row (`logged_by` NULL,
+so it appears in the task's log with no author tag). The note is written
+**before** the `recurring_task_runs` row and wrapped in its own try/catch: a
+failed note is logged but never blocks the run being recorded, because an
+unrecorded run would make the next invocation create the task twice.
+
+- **Run `supabase/recurring-task-description.sql` before deploying
+  `tasks.html`** — saving a rule sends `description`, which fails until the
+  column exists. Statements are run one at a time.
+- Editing a rule's description only affects tasks generated **afterwards**;
+  tasks already created keep the log entry they were given.
+- Rules created before this change have no description and behave as before.
+
 ## Student modal: "View Tasks" (Oct 2026)
 
 (Also on `students.html`: the student's name in the list is a link
@@ -1977,6 +1996,77 @@ shared code in `js/events-common.js`; database in `supabase/events.sql`.
   if it matches that exact page + a UUID (`safeNext()`), so it cannot become an
   open redirect. Staff following the link are sent to `events.html` for the same
   event. A user forced to change their password first loses the `next`.
+- **Teachers' view (Oct 2026, `supabase/events-teachers.sql`, migration #45).**
+  A teacher now sees **only** their own students' performances and the ones they
+  are asked to accompany, not the whole event. "Their student" = the booking
+  names them as teacher, **or** they appear in `_event_student_teachers(student)`
+  (`student_teachers` + active lesson series). "Accompany" =
+  `accompaniment = 'teacher'` **and** `booking.teacher_id` = that teacher.
+  `get_event_grid` filters server-side for teachers (so it can't be bypassed from
+  the browser), adds an `accompany` flag to every row and sets `own` for the
+  teacher's own students; admin and student output is unchanged. The page
+  (`PF.renderGrid` with `teacherView`) shows only blocks that contain one of the
+  teacher's performances, tags accompanied ones "♪ You accompany" (orange), and
+  the Running order highlights them and says "With you".
+  `get_event_teacher_summary(event)` (teachers only) feeds the **Your summary**
+  card: X of your students performing, Y would like to be accompanied by you
+  (names and pieces), and the backing tracks to prepare (student, piece,
+  instrument, the notes the student left when booking, and the task's due /
+  Done / Overdue state).
+- **Backing-track tasks.** `event_bookings` has a trigger that keeps one task per
+  booking (`tasks.event_booking_id`, unique) when `accompaniment = 'backing_track'`
+  and the booking names a teacher from the list: subject = that teacher,
+  `source = 'system'`, studio = the event's studio, no assignee (so it shows to
+  admins/superusers exactly like a task an admin creates about a teacher, and
+  the teacher sees it in My Tasks). The task's log holds the student, piece,
+  instrument, event and the student's notes. **Due date = the later of (event
+  date − 14 days) and the day of booking** (Melbourne), so a late booking is
+  due that day rather than in the past. Changes follow the booking: piece /
+  instrument / notes / teacher edits update an open task (and add a log line);
+  cancelling the booking or switching away from a backing track **cancels** the
+  open task with a reason; switching back reopens it; a *done* task is reopened
+  only if the piece or teacher changed. Changing the event date re-dates open
+  tasks that still have the automatic due date (hand-edited dates are left
+  alone). Migration step 9 back-fills tasks for bookings that already exist.
+  **Caveat:** a student who picks "someone else / not sure" (free-text teacher)
+  gets no task, because there is no teacher to give it to; and the task belongs
+  to the booking's `teacher_id` only — a student's other teacher sees the
+  performance in the grid but not that backing-track task.
+- **Backing-track task owner (fix, `supabase/events-teachers-fix1.sql`, migration
+  #46).** The first version created these tasks with no studio and no assignee,
+  so the admin Tasks page (which opens on the admin's own studio) filtered them
+  out and the teacher's task popup showed blank Studio / Assigned to. Now
+  `_event_backing_task_owner()` picks the **studio** = the event's studio, else
+  the student's studio, else the teacher's first studio, and the **assignee** =
+  an active admin of that studio (an admin set up for exactly that studio wins
+  over one who covers every studio; oldest first; none → left in the studio
+  queue). Later edits only fill a *missing* studio and never re-assign, so an
+  admin's manual change stands. The migration also repairs existing tasks
+  (blank studio and/or unassigned) without touching anything already set.
+  `tasks.html` also fills About / Studio / Assigned to for **teachers** (their
+  admin-only pickers were never loaded, so those boxes were blank on every task
+  they opened; the assignee shows as "Studio admin" because a teacher can't
+  read the admin list).
+- **Send invitation → Students / Teachers / Both.** The button now opens a small
+  chooser. Each audience has its own wording (`invitationDrafts()` in
+  `events.html`): students are asked to book; teachers are told their students
+  are invited, shown the link to `events.html?event=<id>` and told about the
+  summary and the automatic backing-track tasks. The drafts go to Notifications
+  in `sessionStorage.notifPrefill` as `{drafts: [...]}`; **Both** loads the
+  student draft first and, after it has been sent, loads the teacher draft
+  (`pendingDrafts` in `notifications.html`, in memory only — leaving the page
+  drops the queue). `send-email.js` has a new recipient mode **`teachers`**
+  (`{ studioIds? }`: active teachers at those studios, plus teachers with no
+  studio set; none ticked = all). Teachers are emailed at their login address;
+  `{{first_name}}` / `{{student_name}}` are the teacher's name; `{{portal_link}}`
+  is refused for teachers. The studio summary email and `email_log` say
+  "teachers" (`recipient_mode = 'teachers'`). Unlike the long-standing student
+  modes, `teachers` **requires a signed-in admin**: Notifications now sends the
+  Portal session token and the function checks it and the caller's role.
+  *Still true and worth fixing separately:* the student modes of `send-email.js`
+  have no caller check at all.
+  **Deploy order:** run `events-teachers.sql`, then `events-teachers-fix1.sql`
+  (each one statement at a time in the Supabase SQL editor), then `git push`.
 - **Not built (ideas):** automatic emailing of a confirmation when a booking is
   made; waiting list when a block is full; per-event "accompanist/venue
   equipment" fields; exporting the running order to PDF/CSV (use Print for now).
@@ -1985,7 +2075,12 @@ shared code in `js/events-common.js`; database in `supabase/events.sql`.
   deadline, swap, layout guard, 10-way race); jsdom runs of the admin, teacher
   and student pages against that database (create → open → book → move →
   cancel, sibling picker, live update, closed event, other-studio isolation,
-  login `next`, notification prefill). **Not yet tested live** — run the SQL
+  login `next`, notification prefill). The teacher additions were tested the same
+  way (41 database checks on the filtered grid, accompany flag, task create /
+  update / cancel / reopen / re-date / late booking / back-fill / uniqueness,
+  summary and permissions; jsdom runs of the teacher page, the invitation
+  chooser and the Notifications queue; the email function with a mocked
+  Supabase and Resend). **Not yet tested live** — run the SQL
   first, then follow the go-live checks in the hand-over notes.
 
 ## Gift vouchers (Oct 2026) — front-desk PDF vouchers
@@ -2047,6 +2142,55 @@ Email: `netlify/functions/send-voucher.js`. Database: `supabase/gift-vouchers.sq
   database (picker, validation, preview, save-then-fail-then-retry, resend,
   redeem, expiry, number clash). **Not yet tested live** — run the SQL first,
   then send a voucher to yourself.
+
+## Teachers utilisation report (Oct 2026) — superuser only
+
+Page: `teacher-utilisation.html` (sidebar → **Super User → Teachers utilisation**;
+`requireAuth(['superuser'])`, so an admin who types the URL is sent to the login
+page). Calculations: `js/utilisation-calc.js` (pure functions, `window.PFUtil`,
+also loadable from Node for tests). **No database change** — it reads existing
+tables as the signed-in superuser: `teacher_availability`, `schedule_view` and
+`attendance`.
+
+- **Controls.** Teacher drop-down (inactive teachers are listed and labelled),
+  From / To calendar pickers (both days inclusive: `gte` / `lte`), defaulting to
+  the last complete **Wednesday–Tuesday fortnight** (ends on the most recent
+  Tuesday *before* today, starts 13 days earlier). The report runs as soon as a
+  teacher and a valid period are set; the limit is 13 months. Export CSV and
+  Print are included.
+- **Grid.** One column per *day + studio* in the format
+  `Tue 29/09/2026 (Ringwood)`, plus a Total column. A column exists for every
+  date that has availability for that weekday **or** any lesson (so an
+  available-but-empty day shows zeros, and a lesson outside the set availability
+  still appears with "—" for availability). Rows: **Availability** (each range
+  as `03:00 PM-08:00 PM (5 Hrs)`; several ranges on a day are listed in time
+  order), **Lessons booked** (`n (x Hrs)`), **Lessons taught**
+  (`n (% of booked)` and `x Hrs (% of booked time)`), **Billable lessons**
+  (same shape).
+- **Counting rules (agreed with the superuser).** One lesson = one scheduled
+  occurrence; a group lesson counts once with its length. *Booked* = every
+  occurrence, including ones later cancelled. *No-show* = the occurrence is
+  cancelled, or every student on its roster is marked Absent (no credit),
+  Absent (notice given) or Teacher cancelled. *Taught* = booked less no-shows.
+  A lesson that hasn't been marked yet counts as taught (not billable) — the
+  page lists how many are unmarked. *Billable* = at least one student marked
+  Present (a cancelled occurrence is never billable). Whoever actually taught
+  the occurrence gets it (`schedule_view.teacher_id` already resolves
+  substitutes), so a covered lesson counts for the substitute.
+- **Limitations.** Availability is the teacher's *current* weekly availability
+  applied to every matching date (there is no history of past availability, so
+  a changed roster rewrites past periods). Percentages are rounded to whole
+  numbers; hours to two decimals.
+- **Menu.** The link is a hidden `utilLink` in each page's Super User section,
+  revealed in the same place as `studiosLink` / `adminsLink`; the pages that
+  build their sidebar in JavaScript (Tasks, Enquiries, Events, Vouchers) add it
+  inside their `if (me.role === 'superuser')` block.
+- **Tests run.** 37 unit checks on the sums (default fortnight incl. year-end,
+  clock/hours formatting, availability ranges, every attendance outcome, group
+  lessons, cancelled/unmarked, empty periods, CSV) and a jsdom run of the page
+  against a fake database (superuser-only, query bounds, validation, error
+  display, CSV file name, non-superuser). **Not yet tested live** against the
+  real data.
 
 ## Traps that have already cost time
 

@@ -28,6 +28,9 @@
 //   teacher_date  { teacherId, date }
 //   students      { studentIds: [] }
 //   occurrence    { occurrenceId }   (used by automatic emails)
+//   teachers      { studioIds? }     (active teachers; no studioIds = all of them.
+//                                     Placeholders: {{first_name}} / {{student_name}} are
+//                                     the TEACHER's name; {{portal_link}} is not offered.)
 // ============================================================
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails/batch';
@@ -73,7 +76,32 @@ exports.handler = async (event) => {
     // 1. Resolve which student IDs should receive the email
     // ============================================================
     const mode = body.mode;
+
+    // Teacher addresses are staff details, so unlike the long-standing
+    // student modes this one insists on a signed-in admin: the caller's
+    // Portal session token is checked against Supabase and their role read
+    // from profiles. (The student modes are unchanged.)
+    if (mode === 'teachers') {
+      const token = (event.headers?.authorization ?? event.headers?.Authorization ?? '').replace(/^Bearer\s+/i, '');
+      let role = null;
+      if (token) {
+        try {
+          const ur = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+            headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${token}` },
+          });
+          const u = ur.ok ? await ur.json() : null;
+          if (u?.id) {
+            const pr = await get(`profiles?id=eq.${u.id}&status=eq.active&select=role`);
+            role = pr?.[0]?.role ?? null;
+          }
+        } catch (_) { role = null; }
+      }
+      if (role !== 'admin' && role !== 'superuser') {
+        return json(403, { error: 'Only a signed-in admin can email teachers.' });
+      }
+    }
     let studentIds = [];
+    let teacherRows   = [];  // 'teachers' mode only
     let lessonContext  = null; // for occurrence-driven emails
     let audienceLabel  = null; // human-readable "who this went to", for the studio summary
     // Which student statuses count as "in audience" for THIS mode. Broad
@@ -192,18 +220,44 @@ exports.handler = async (event) => {
       };
       audienceLabel = `${lessonContext.instrument || 'Lesson'} with ${teacherName || 'the teacher'} — ${lessonContext.lesson_day}`;
 
+    } else if (mode === 'teachers') {
+      // Teachers, not students: resolved here and turned into recipients
+      // in step 2. A teacher with no studio_ids works at every studio.
+      const ids = body.studioIds ?? [];
+      const trows = await get(`teachers?select=id,user_id,studio_ids`);
+      const uids  = trows.map(t => t.user_id).filter(Boolean);
+      const profs = uids.length
+        ? await get(`profiles?id=in.(${uids.map(i => `"${i}"`).join(',')})&status=eq.active&select=id,first_name,last_name`)
+        : [];
+      const profById = {};
+      profs.forEach(p => { profById[p.id] = p; });
+      teacherRows = trows
+        .filter(t => profById[t.user_id])
+        .filter(t => !ids.length || !(t.studio_ids?.length) || t.studio_ids.some(x => ids.includes(x)))
+        .map(t => ({ ...t, profile: profById[t.user_id] }));
+      audienceLabel = ids.length
+        ? `Teachers — ${await studioNamesLabel(ids)}`
+        : 'Teachers (all studios)';
+
     } else {
       return json(400, { error: `Unknown recipient mode: ${mode}` });
     }
 
     studentIds = [...new Set(studentIds.filter(Boolean))];
-    if (studentIds.length === 0) {
-      return json(200, { count: 0, recipients: [], message: 'No matching students found.' });
+    if (mode === 'teachers' ? teacherRows.length === 0 : studentIds.length === 0) {
+      return json(200, { count: 0, recipients: [], message: mode === 'teachers' ? 'No matching teachers found.' : 'No matching students found.' });
     }
 
     // ============================================================
     // 2. Resolve student names, user_ids and parent emails
     // ============================================================
+    let students = [];
+    const emailById = {};
+    const recipients = [];
+    const unreachable = [];
+    const invalidAddresses = [];
+
+    if (mode !== 'teachers') {
     const idList = studentIds.map(i => `"${i}"`).join(',');
     // Audience modes exclude prospects — a studio-wide announcement
     // should never reach someone who has only enquired. But when the
@@ -215,7 +269,7 @@ exports.handler = async (event) => {
       ? '&status=in.(active,trial,prospective)'
       : `&status=in.(${desiredStatuses.join(',')})`;
 
-    const students = await get(
+    students = await get(
       `students?id=in.(${idList})${statusFilter}` +
       `&select=id,user_id,email,parent_name,parent_email,first_name,last_name`
     );
@@ -233,13 +287,9 @@ exports.handler = async (event) => {
       { headers: sb }
     );
     const authData  = await authRes.json();
-    const emailById = {};
     (authData?.users ?? []).forEach(u => { if (u.id) emailById[u.id] = u.email; });
 
     // Build recipient list — student email plus parent email where present
-    const recipients = [];
-    const unreachable = [];
-    const invalidAddresses = [];
     students.forEach(s => {
       // A student's own name (students.first_name/last_name) is the source
       // of truth — siblings sharing a login would otherwise all resolve to
@@ -281,6 +331,29 @@ exports.handler = async (event) => {
         addresses,
       });
     });
+    } else {
+      // Teachers: the login address is the only one we hold for them.
+      const authRes = await fetch(
+        `${SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=1000`,
+        { headers: sb }
+      );
+      const authData = await authRes.json();
+      (authData?.users ?? []).forEach(u => { if (u.id) emailById[u.id] = u.email; });
+      teacherRows.forEach(t => {
+        const fullName = `${t.profile.first_name ?? ''} ${t.profile.last_name ?? ''}`.trim();
+        const label    = fullName || '(unnamed)';
+        const addr     = emailById[t.user_id];
+        if (!addr) { unreachable.push(label); return; }
+        if (!isValidEmail(addr)) { invalidAddresses.push(`${label} (${addr})`); return; }
+        recipients.push({
+          studentId: null,            // (kept for the shared send code; not a student)
+          teacherId: t.id,
+          name:      label,
+          firstName: t.profile.first_name || fullName,
+          addresses: [String(addr).trim()],
+        });
+      });
+    }
 
     // ============================================================
     // 3. Resolve the BCC address
@@ -311,6 +384,7 @@ exports.handler = async (event) => {
         invalid: invalidAddresses.length,
         invalidNames: body.full ? invalidAddresses : invalidAddresses.slice(0, SAMPLE),
         audienceLabel,
+        audience: mode === 'teachers' ? 'teachers' : 'students',
         bcc,
       });
     }
@@ -357,6 +431,10 @@ exports.handler = async (event) => {
 
     const portalLinkByStudent = {};
     const noPortalLink = [];
+
+    if (mode === 'teachers' && needsPortalLink) {
+      return json(400, { error: '{{portal_link}} is only available when writing to students.' });
+    }
 
     if (needsPortalLink) {
       const studentById = {};
@@ -436,6 +514,7 @@ exports.handler = async (event) => {
     // ============================================================
     // 5b. Bulk send: one summary to the studio instead of N BCCs
     // ============================================================
+    const noun = mode === 'teachers' ? 'teacher' : 'student';
     let summarySent  = false;
     let summaryError = null; // null = no summary was expected this send
     if (bcc && sendableRecipients.length > 1 && sent > 0) {
@@ -450,12 +529,12 @@ exports.handler = async (event) => {
             from:     `${fromName} <${fromEmail}>`,
             to:       [bcc],
             reply_to: fromEmail,
-            subject:  `Sent to ${sent} student${sent !== 1 ? 's' : ''}: ${subject}`,
+            subject:  `Sent to ${sent} ${noun}${sent !== 1 ? 's' : ''}: ${subject}`,
             html:     summaryTemplate({
               subject, bodyText, fromEmail,
               recipients: sendableRecipients, sent,
               unreachable, invalidAddresses, noPortalLink,
-              mode, spec: body, audienceLabel,
+              mode, spec: body, audienceLabel, noun,
             }),
           }),
         });
@@ -508,6 +587,7 @@ exports.handler = async (event) => {
       sent,
       total:          recipients.length,
       unreachable:    unreachable.length,
+      audience:       mode === 'teachers' ? 'teachers' : 'students',
       skippedNoLogin: noPortalLink.length,
       skippedNoLoginNames: noPortalLink,
       summarySent,
@@ -575,7 +655,7 @@ function json(statusCode, obj) {
 // Resend dashboard) while the student batch, using emailTemplate(),
 // sent fine. Caught via email_log.summary_error / a studio reporting no
 // summary ever arrived despite the "sent successfully" toast.
-function summaryTemplate({ subject, bodyText, fromEmail, recipients, sent, unreachable, invalidAddresses, noPortalLink, mode, spec, audienceLabel }) {
+function summaryTemplate({ subject, bodyText, fromEmail, recipients, sent, unreachable, invalidAddresses, noPortalLink, mode, spec, audienceLabel, noun }) {
   const rows = (recipients ?? []).map(r =>
     `<tr>
        <td style="padding:6px 10px;border-bottom:1px solid #eee;font-size:13px;">${escapeHtml(r.name)}</td>
@@ -607,7 +687,7 @@ function summaryTemplate({ subject, bodyText, fromEmail, recipients, sent, unrea
         </td></tr>
         <tr><td style="padding:24px;color:#1c1c1e;font-size:15px;line-height:1.6;">
           ${label('Sent to')}
-          <p style="margin:0 0 16px;font-weight:bold;">${sent} student${sent !== 1 ? 's' : ''} — ${escapeHtml(audienceLabel ?? mode ?? '')}</p>
+          <p style="margin:0 0 16px;font-weight:bold;">${sent} ${noun ?? 'student'}${sent !== 1 ? 's' : ''} — ${escapeHtml(audienceLabel ?? mode ?? '')}</p>
 
           ${label('Subject')}
           <p style="margin:0 0 16px;">${escapeHtml(subject ?? '')}</p>

@@ -385,7 +385,8 @@ function renderSidebar() {
   if (me.role === 'superuser') {
     html += `<div class="sidebar-section">Super User</div>
       ${it('studios.html','Studios',I.home)}
-      ${it('admins.html','Admins',I.shield)}`;
+      ${it('admins.html','Admins',I.shield)}
+        ${it('teacher-utilisation.html','Teachers utilisation','<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>')}`;
   }
   html += `<div class="sidebar-section">Manuals</div>
     ${it('manuals/index.html','How-To Guide',I.help)}`;

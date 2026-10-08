@@ -151,6 +151,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
       Admins
     </a>
+    <a class="nav-item hidden" href="teacher-utilisation.html" id="utilLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Teachers utilisation
+    </a>
     <div class="sidebar-section">Manuals</div>
     <a class="nav-item" href="manuals/index.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -162,7 +166,7 @@
     <div class="page-header">
       <div>
         <div class="page-title">Notifications</div>
-        <div class="page-sub">Send an email to a group of students</div>
+        <div class="page-sub">Send an email to a group of students or teachers</div>
       </div>
     </div>
 
@@ -206,6 +210,13 @@
             <div>
               <div class="mode-opt-label">Students of one teacher on a specific date</div>
               <div class="mode-opt-desc">e.g. teacher unavailable that day</div>
+            </div>
+          </label>
+          <label class="mode-opt" data-mode="teachers">
+            <input type="radio" name="mode" value="teachers" onchange="onModeChange()">
+            <div>
+              <div class="mode-opt-label">Teachers</div>
+              <div class="mode-opt-desc">e.g. an event or news for staff — all active teachers, or those at chosen studios. Teachers receive it at their login email.</div>
             </div>
           </label>
         </div>
@@ -389,6 +400,7 @@ let lastPreview    = null;
     document.getElementById('superuserSection').classList.remove('hidden');
     document.getElementById('studiosLink').classList.remove('hidden');
     document.getElementById('adminsLink').classList.remove('hidden');
+    document.getElementById('utilLink').classList.remove('hidden');
   }
   if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
 
@@ -401,23 +413,40 @@ let lastPreview    = null;
 // The Events page hands over a ready-made invitation via sessionStorage
 // (subject, body, optional studio). Read once, then forget it, so a
 // later visit to Notifications starts empty as usual.
+let pendingDrafts = [];   // drafts waiting to be loaded after the current send
+
 function applyPrefill() {
   let p = null;
   try { p = JSON.parse(sessionStorage.getItem('notifPrefill') || 'null'); } catch (_) {}
   sessionStorage.removeItem('notifPrefill');
   if (!p) return;
-  const studiosRadio = document.querySelector('input[name="mode"][value="studios"]');
-  if (studiosRadio) { studiosRadio.checked = true; onModeChange(); }
+  // Either one draft {subject, body, studioId, audience?} or {drafts: [...]}.
+  const drafts = Array.isArray(p.drafts) ? p.drafts.slice() : [p];
+  if (!drafts.length) return;
+  const first = drafts.shift();
+  pendingDrafts = drafts;
+  applyDraft(first, drafts.length
+    ? 'Student invitation drafted — send it, and the teacher version will follow.'
+    : (first.audience === 'teachers'
+        ? 'Teacher invitation drafted — check the recipients, then send.'
+        : 'Invitation drafted — check the recipients, then send.'));
+}
+
+function applyDraft(p, message) {
+  const teachers = p.audience === 'teachers';
+  const radio = document.querySelector(`input[name="mode"][value="${teachers ? 'teachers' : 'studios'}"]`);
+  if (radio) { radio.checked = true; onModeChange(); }
   if (p.studioId) {
     document.querySelectorAll('.studio-check').forEach(c => { c.checked = (c.value === p.studioId); });
     const from = document.getElementById('fromStudio');
     if (from && [...from.options].some(o => o.value === p.studioId && !o.disabled)) from.value = p.studioId;
   } else {
-    document.querySelectorAll('.studio-check').forEach(c => { c.checked = true; });
+    // students: every studio; teachers: none ticked = every active teacher
+    document.querySelectorAll('.studio-check').forEach(c => { c.checked = !teachers; });
   }
   document.getElementById('subject').value  = p.subject ?? '';
   document.getElementById('bodyText').value = p.body ?? '';
-  showToast('Invitation drafted — check the recipients, then send.', 'success');
+  showToast(message, 'success');
   refreshPreview();
 }
 
@@ -484,6 +513,10 @@ function onModeChange() {
     box.innerHTML = `<div class="form-label" style="margin-bottom:0.5rem;">Select studios</div>
       <div style="display:flex;flex-wrap:wrap;gap:0.85rem;">${studioChecks}</div>`;
 
+  } else if (mode === 'teachers') {
+    box.innerHTML = `<div class="form-label" style="margin-bottom:0.5rem;">Limit to teachers at these studios (optional — leave all unticked for every active teacher)</div>
+      <div style="display:flex;flex-wrap:wrap;gap:0.85rem;">${studioChecks}</div>`;
+
   } else if (mode === 'teacher') {
     box.innerHTML = `<div class="form-group" style="margin-bottom:0;">
       <label class="form-label">Teacher</label>
@@ -521,6 +554,17 @@ function onModeChange() {
   clearPreview('Choose an audience to preview.');
 }
 
+// The teachers mode is admin-only on the server, which checks the
+// signed-in Portal session sent with the request.
+async function authHeaders() {
+  const h = { 'Content-Type': 'application/json' };
+  try {
+    const { data } = await db.auth.getSession();
+    if (data?.session?.access_token) h.Authorization = 'Bearer ' + data.session.access_token;
+  } catch (_) {}
+  return h;
+}
+
 function buildSpec() {
   const mode = currentMode();
   const spec = { mode };
@@ -532,6 +576,8 @@ function buildSpec() {
   } else if (mode === 'teacher') {
     spec.teacherId = document.getElementById('pTeacher')?.value;
     if (!spec.teacherId) return { error: 'Select a teacher.' };
+  } else if (mode === 'teachers') {
+    if (checked.length) spec.studioIds = checked;
   } else if (mode === 'day') {
     spec.dayOfWeek = parseInt(document.getElementById('pDay')?.value ?? '1');
     if (checked.length) spec.studioIds = checked;
@@ -567,7 +613,7 @@ async function refreshPreview() {
   try {
     const res = await fetch('/.netlify/functions/send-email', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await authHeaders(),
       body: JSON.stringify({ action: 'preview', ...spec, bccStudioId: studioId }),
     });
     const data = await res.json();
@@ -576,7 +622,7 @@ async function refreshPreview() {
     lastPreview = data;
     document.getElementById('recipientCount').textContent = data.count;
     document.getElementById('recipientHint').textContent  =
-      data.count === 1 ? 'student will receive this' : 'students will receive this';
+      (data.audience === 'teachers' ? 'teacher' : 'student') + (data.count === 1 ? ' will receive this' : 's will receive this');
 
     let listHtml = (data.recipients ?? [])
       .map(r => `<div class="recipient-row">
@@ -603,12 +649,12 @@ async function refreshPreview() {
     if (data.unreachable > 0) {
       listHtml += `<div style="margin-top:0.75rem;padding:0.6rem 0.7rem;background:#fef3c7;
         border:1px solid #fcd34d;border-radius:var(--r-sm);font-size:0.76rem;color:#92400e;line-height:1.55;">
-        ⚠️ <strong>${data.unreachable}</strong> student${data.unreachable !== 1 ? 's have' : ' has'}
+        ⚠️ <strong>${data.unreachable}</strong> ${data.audience === 'teachers' ? 'teacher' : 'student'}${data.unreachable !== 1 ? 's have' : ' has'}
         no email on file and will be skipped${
           (data.unreachableNames ?? []).length
             ? `: ${data.unreachableNames.join(', ')}${data.unreachable > (data.unreachableNames ?? []).length ? '…' : ''}`
             : ''
-        }. Add an email on their student record so they receive notifications.
+        }. ${data.audience === 'teachers' ? 'A teacher needs a login email to be reached.' : 'Add an email on their student record so they receive notifications.'}
       </div>`;
     }
 
@@ -669,7 +715,7 @@ async function doSend() {
   try {
     const res = await fetch('/.netlify/functions/send-email', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await authHeaders(),
       body: JSON.stringify({
         action: 'send', ...spec,
         from: studio.email, fromName: `Pathfinder Music Lessons (${studio.name})`,
@@ -686,7 +732,7 @@ async function doSend() {
       showToast(`Sent ${data.sent} of ${data.total} — some failed. Check Resend dashboard.`, 'warning');
     } else {
       showToast(
-        `Sent to ${data.sent} student${data.sent !== 1 ? 's' : ''}.` +
+        `Sent to ${data.sent} ${data.audience === 'teachers' ? 'teacher' : 'student'}${data.sent !== 1 ? 's' : ''}.` +
         (data.unreachable ? ` ${data.unreachable} skipped — no email on file.` : '') +
         (data.skippedNoLogin ? ` ${data.skippedNoLogin} skipped — no Portal login yet.` : ''),
         (data.unreachable || data.skippedNoLogin) ? 'warning' : 'success');
@@ -696,6 +742,12 @@ async function doSend() {
       document.getElementById('subject').value  = '';
       document.getElementById('bodyText').value = '';
       clearPreview('Choose an audience to preview.');
+      // "Send invitation → Both": the second draft (for teachers) is
+      // loaded once the first one has gone.
+      if (pendingDrafts.length) {
+        setTimeout(() => applyDraft(pendingDrafts.shift(),
+          'Now the teacher version — check the wording and recipients, then send.'), 700);
+      }
     }
   } catch (err) {
     showToast('Error: ' + err.message, 'error');

@@ -198,6 +198,23 @@ exports.handler = async () => {
             recurring_task_id: rule.id,
           }, { Prefer: 'return=representation' });
 
+          // The rule's description becomes the first entry in the new
+          // task's log, so whoever picks it up sees what it is for.
+          // Best-effort and kept separate: a failure here must not
+          // stop the run being recorded below, or the next run would
+          // create the task a second time.
+          if (rule.description && insertedTask?.id) {
+            try {
+              await post('task_notes', {
+                task_id:   insertedTask.id,
+                note_text: rule.description,
+                logged_by: null,              // written by the system, not a person
+              }, { Prefer: 'return=minimal' });
+            } catch (noteErr) {
+              console.error(`[recurring-tasks] rule ${rule.id} (${rule.title}): description not logged:`, noteErr.message);
+            }
+          }
+
           await post('recurring_task_runs', {
             recurring_task_id: rule.id,
             run_date:           todayISO,

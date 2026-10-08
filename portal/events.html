@@ -41,6 +41,25 @@
     .ev-table th { text-align: left; font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--mid-grey); padding: .5rem .6rem; border-bottom: 2px solid var(--light-grey); }
     .ev-table td { padding: .5rem .6rem; border-bottom: 1px solid var(--border); vertical-align: top; }
     .ev-table tr.own td { background: rgba(232,73,30,.06); }
+    .ev-table tr.acc td { background: rgba(232,73,30,.16); }
+    .ev-table tr.acc td:first-child { box-shadow: inset 4px 0 0 var(--orange); }
+    .ev-inv-opt { display: flex; gap: .6rem; align-items: flex-start; padding: .6rem .75rem; border: 1px solid var(--light-grey); border-radius: var(--r-sm); margin-bottom: .45rem; cursor: pointer; }
+    .ev-inv-opt:has(input:checked) { border-color: var(--orange); background: var(--off-white); }
+    .ev-inv-opt input { margin-top: .25rem; accent-color: var(--orange); }
+    .ev-inv-opt b { font-size: .9rem; display: block; }
+    .ev-inv-opt span { font-size: .78rem; color: var(--mid-grey); line-height: 1.45; display: block; }
+    .ev-sum { padding: 1rem 1.15rem; margin-bottom: 1rem; }
+    .ev-sum h3 { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--mid-grey); margin: 0 0 .6rem; font-weight: 700; }
+    .ev-sum p { font-size: .9rem; color: var(--charcoal); margin: 0 0 .5rem; line-height: 1.5; }
+    .ev-sum ul { margin: .2rem 0 .8rem 0; padding: 0; list-style: none; }
+    .ev-sum li { font-size: .86rem; padding: .45rem .7rem; margin-bottom: .35rem; background: var(--off-white); border-radius: var(--r-sm); border-left: 3px solid var(--orange); }
+    .ev-sum li .sub { display: block; font-size: .78rem; color: var(--dark-grey); margin-top: .15rem; }
+    .ev-sum li .chip { float: right; margin-left: .6rem; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; padding: .1rem .5rem; border-radius: 99px; background: #fff; border: 1px solid var(--light-grey); color: var(--dark-grey); white-space: nowrap; }
+    .ev-sum li .chip.done { background: #dcfce7; border-color: #86efac; color: #166534; }
+    .ev-sum li .chip.late { background: #fee2e2; border-color: #fca5a5; color: #b91c1c; }
+    .ev-sum .inst { color: var(--dark-grey); font-size: .8rem; }
+    .ev-sum p.sub { font-size: .78rem; color: var(--mid-grey); }
+    .ev-sum .note { font-size: .78rem; color: var(--mid-grey); margin-top: .2rem; }
     .ev-table tr.blockrow td { background: var(--off-white); font-weight: 700; color: var(--charcoal); }
     .ev-kv { display: grid; grid-template-columns: 130px 1fr; gap: .45rem .9rem; font-size: .86rem; }
     .ev-kv dt { color: var(--mid-grey); font-weight: 600; font-size: .78rem; padding-top: .1rem; }
@@ -110,6 +129,8 @@
         <div class="form-hint" id="shareHint" style="margin-top:.4rem"></div>
       </div>
 
+      <div class="card ev-sum hidden" id="dSummary"></div>
+
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.6rem;margin-bottom:.7rem" class="no-print">
         <div class="ev-stat" id="dStat" style="margin:0"></div>
         <div class="ev-tabs">
@@ -124,6 +145,30 @@
     </div>
 
   </main>
+</div>
+
+<!-- ============ MODAL: who to invite ============ -->
+<div class="modal-overlay hidden" id="inviteModal">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title">Send invitation</div>
+      <button class="modal-close" onclick="closeModal('inviteModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:.86rem;color:var(--dark-grey);margin-bottom:.7rem">Who should be invited? Each audience gets its own wording, which you can review and edit before anything is sent.</div>
+      <label class="ev-inv-opt"><input type="radio" name="invWho" value="students" checked>
+        <div><b>Students</b><span>Asks them to book a performance.</span></div></label>
+      <label class="ev-inv-opt"><input type="radio" name="invWho" value="teachers">
+        <div><b>Teachers</b><span>Tells them their students are invited, and that they will see their students' performances, who wants them to accompany, and any backing-track tasks.</span></div></label>
+      <label class="ev-inv-opt"><input type="radio" name="invWho" value="both">
+        <div><b>Both</b><span>You review and send the student email first, then the teacher email.</span></div></label>
+      <div class="form-hint hidden" id="invDraftWarn" style="margin-top:.5rem;color:#b45309">This event is still a draft — students and teachers cannot see it until you open it for booking.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('inviteModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="startInvitation()">Continue →</button>
+    </div>
+  </div>
 </div>
 
 <!-- ============ MODAL: create / edit event ============ -->
@@ -238,6 +283,7 @@ PF.injectStyles();
 let me = null, isAdmin = false, isTeacher = false;
 let events = [];
 let grid = null;                 // current get_event_grid() result
+let summary = null;              // teachers: get_event_teacher_summary() result
 let currentId = null;
 let tab = 'grid';
 let stopPoll = null;
@@ -264,7 +310,7 @@ let studentChoices = null;
     await loadStudios();
   } else {
     document.getElementById('listSub').textContent =
-      'Concerts and other occasions your students can perform at. You can see who is performing, and your own students are highlighted.';
+      'Concerts and other occasions your students can perform at. You see your own students\' performances, and the ones you are asked to accompany.';
   }
 
   window.addEventListener('popstate', route);
@@ -329,7 +375,8 @@ function renderSidebar() {
     if (me.role === 'superuser') {
       html += `<div class="sidebar-section">Super User</div>
         ${item('studios.html','Studios',I.home)}
-        ${item('admins.html','Admins',I.shield)}`;
+        ${item('admins.html','Admins',I.shield)}
+        ${item('teacher-utilisation.html','Teachers utilisation','<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>')}`;
     }
     html += `<div class="sidebar-section">Manuals</div>
       ${item('manuals/index.html','How-To Guide',I.help)}`;
@@ -408,8 +455,8 @@ function renderList() {
           ${e.venue_name ? `<br>📍 ${PF.esc(e.venue_name)}${e.venue_address ? ', ' + PF.esc(e.venue_address) : ''}` : ''}
           <br>${e.block_count} block${e.block_count === 1 ? '' : 's'} of ${e.block_minutes} min · ${e.slots_per_block} per block</div>
       </div>
-      <div class="evl-fill"><span class="ev-meter"><span style="width:${pct}%"></span></span>
-        <small>${e.booked_count} of ${cap} performances booked</small></div>
+      ${isTeacher ? '' : `<div class="evl-fill"><span class="ev-meter"><span style="width:${pct}%"></span></span>
+        <small>${e.booked_count} of ${cap} performances booked</small></div>`}
     </div>`;
   };
   box.innerHTML =
@@ -422,7 +469,7 @@ function renderList() {
 // ============================================================
 async function showEvent(id) {
   stopPolling();
-  currentId = id; grid = null;
+  currentId = id; grid = null; summary = null;
   document.getElementById('listView').classList.add('hidden');
   document.getElementById('detailView').classList.remove('hidden');
   document.getElementById('dGrid').innerHTML = '<div class="ev-skel"></div><div class="ev-skel"></div>';
@@ -432,7 +479,10 @@ async function showEvent(id) {
 }
 
 async function loadGrid() {
-  const { data, error } = await db.rpc('get_event_grid', { p_event: currentId });
+  const [{ data, error }, sum] = await Promise.all([
+    db.rpc('get_event_grid', { p_event: currentId }),
+    isTeacher ? db.rpc('get_event_teacher_summary', { p_event: currentId }) : Promise.resolve(null),
+  ]);
   if (error || !data) {
     stopPolling();
     document.getElementById('dTitle').textContent = 'Event not found';
@@ -440,12 +490,15 @@ async function loadGrid() {
     document.getElementById('dActions').innerHTML = '';
     document.getElementById('dHead').innerHTML = '';
     document.getElementById('sharePanel').classList.add('hidden');
+    document.getElementById('dSummary').classList.add('hidden');
     document.getElementById('dGrid').innerHTML =
       `<div class="empty-state"><div class="empty-state-icon">🔍</div><div class="empty-state-title">That event is not available</div>
        <div class="empty-state-text">It may have been deleted, or it is not open yet.</div></div>`;
     return false;
   }
   grid = data;
+  // The summary is a nicety: if it fails the grid still works.
+  summary = (sum && !sum.error) ? sum.data : null;
   renderDetail();
   if (bookingForm) bookingForm.setBookings(grid.bookings);
   return true;
@@ -460,12 +513,15 @@ function renderDetail() {
 
   const cap = ev.block_count * ev.slots_per_block;
   const students = new Set(grid.bookings.map(b => b.student_id)).size;
-  document.getElementById('dStat').innerHTML =
-    `<b>${grid.bookings.length}</b> of ${cap} performances booked · <b>${students}</b> student${students === 1 ? '' : 's'} · <b>${cap - grid.bookings.length}</b> free`;
+  const nAcc = grid.bookings.filter(b => b.accompany).length;
+  document.getElementById('dStat').innerHTML = isTeacher
+    ? `<b>${students}</b> of your student${students === 1 ? ' is' : 's are'} performing · <b>${grid.bookings.length}</b> performance${grid.bookings.length === 1 ? '' : 's'}${nAcc ? ` · <b>${nAcc}</b> you accompany` : ''}`
+    : `<b>${grid.bookings.length}</b> of ${cap} performances booked · <b>${students}</b> student${students === 1 ? '' : 's'} · <b>${cap - grid.bookings.length}</b> free`;
 
   document.getElementById('dLegend').innerHTML = isAdmin
     ? '<span><i></i>Booked — click for details</span><span><i class="free"></i>Free — click to add a performance</span>'
-    : '<span><i class="own"></i>Your students</span><span><i></i>Other performances</span><span><i class="free"></i>Free</span>';
+    : '<span><i class="own"></i>Your student</span><span><i class="acc"></i>You accompany</span>';
+  renderSummary();
 
   // actions
   if (isAdmin) {
@@ -497,9 +553,53 @@ function renderDetail() {
     onFilled: bk => openDetailModal(bk),
     canClick: bk => isAdmin || bk.detail,
     mineLabel: 'Mine',
+    teacherView: isTeacher,
   });
   renderRunOrder();
   setTab(tab, true);
+}
+
+// Teacher summary card: how many of my students perform, who wants me
+// to accompany them, and which backing tracks I need to prepare.
+function renderSummary() {
+  const el = document.getElementById('dSummary');
+  if (!isTeacher || !summary) { el.classList.add('hidden'); return; }
+  const n = summary.students_performing ?? 0;
+  const y = summary.accompany_students ?? 0;
+  const acc = summary.accompany ?? [];
+  const bts = summary.backing_tracks ?? [];
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Melbourne' });
+  const plural = (k, one, many) => k === 1 ? one : many;
+
+  const accLine = y === 0
+    ? 'No students have asked you to accompany them so far.'
+    : `<b>${y}</b> ${plural(y, 'student would', 'students would')} like to be accompanied by you.`;
+  const accList = acc.length
+    ? `<ul>${acc.map(a => `<li><b>${PF.esc(a.student_name)}</b> — ${PF.esc(a.piece)}${a.instrument ? ` <span class="inst">(${PF.esc(a.instrument)})</span>` : ''}</li>`).join('')}</ul>`
+    : '';
+
+  let btHtml;
+  if (!bts.length) {
+    btHtml = '<p>No backing tracks are needed from you at the moment.</p>';
+  } else {
+    btHtml = `<p>You need to prepare backing tracks for the following ${plural(bts.length, 'student', 'students')}:</p>
+      <ul>${bts.map(t => {
+        let chip = '';
+        if (t.task_status === 'done') chip = '<span class="chip done">Done</span>';
+        else if (t.task_status === 'open' && t.due_date) {
+          chip = `<span class="chip ${t.due_date < today ? 'late' : ''}">${t.due_date < today ? 'Overdue — was due ' : 'Due '}${PF.esc(PF.fmtDate(t.due_date, true))}</span>`;
+        }
+        return `<li><b>${PF.esc(t.student_name)}</b> — ${PF.esc(t.piece)}${t.instrument ? ` <span class="inst">(${PF.esc(t.instrument)})</span>` : ''} ${chip}
+          ${t.notes ? `<div class="note">Student's notes: ${PF.esc(t.notes)}</div>` : ''}</li>`;
+      }).join('')}</ul>
+      <p class="sub">Each backing track also appears as a task in <a href="tasks.html">My Tasks</a>, due two weeks before the event.</p>`;
+  }
+
+  el.innerHTML = `<h3>Your summary</h3>
+    <p>You have <b>${n}</b> of your ${plural(n, 'student', 'students')} performing.</p>
+    <p>${accLine}</p>${accList}
+    ${btHtml}`;
+  el.classList.remove('hidden');
 }
 
 function setTab(t, quiet) {
@@ -517,23 +617,24 @@ function renderRunOrder() {
   grid.bookings.forEach(b => {
     if (b.block !== lastBlock) {
       lastBlock = b.block;
-      rows.push(`<tr class="blockrow"><td colspan="${isAdmin ? 7 : 6}">Block ${b.block} · ${PF.blockTimes(ev, b.block)}</td></tr>`);
+      rows.push(`<tr class="blockrow"><td colspan="${(isAdmin || isTeacher) ? 7 : 6}">Block ${b.block} · ${PF.blockTimes(ev, b.block)}</td></tr>`);
     }
-    const acc = b.accompaniment === 'peer'
-      ? 'Peer' + (b.accompanist_name ? ': ' + PF.esc(b.accompanist_name) : '')
-      : PF.ACCOMP[b.accompaniment] ?? '';
-    rows.push(`<tr class="${b.own ? 'own' : ''}">
+    const acc = (isTeacher && b.accompany) ? 'With you'
+      : b.accompaniment === 'peer'
+        ? 'Peer' + (b.accompanist_name ? ': ' + PF.esc(b.accompanist_name) : '')
+        : PF.ACCOMP[b.accompaniment] ?? '';
+    rows.push(`<tr class="${b.accompany ? 'acc' : b.own ? 'own' : ''}">
       <td>~${PF.clock(PF.slotMinute(ev, b.block, b.position))}</td>
       <td>#${b.position}</td>
       <td><b>${PF.esc(b.student_name)}</b></td>
       <td>${PF.esc(b.instrument)}</td>
       <td>${PF.esc(b.piece)}</td>
       <td>${PF.esc(acc)}</td>
-      ${isAdmin ? `<td>${PF.esc(b.teacher_name ?? '')}${b.notes ? `<div style="color:var(--mid-grey);font-size:.74rem">${PF.esc(b.notes)}</div>` : ''}</td>` : ''}
+      ${(isAdmin || isTeacher) ? `<td>${PF.esc(b.teacher_name ?? '')}${b.notes ? `<div style="color:var(--mid-grey);font-size:.74rem">${PF.esc(b.notes)}</div>` : ''}</td>` : ''}
     </tr>`);
   });
   document.getElementById('dRun').innerHTML = rows.length
-    ? `<table class="ev-table"><thead><tr><th>Time</th><th>Slot</th><th>Student</th><th>Instrument</th><th>Piece</th><th>Accompaniment</th>${isAdmin ? '<th>Teacher / notes</th>' : ''}</tr></thead><tbody>${rows.join('')}</tbody></table>`
+    ? `<table class="ev-table"><thead><tr><th>Time</th><th>Slot</th><th>Student</th><th>Instrument</th><th>Piece</th><th>Accompaniment</th>${(isAdmin || isTeacher) ? '<th>Teacher / notes</th>' : ''}</tr></thead><tbody>${rows.join('')}</tbody></table>`
     : '<div class="empty-state"><div class="empty-state-text">No performances booked yet.</div></div>';
 }
 
@@ -547,11 +648,21 @@ async function copyShare() {
 }
 
 function sendInvitation() {
-  const ev = grid.event;
-  const url = PF.shareUrl(ev.id);
+  document.getElementById('invDraftWarn').classList.toggle('hidden', grid.event.status !== 'draft');
+  openModal('inviteModal');
+}
+
+function invitationDrafts(ev) {
+  const url = PF.shareUrl(ev.id);                                   // students
+  const teacherUrl = url.replace('event-book.html', 'events.html'); // teachers
   const when = `${PF.fmtDate(ev.event_date)}, ${PF.timeRange(ev)}`;
   const where = [ev.venue_name, ev.venue_address].filter(Boolean).join(', ');
-  const body =
+  const deadline = ev.booking_deadline ? `\n\nStudents have been asked to book by **${PF.fmtDate(ev.booking_deadline)}**.` : '';
+  const students = {
+    audience: 'students',
+    subject: `Book your performance: ${ev.name}`,
+    studioId: ev.studio_id ?? null,
+    body:
 `Hi {{first_name}},
 
 We are holding **${ev.name}** on ${when}${where ? ' at ' + where : ''}.
@@ -562,12 +673,35 @@ Would you like to perform? Please book your spot here — sign in with your usua
 
 Choose up to three time blocks you would like, and the Portal will place you in the first one that still has room. You will see everyone's performances build up on the same page, and you can change or cancel your booking at any time while bookings are open.${ev.booking_deadline ? `\n\nPlease book by **${PF.fmtDate(ev.booking_deadline)}**.` : ''}
 
-We look forward to hearing you play!`;
-  sessionStorage.setItem('notifPrefill', JSON.stringify({
-    subject: `Book your performance: ${ev.name}`,
-    body,
+We look forward to hearing you play!`,
+  };
+  const teachers = {
+    audience: 'teachers',
+    subject: `${ev.name}: your students are invited`,
     studioId: ev.studio_id ?? null,
-  }));
+    body:
+`Hi {{first_name}},
+
+We are holding **${ev.name}** on ${when}${where ? ' at ' + where : ''}, and your students are invited to perform. They book their own spots through the Portal — please encourage them to take part.${deadline}
+
+Sign in to the Portal and open the event to see it all in one place:
+
+[Open ${ev.name}](${teacherUrl})
+
+You will see your own students' performances in the schedule as they book, and any students who have asked you to accompany them are highlighted. At the top of the page there is a summary of how many of your students are performing, who would like you to accompany them, and which backing tracks you need to prepare.
+
+If a student chooses a backing track with you as their teacher, a task is added to your My Tasks list automatically, due two weeks before the event, with the student's piece and any notes they left when booking.
+
+Thank you for supporting your students!`,
+  };
+  return { students, teachers };
+}
+
+function startInvitation() {
+  const who = document.querySelector('input[name="invWho"]:checked')?.value ?? 'students';
+  const d = invitationDrafts(grid.event);
+  const drafts = who === 'both' ? [d.students, d.teachers] : [d[who]];
+  sessionStorage.setItem('notifPrefill', JSON.stringify({ drafts }));
   location.href = 'notifications.html';
 }
 

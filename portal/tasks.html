@@ -463,6 +463,12 @@
       </div>
 
       <div class="form-group">
+        <label class="form-label">Description <span class="text-muted" style="font-weight:400;">(optional)</span></label>
+        <textarea class="form-textarea" id="rtDescription" rows="3" maxlength="1000"
+                  placeholder="Briefly describe what needs doing. This is added to the log of every task this rule creates."></textarea>
+      </div>
+
+      <div class="form-group">
         <label class="form-label">Repeats</label>
         <select class="form-select" id="rtType" onchange="onRecurrenceTypeChange()">
           <option value="daily">Every day</option>
@@ -600,6 +606,12 @@ let rtSelectedSubjects     = new Set();  // subject ids checked in the rule edit
     initRecurringFormOptions();
   } else {
     document.getElementById('filterBar').classList.add('hidden');
+    // Studio names, so the task shows which studio it belongs to. Best
+    // effort: if a teacher can't read the list the Studio box just says so.
+    try {
+      const r = await db.from('studios').select('id,name').eq('status','active');
+      studios = r.data ?? [];
+    } catch (_) { studios = []; }
   }
   syncTaskDatePicker();
   await loadTasks();
@@ -681,7 +693,8 @@ function renderSidebar() {
     if (me.role === 'superuser') {
       html += `<div class="sidebar-section">Super User</div>
         ${item('studios.html','Studios',ICONS.home)}
-        ${item('admins.html','Admins',ICONS.shield)}`;
+        ${item('admins.html','Admins',ICONS.shield)}
+        ${item('teacher-utilisation.html','Teachers utilisation','<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>')}`;
     }
     html += `<div class="sidebar-section">Manuals</div>
       ${item('manuals/index.html','How-To Guide',ICONS.help)}`;
@@ -1191,6 +1204,16 @@ async function openTaskModal(id) {
     }
     document.getElementById('tmStudio').value   = t.studio_id   ?? '';
     document.getElementById('tmAssignee').value = t.assigned_to ?? '';
+  } else {
+    // The admin pickers are never loaded for a teacher, so these three
+    // boxes used to open blank. Fill them with plain read-only text.
+    const one = (id, text) => {
+      document.getElementById(id).innerHTML = `<option value="">${escapeHtml(text)}</option>`;
+    };
+    const myName = `${me.first_name ?? ''} ${me.last_name ?? ''}`.trim();
+    one('tmSubject', t.subject_type ? (myName ? `You (${myName})` : 'You') : 'Nothing in particular');
+    one('tmStudio', t.studio_id ? (studios.find(x => x.id === t.studio_id)?.name ?? 'Your studio') : 'All studios');
+    one('tmAssignee', t.assigned_to ? 'Studio admin' : 'Studio admin team');
   }
 
   // Teachers get a read-only view of the details, plus a reply box
@@ -2124,6 +2147,7 @@ function renderRecurringList() {
     return `<div class="rt-row">
       <div>
         <div class="task-title">${escapeHtml(r.title)}</div>
+        ${r.description ? `<div class="text-sm text-muted" style="margin:0.15rem 0 0.2rem;white-space:pre-wrap;">${escapeHtml(r.description.length > 140 ? r.description.slice(0, 140) + '…' : r.description)}</div>` : ''}
         <div class="task-meta">
           <span>${describeRecurrence(r)}</span>
           <span class="tag">${studioName(r.studio_id)}</span>
@@ -2182,6 +2206,7 @@ function openRecurringEditModal(id) {
   document.getElementById('rtId').value = id ?? '';
   document.getElementById('rtModalTitle').textContent = id ? 'Edit recurring task' : 'New recurring task';
   document.getElementById('rtTitle').value = r?.title ?? '';
+  document.getElementById('rtDescription').value = r?.description ?? '';
   document.getElementById('rtType').value  = r?.recurrence_type ?? 'weekly';
   document.getElementById('rtStudio').value   = r?.studio_id   ?? '';
   document.getElementById('rtAssignee').value = r?.assigned_to ?? '';
@@ -2278,6 +2303,8 @@ async function saveRecurringTask() {
   const type = document.getElementById('rtType').value;
   const payload = {
     title,
+    // Copied into the log of each task this rule generates
+    description: document.getElementById('rtDescription').value.trim() || null,
     recurrence_type: type,
     weekday: null, day_of_month: null, week_of_month: null,
     studio_id:   document.getElementById('rtStudio').value   || null,

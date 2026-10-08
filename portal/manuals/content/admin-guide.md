@@ -236,11 +236,27 @@ two performances) or <strong>Cancel this booking</strong>. Click a
 <strong>free</strong> square to add a performance for a student yourself — it
 lands exactly in that slot. <strong>Running order</strong> switches to a table
 you can <strong>Print</strong> for the day.</p>
-<p><strong>Inviting students.</strong> Under the grid title is the booking link.
-<strong>Copy</strong> it, or press <strong>✉️ Send invitation…</strong> to open
-Notifications with a ready-written email (it greets each family by first name
-and includes the link). Check the studio and recipients, then send as usual.
-The same link also appears on each student's dashboard once the event is open.</p>
+<p><strong>Inviting students and teachers.</strong> Under the grid title is the
+booking link. <strong>Copy</strong> it, or press <strong>✉️ Send invitation…</strong>
+and choose <strong>Students</strong>, <strong>Teachers</strong> or
+<strong>Both</strong>. Notifications opens with a ready-written email (it greets
+each person by first name and includes the link). The student email asks them to
+book; the teacher email tells them their students are invited and what they will
+see. With <strong>Both</strong> you review and send the student email first, then
+the teacher email appears for you to review and send. Check the studio and
+recipients, then send as usual. The same link also appears on each student's
+dashboard once the event is open.</p>
+<p><strong>What teachers see.</strong> A teacher sees only their own students'
+performances and any they have been asked to accompany (those are highlighted),
+plus a short summary: how many of their students are performing, who would like
+them to accompany, and which backing tracks to prepare, with the piece and any
+notes the student left. Each backing track also becomes a task about that
+teacher, in the teacher's studio (the event's studio, or the student's if the event
+is for all studios) and assigned to that studio's admin, so it shows up on the
+Tasks page like any task you create about a teacher. It is due two weeks before the event — or on the day of booking if the booking is made later
+than that. If a student cancels or changes their accompaniment, the task is
+cancelled or updated for you. A student who chooses "someone else" as their
+teacher does not create a task, because there is no teacher to give it to.</p>
 <div class="callout callout-tip">
 <strong>How students are placed</strong>
 <p>
@@ -695,3 +711,41 @@ when setting up someone meant to be limited to just one.
 </p>
 </div>
 
+<h3 id="teacher-utilisation">Teachers Utilisation</h3>
+<p>
+A superuser-only report showing how much of a teacher's available time was
+actually used. Choose a <strong>teacher</strong> and a <strong>From</strong> and
+<strong>To</strong> date (both days are included). It opens on the last
+Wednesday-to-Tuesday fortnight; <strong>Last Wed–Tue fortnight</strong> returns
+to it.
+</p>
+<p>
+There is one column for each day the teacher has availability or lessons, titled
+with the weekday, date and studio, and a <strong>Total</strong> column at the
+end. The rows are:
+</p>
+<ul>
+<li><strong>Availability</strong> — the teacher's availability that day, for
+example 03:00 PM-08:00 PM (5 Hrs).</li>
+<li><strong>Lessons booked</strong> — how many lessons were scheduled and their
+total time.</li>
+<li><strong>Lessons taught</strong> — booked lessons less the no-shows
+(cancelled, or every student Absent — no credit, Absent — notice given or
+Teacher cancelled), with the share of lessons booked and of booked time.</li>
+<li><strong>Billable lessons</strong> — lessons where a student was marked
+Present, again as a share of lessons booked and of booked time.</li>
+</ul>
+<div class="callout callout-caution">
+<strong>Lessons that haven't been marked yet</strong>
+<p>
+A lesson that has not been marked (including one still in the future) counts as
+taught but is not billable until a student is marked Present. The note under the
+grid says how many are still unmarked, so run the report after attendance is up
+to date. A group lesson counts once, however many students are in it, and a
+lesson covered by another teacher counts for the teacher who took it. The
+availability shown is the teacher's current weekly availability, so changing it
+also changes how past periods look.
+</p>
+</div>
+<p><strong>Export CSV</strong> downloads the same figures as plain numbers for a
+spreadsheet, and <strong>Print</strong> prints just the grid.</p>

@@ -192,6 +192,9 @@
     .ev-slot{font:inherit;text-align:left;display:flex;flex-direction:column;gap:.12rem;min-height:74px;padding:.45rem .6rem;border-radius:var(--r-sm);border:1.5px solid var(--light-grey);background:#fff;color:var(--charcoal);position:relative}
     button.ev-slot{cursor:pointer}button.ev-slot:hover{border-color:var(--orange);box-shadow:var(--shadow)}
     .ev-slot.own{border-color:var(--orange);background:rgba(232,73,30,.08)}
+    .ev-slot.acc{border-color:var(--orange);background:rgba(232,73,30,.16);box-shadow:inset 4px 0 0 var(--orange)}
+    .ev-slot-tag{align-self:flex-start;margin-top:.2rem;font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#fff;background:var(--orange);border-radius:99px;padding:.06rem .5rem}
+    .ev-legend i.acc{border-color:var(--orange);background:rgba(232,73,30,.3);box-shadow:inset 3px 0 0 var(--orange)}
     .ev-slot.empty{border-style:dashed;background:transparent;color:var(--mid-grey);justify-content:center;align-items:center;font-size:.78rem}
     .ev-slot.empty .ev-slot-no{position:absolute;top:.35rem;left:.5rem}
     .ev-slot-no{font-size:.66rem;font-weight:700;color:var(--mid-grey);letter-spacing:.02em}
@@ -233,10 +236,66 @@
   PF.renderGrid = (container, data, opts) => {
     opts = opts || {};
     const ev = data.event;
-    const sig = JSON.stringify([ev.id, ev.status, ev.block_minutes, ev.slots_per_block, ev.start_time, ev.end_time, !!opts.clickEmpty,
-      (data.bookings ?? []).map(b => [b.id, b.block, b.position, b.student_name, b.instrument, b.piece, b.accompaniment, b.own, b.detail, b.accompanist_name, b.teacher_name, b.notes])]);
+    const sig = JSON.stringify([ev.id, ev.status, ev.block_minutes, ev.slots_per_block, ev.start_time, ev.end_time, !!opts.clickEmpty, !!opts.teacherView,
+      (data.bookings ?? []).map(b => [b.id, b.block, b.position, b.student_name, b.instrument, b.piece, b.accompaniment, b.own, b.detail, b.accompanist_name, b.teacher_name, b.notes, b.accompany])]);
     if (container._evSig === sig) return false;
     container._evSig = sig;
+
+    // A teacher's view: only their own students' performances (the
+    // database sends nothing else), so there is no free/booked picture to
+    // draw — just the blocks that contain one of theirs. The ones they
+    // accompany are marked more strongly than the rest.
+    if (opts.teacherView) {
+      const mine = (data.bookings ?? []).slice().sort((a, b) => a.block - b.block || a.position - b.position);
+      if (!mine.length) {
+        container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🎤</div>
+          <div class="empty-state-title">None of your students are performing yet</div>
+          <div class="empty-state-text">Performances by your students, and any you are asked to accompany, will appear here as they book.</div></div>`;
+        container.onclick = null;
+        return true;
+      }
+      let thtml = '';
+      const nb = PF.blockCount(ev.start_time, ev.end_time, ev.block_minutes);
+      for (let blk = 1; blk <= nb; blk++) {
+        const list = mine.filter(b => b.block === blk);
+        if (!list.length) continue;
+        const nAcc = list.filter(b => b.accompany).length;
+        const cells = list.map(b => {
+          const t = PF.clock(PF.slotMinute(ev, blk, b.position));
+          const accTxt = b.accompany ? 'with you'
+            : b.accompaniment === 'peer' ? (b.accompanist_name ? 'with ' + PF.esc(b.accompanist_name) : 'with a peer')
+            : b.accompaniment === 'teacher' ? 'with ' + PF.esc(b.teacher_name || 'their teacher')
+            : b.accompaniment === 'backing_track' ? 'backing track' : '';
+          const clickable = !!opts.onFilled && (!opts.canClick || opts.canClick(b));
+          const tag = clickable ? 'button type="button"' : 'div';
+          const end = clickable ? 'button' : 'div';
+          return `<${tag} class="ev-slot filled ${b.accompany ? 'acc' : 'own'}" data-id="${PF.esc(b.id)}">
+            <span class="ev-slot-no">#${b.position} · ~${t}</span>
+            <span class="ev-slot-name">${PF.esc(b.student_name)}</span>
+            <span class="ev-slot-what">${PF.esc(b.instrument)} — ${PF.esc(b.piece)}</span>
+            ${accTxt ? `<span class="ev-slot-acc">${accTxt}</span>` : ''}
+            ${b.accompany ? '<span class="ev-slot-tag">♪ You accompany</span>' : ''}
+          </${end}>`;
+        }).join('');
+        thtml += `<section class="ev-block" data-block="${blk}">
+          <div class="ev-block-head">
+            <span class="ev-block-title">Block ${blk}</span>
+            <span class="ev-block-time">${PF.blockTimes(ev, blk)}</span>
+            <span class="ev-count">${list.length} performance${list.length === 1 ? '' : 's'}${nAcc ? ` · ${nAcc} you accompany` : ''}</span>
+          </div>
+          <div class="ev-slots">${cells}</div>
+        </section>`;
+      }
+      container.innerHTML = thtml;
+      container.onclick = e => {
+        const f = e.target.closest('.ev-slot.filled');
+        if (f && f.tagName === 'BUTTON' && opts.onFilled) {
+          const bk = (data.bookings ?? []).find(x => x.id === f.dataset.id);
+          if (bk) opts.onFilled(bk);
+        }
+      };
+      return true;
+    }
 
     const stats = PF.blockStats(ev, data.bookings);
     const at = new Map();

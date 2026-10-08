@@ -141,14 +141,33 @@ stand, and they take it from there.
 <h2 id="events">Events</h2>
 <p>
 <strong>Events</strong> in the sidebar shows concerts the studio is running.
-Open one to see the programme: every block and slot, with who is performing,
-the instrument and the piece. <strong>Your own students are highlighted</strong>
-and you can click them to see the full details — the piece, who is
-accompanying, and any comments the family left. Other teachers' students show
-as a first name and last initial only. The page is read-only for teachers:
-bookings, moves and cancellations are done by the studio admins. It updates
+Open one to see the programme for <strong>your students</strong>: the blocks
+and slots where they are performing, with the instrument and the piece. Click a
+performance to see the full details — the piece, who is accompanying, and any
+comments the family left. You will also see any performance where a student
+has asked <strong>you</strong> to accompany them; those are
+<strong>highlighted in orange</strong> and marked "♪ You accompany". Other
+teachers' students are not shown. The page is read-only for teachers: bookings,
+moves and cancellations are done by the studio admins. It updates
 automatically, and <strong>🖨️ Print</strong> gives you a copy for the day.
 </p>
+<p>
+At the top of the event is a short <strong>summary</strong>: how many of your
+students are performing, how many would like you to accompany them (with their
+names and pieces), and the <strong>backing tracks you need to prepare</strong> —
+the student, the piece, and any notes the family left when booking.
+</p>
+<div class="callout callout-tip">
+<strong>Backing tracks appear in My Tasks</strong>
+<p>
+When a student chooses a backing track with you as their teacher, a task is
+added to My Tasks for that performance, due <strong>two weeks before the
+event</strong> (or on the day they book, if that is already closer). The task's
+log has the student, piece and their notes. If the student cancels, or changes
+to a different kind of accompaniment, the task is cancelled for you. Let the
+studio know in a reply on the task once the track is ready.
+</p>
+</div>
 
 <h2 id="password">Changing your password</h2>
 <p>
