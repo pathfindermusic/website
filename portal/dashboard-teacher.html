@@ -727,11 +727,11 @@ async function loadSchedule() {
               : ''}
           ${isGroup && names.length ? `<div class="lesson-meta">${names.join(' · ')}</div>` : ''}
           <div class="lesson-meta">${l.studio_name}${l.is_online ? ' · <span class="pill pill-online" style="font-size:0.65rem;">Online</span>' : ''}</div>
-          <div style="margin-top:4px;">${
+          ${isCancelled ? '' : `<div style="margin-top:4px;">${
             isGroup
               ? `<span class="pill ${l.fully_marked ? 'pill-present' : 'pill-scheduled'}">${l.attendance_marked_count ?? 0} of ${nameCount} marked</span>`
               : attendancePill(attStatus)
-          }</div>
+          }</div>`}
           ${l.occurrence_notes ? `<div class="studio-note"><b>Note from the studio:</b> ${escHtml(l.occurrence_notes)}</div>` : ''}
           ${l.note_text ? `<div class="text-sm text-muted mt-1">📝 Note saved</div>` : ''}
           ${l.drive_link ? `<a href="${l.drive_link}" target="_blank" class="text-sm text-orange mt-1" style="display:inline-block;" onclick="event.stopPropagation()">📁 Drive link</a>` : ''}
@@ -1009,7 +1009,7 @@ async function openLessonView(occurrenceId) {
         <div><div class="text-sm text-muted">Studio</div><div class="font-bold">${l.studio_name ?? '—'}</div></div>
         <div><div class="text-sm text-muted">Time</div><div class="font-bold">${formatTime(l.start_time)} · ${formatDuration(l.duration_mins)}</div></div>
         <div><div class="text-sm text-muted">Type</div><div class="font-bold">${isGroup ? 'Group' : 'Private'}</div></div>
-        <div><div class="text-sm text-muted">Attendance</div><div>${attendancePill(l.attendance_status)}</div></div>
+        <div><div class="text-sm text-muted">Attendance</div><div>${l.occurrence_status === 'cancelled' ? '<span class="pill pill-cancelled">Cancelled</span>' : attendancePill(l.attendance_status)}</div></div>
         <div><div class="text-sm text-muted">Mode</div><div class="font-bold">${l.is_online ? 'Online' : 'In studio'}</div></div>
       </div>
       ${l.series_notes ? `<div style="margin-top:0.65rem;padding-top:0.65rem;border-top:1px solid var(--border);font-size:0.82rem;color:var(--dark-grey);">📋 ${l.series_notes}</div>` : ''}

@@ -706,7 +706,7 @@ async function loadSchedule() {
             </div>` : ''}
         </div>
         <div>
-          ${attendancePill(l.attendance_status)}
+          ${isCancelled ? '' : attendancePill(l.attendance_status)}
           ${l.is_online && l.virtual_room_link ? `
             <div class="mt-1">
               <a href="${l.virtual_room_link}" target="_blank" class="btn btn-secondary btn-sm">Join online</a>
