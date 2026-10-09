@@ -38,6 +38,12 @@ instrument, teacher and studio, with an "Online lesson" tag and a
 "Cancelled" tag if it's been cancelled.
 </p>
 <p>
+If the studio left a message when a lesson was cancelled, it shows under
+that lesson as <strong>Note from the studio</strong>. If your teacher has
+since sent a recorded lesson or other materials in its place, you'll see
+that note and its "View shared file" link there too (and in your email).
+</p>
+<p>
 If your teacher has left a practice note or attached materials for a
 lesson, it appears directly underneath that lesson — including a "View
 shared file" link and a list of materials grouped by Repertoire, Technique

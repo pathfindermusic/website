@@ -2905,3 +2905,24 @@ sibling first registered.
 `receive-enquiry.js`, the Enquiries page's manual-add form, and the Add
 Student and CSV-import paths in `students.html` all write both now, so this
 can't regress by a new student record going through the old, profile-only path.
+
+**Cancelled lessons: studio note visible, teacher can still add a note
+(Oct 2026).** Teachers recorded a catch-up video, put it on Google Drive and
+sent the link to a student whose lesson the studio had cancelled — but the
+teacher card only said "Cancelled", hid the Add Note button and never showed
+the admin's `occurrence_notes` ("Ethan unwell, recorded lesson to be
+provided"). Now `dashboard-teacher.html` and `dashboard-student.html` render
+`occurrence_notes` as an escaped "Note from the studio" box on every lesson
+card (the lesson-view modal too), cancelled rows dim only their time/name/
+meta lines (not the whole row, so notes stay readable), and a cancelled
+teacher card shows a Cancelled pill **plus** the Add/Edit Note button (no
+attendance select). The student schedule and Notes tab also now show a note
+that has only a Drive link (previously hidden unless there was note text or
+materials). `notifyStudentOfNote` now emails on a Drive-link-only save, with
+"…for your lesson on {{lesson_day}}, which was cancelled" wording and a
+"Lesson materials for your {{instrument}} lesson" subject when the occurrence
+is cancelled. No schema change. **Unverified:** the `lesson_notes` RLS
+policies were created by hand in Supabase and aren't in the repo; if a save on
+a cancelled occurrence is rejected ("Could not save note"), re-read them with
+`select policyname, cmd, qual, with_check from pg_policies where tablename =
+'lesson_notes';` and look for a `status` condition on `lesson_occurrences`.

@@ -44,7 +44,18 @@
     }
     .lesson-row-teacher:last-child { border-bottom: none; }
     .lesson-row-teacher:hover { background: var(--off-white); }
-    .lesson-row-teacher.cancelled { opacity: 0.4; }
+    /* A cancelled lesson is dimmed, but its studio note and the Add Note
+       button stay fully readable — teachers still send a recorded lesson. */
+    .lesson-row-teacher.cancelled .time-cell,
+    .lesson-row-teacher.cancelled .duration-label,
+    .lesson-row-teacher.cancelled .lesson-name,
+    .lesson-row-teacher.cancelled .lesson-instrument,
+    .lesson-row-teacher.cancelled .lesson-meta { opacity: 0.5; }
+    .studio-note {
+      margin-top: 6px; padding: 0.4rem 0.6rem; font-size: 0.8rem; line-height: 1.45;
+      background: #fff7ed; border-left: 3px solid var(--orange); border-radius: 0 var(--r-sm) var(--r-sm) 0;
+      color: var(--dark-grey); white-space: pre-line;
+    }
     .lesson-actions { display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-end; }
     .att-select {
       font-size: 0.78rem;
@@ -721,12 +732,13 @@ async function loadSchedule() {
               ? `<span class="pill ${l.fully_marked ? 'pill-present' : 'pill-scheduled'}">${l.attendance_marked_count ?? 0} of ${nameCount} marked</span>`
               : attendancePill(attStatus)
           }</div>
+          ${l.occurrence_notes ? `<div class="studio-note"><b>Note from the studio:</b> ${escHtml(l.occurrence_notes)}</div>` : ''}
           ${l.note_text ? `<div class="text-sm text-muted mt-1">📝 Note saved</div>` : ''}
           ${l.drive_link ? `<a href="${l.drive_link}" target="_blank" class="text-sm text-orange mt-1" style="display:inline-block;" onclick="event.stopPropagation()">📁 Drive link</a>` : ''}
         </div>
         <div class="lesson-actions" onclick="event.stopPropagation()">
-          ${!isCancelled ? `
-          ${isGroup ? `
+          ${isCancelled ? '<span class="pill pill-cancelled">Cancelled</span>' : ''}
+          ${!isCancelled ? (isGroup ? `
             <button class="btn btn-secondary btn-sm" onclick="openGroupAttendance('${l.occurrence_id}')">
               ${l.fully_marked ? 'Edit attendance' : 'Mark attendance'}
             </button>` : `
@@ -737,10 +749,10 @@ async function loadSchedule() {
               <option value="absent_no_credit"  ${attStatus==='absent_no_credit'  ? 'selected' : ''}>Absent — No Credit</option>
               <option value="absent_notice"     ${attStatus==='absent_notice'     ? 'selected' : ''}>Absent — Notice Given</option>
               <option value="teacher_cancelled" ${attStatus==='teacher_cancelled' ? 'selected' : ''}>Teacher Cancelled</option>
-            </select>`}
+            </select>`) : ''}
           <button class="btn btn-ghost btn-sm" onclick="openNoteByOccurrence('${l.occurrence_id}')">
-            ${l.note_text ? 'Edit Note' : '+ Add Note'}
-          </button>` : '<span class="text-sm text-muted">Cancelled</span>'}
+            ${l.note_text || l.drive_link ? 'Edit Note' : '+ Add Note'}
+          </button>
         </div>
       </div>`;
     });
@@ -957,6 +969,10 @@ async function saveGroupAttendance() {
 }
 
 // ---- Read-only lesson view ----
+function escHtml(v) {
+  return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
 async function openLessonView(occurrenceId) {
   const l = scheduleRows.find(r => r.occurrence_id === occurrenceId);
   if (!l) { showToast('Could not load that lesson. Please refresh.', 'error'); return; }
@@ -997,7 +1013,7 @@ async function openLessonView(occurrenceId) {
         <div><div class="text-sm text-muted">Mode</div><div class="font-bold">${l.is_online ? 'Online' : 'In studio'}</div></div>
       </div>
       ${l.series_notes ? `<div style="margin-top:0.65rem;padding-top:0.65rem;border-top:1px solid var(--border);font-size:0.82rem;color:var(--dark-grey);">📋 ${l.series_notes}</div>` : ''}
-      ${l.occurrence_notes ? `<div style="margin-top:0.4rem;font-size:0.82rem;color:var(--dark-grey);font-style:italic;">📝 ${l.occurrence_notes}</div>` : ''}
+      ${l.occurrence_notes ? `<div class="studio-note"><b>Note from the studio:</b> ${escHtml(l.occurrence_notes)}</div>` : ''}
     </div>
 
     <div class="form-label" style="margin-bottom:0.4rem;">${isGroup ? `Students (${names.length})` : 'Student'}</div>
@@ -1353,7 +1369,7 @@ async function saveNote() {
   loadSchedule();
 
   // Scenario 7 — let the student know a new note is available
-  if (noteText || pickedArtefacts.length > 0) {
+  if (noteText || driveLink || pickedArtefacts.length > 0) {
     await notifyStudentOfNote(occurrenceId, noteText, driveLink, pickedArtefacts);
   }
 }
@@ -1368,10 +1384,15 @@ async function notifyStudentOfNote(occurrenceId, noteText, driveLink, pickedArte
 
   // The note itself is wrapped in ** so the email template renders it
   // as a highlighted callout block.
+  // A cancelled lesson usually gets a recorded lesson / materials instead,
+  // so say that plainly rather than "a note from your lesson".
+  const wasCancelled = row.occurrence_status === 'cancelled';
   let bodyText =
     'Dear {{student_name}},\n\n' +
-    'Your teacher, {{teacher_name}}, has added a note from your ' +
-    '{{instrument}} lesson on {{lesson_day}}.\n\n';
+    (wasCancelled
+      ? 'Your teacher, {{teacher_name}}, has sent you something for your {{instrument}} lesson on {{lesson_day}}, which was cancelled.\n\n'
+      : 'Your teacher, {{teacher_name}}, has added a note from your ' +
+        '{{instrument}} lesson on {{lesson_day}}.\n\n');
   if (noteText) bodyText += `**${noteText}**\n\n`;
 
   // Same grouping as the "Materials for this lesson" picker in the note
@@ -1407,7 +1428,7 @@ async function notifyStudentOfNote(occurrenceId, noteText, driveLink, pickedArte
         occurrenceId,
         from:         row.studio_email,
         fromName:     `Pathfinder Music Lessons (${row.studio_name ?? ''})`.trim(),
-        subject:      'A new note from your {{instrument}} lesson',
+        subject:      wasCancelled ? 'Lesson materials for your {{instrument}} lesson' : 'A new note from your {{instrument}} lesson',
         bodyText,
         sentBy:       currentProfile?.id ?? null,
       }),

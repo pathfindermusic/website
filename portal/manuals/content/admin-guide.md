@@ -538,7 +538,10 @@ makeup slot.</li>
 or <strong>the entire series</strong> — all of these keep past history
 intact and free the slot for rebooking; only future, unmarked occurrences
 are actually removed. You'll always be asked whether to email the
-student(s).</li>
+student(s). Anything you type in <strong>Occurrence notes</strong> when
+cancelling is shown to the teacher and the student as "Note from the
+studio", and the teacher can still add a lesson note (e.g. a recorded
+lesson link) to a cancelled lesson.</li>
 <li><strong>Edit series</strong> to change the recurring pattern itself —
 this rebuilds future, unmarked occurrences only; anything already marked
 or in the past is left untouched.</li>

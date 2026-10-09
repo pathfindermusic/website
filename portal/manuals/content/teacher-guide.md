@@ -62,6 +62,18 @@ no extra "send" step, so make sure the note reads the way you want a
 family to see it before saving.
 </p>
 </div>
+<div class="callout callout-tip">
+<strong>Cancelled lessons — sending a recorded lesson</strong>
+<p>
+When the studio cancels a lesson, it stays on your schedule with a
+"Cancelled" tag, and any note the admin typed when cancelling (for example
+"Ethan unwell, recorded lesson to be provided") appears on the lesson as
+<strong>Note from the studio</strong>. You can still click <strong>+ Add
+Note</strong> on a cancelled lesson: paste your Google Drive link, add a
+few words if you like, and save. The student is emailed straight away with
+the link, and it appears under that lesson on their dashboard.
+</p>
+</div>
 <p>
 Clicking anywhere else on a lesson opens a read-only view showing the
 previous lesson's note for context, plus the full details of the current

@@ -22,7 +22,17 @@
     }
     .lesson-row-student:last-child { border-bottom: none; }
     .lesson-row-student:hover { background: var(--off-white); }
-    .lesson-row-student.cancelled { opacity: 0.45; }
+    /* Dim the lesson details, but keep the studio's message and the
+       teacher's note (often a recorded lesson) fully readable. */
+    .lesson-row-student.cancelled .time-cell,
+    .lesson-row-student.cancelled .duration-label,
+    .lesson-row-student.cancelled .lesson-name,
+    .lesson-row-student.cancelled .lesson-meta { opacity: 0.5; }
+    .studio-note {
+      margin-top: 6px; padding: 0.4rem 0.6rem; font-size: 0.82rem; line-height: 1.45;
+      background: #fff7ed; border-left: 3px solid var(--orange); border-radius: 0 var(--r-sm) var(--r-sm) 0;
+      color: var(--dark-grey); white-space: pre-line;
+    }
 
     .note-box {
       background: var(--off-white);
@@ -686,7 +696,8 @@ async function loadSchedule() {
           <div class="lesson-meta">with ${l.teacher_name} · ${l.studio_name}</div>
           ${l.is_online ? `<div class="mt-1"><span class="pill pill-online">Online lesson</span></div>` : ''}
           ${isCancelled ? `<div class="mt-1"><span class="pill pill-cancelled">Cancelled</span></div>` : ''}
-          ${(l.note_text || materialsMap[l.occurrence_id]?.length) ? `
+          ${l.occurrence_notes ? `<div class="studio-note"><b>Note from the studio:</b> ${escHtml(l.occurrence_notes)}</div>` : ''}
+          ${(l.note_text || l.drive_link || materialsMap[l.occurrence_id]?.length) ? `
             <div class="note-box">
               <div class="note-date">Practice note from ${l.teacher_name}</div>
               ${l.note_text ?? ''}
@@ -707,6 +718,10 @@ async function loadSchedule() {
   });
 
   wrap.innerHTML = html;
+}
+
+function escHtml(v) {
+  return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 // ---- Notes tab ----
@@ -741,7 +756,7 @@ async function loadNotes() {
 
   const materialsMap = await fetchOccurrenceMaterials((recent ?? []).map(r => r.occurrence_id));
   const data = (recent ?? [])
-    .filter(l => l.note_text || (materialsMap[l.occurrence_id]?.length > 0))
+    .filter(l => l.note_text || l.drive_link || (materialsMap[l.occurrence_id]?.length > 0))
     .slice(0, 50);
 
   if (data.length === 0) {
