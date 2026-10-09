@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Posters &amp; Leaflets — Pathfinder Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/portal.css">
+  <style>
+    .pm-wrap { display: grid; grid-template-columns: minmax(300px, 400px) 1fr; gap: 1.2rem; align-items: start; }
+    @media (max-width: 1100px) { .pm-wrap { grid-template-columns: 1fr; } }
+    .pm-card { padding: 1rem 1.1rem; margin-bottom: .9rem; }
+    .pm-card h3 { font-size: .86rem; font-weight: 700; color: var(--charcoal); margin-bottom: .6rem; }
+    .pm-seg { display: flex; gap: .4rem; flex-wrap: wrap; }
+    .pm-seg label { position: relative; flex: 1 1 130px; cursor: pointer; border: 1px solid var(--border); border-radius: var(--r-sm); padding: .5rem .65rem; font-size: .82rem; background: var(--white); line-height: 1.3; }
+    .pm-seg label small { display: block; color: var(--mid-grey); font-size: .72rem; margin-top: .1rem; }
+    .pm-seg input { position: absolute; opacity: 0; pointer-events: none; }
+    .pm-seg label:has(input:checked) { border-color: var(--orange); box-shadow: 0 0 0 1px var(--orange); background: #fff7f4; font-weight: 600; }
+    .pm-chk { display: flex; gap: .55rem; align-items: flex-start; font-size: .84rem; padding: .3rem 0; line-height: 1.35; }
+    .pm-chk input { margin-top: .2rem; }
+    .pm-chk.off { opacity: .5; }
+    .pm-chk small { display: block; color: var(--mid-grey); font-size: .74rem; }
+    .pm-two { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+    .pm-card .form-group { margin-bottom: .6rem; }
+    .pm-card textarea.form-input { min-height: 4.2rem; resize: vertical; font-family: inherit; }
+    .pm-stage { background: #d9d9dc; border-radius: var(--r); padding: 1rem; overflow: hidden; display: flex; justify-content: center; }
+    .pm-frame-box { position: relative; background: #fff; box-shadow: 0 6px 24px rgba(0,0,0,.28); }
+    .pm-frame-box iframe { border: 0; position: absolute; left: 0; top: 0; transform-origin: 0 0; background: #fff; }
+    .pm-bar { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-bottom: .8rem; }
+    .pm-help { font-size: .8rem; line-height: 1.5; color: var(--dark-grey); background: var(--off-white); border-radius: var(--r-sm); padding: .6rem .8rem; margin-bottom: .8rem; }
+    .pm-help b { color: var(--charcoal); }
+    .pm-warn { background: #fff4e5; border: 1px solid #f3c98b; color: #7a4a00; border-radius: var(--r-sm); padding: .7rem .9rem; font-size: .83rem; line-height: 1.5; margin-bottom: 1rem; }
+    .pm-share { width: 100%; min-height: 9rem; font: inherit; font-size: .8rem; }
+    .pm-qrs { display: flex; gap: .5rem; flex-wrap: wrap; }
+    @media print { .sidebar, .topnav, .no-print { display: none !important; } .main { margin: 0 !important; } }
+  </style>
+</head>
+<body>
+<div class="portal-shell">
+
+  <nav class="topnav">
+    <a href="#" class="topnav-logo"><img src="../Logo_-_long.png" alt="Pathfinder Music Lessons"></a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">–</span>
+        </div>
+      </div>
+      <a href="change-password.html" class="btn-logout" style="text-decoration:none;">🔑 Password</a>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <aside class="sidebar" id="sidebar"><!-- injected --></aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Posters &amp; leaflets</div>
+        <div class="page-sub">Make a poster or leaflet for an event, ready to print. Everything comes from the event itself — you only add the friendly touches.</div>
+      </div>
+      <a class="btn btn-secondary btn-sm no-print" id="backLink" href="events.html">← Events</a>
+    </div>
+
+    <div id="msg"></div>
+
+    <div id="app" class="hidden">
+      <div class="form-group" style="max-width:520px">
+        <label class="form-label" for="evSel">Event</label>
+        <select class="form-select" id="evSel"></select>
+      </div>
+
+      <div class="pm-wrap">
+        <!-- ================= CONTROLS ================= -->
+        <div class="no-print">
+          <div class="card pm-card">
+            <h3>1 · What would you like?</h3>
+            <div class="pm-seg" style="margin-bottom:.6rem">
+              <label><input type="radio" name="kind" value="poster" checked>Poster<small>A3 — for the studio wall</small></label>
+              <label><input type="radio" name="kind" value="leaflet">Leaflet<small>A6 — to hand out</small></label>
+            </div>
+            <div class="pm-seg">
+              <label><input type="radio" name="mode" value="office" checked>Office printer<small id="officeHint">Exact size, no extras</small></label>
+              <label><input type="radio" name="mode" value="print">Print shop<small>3&nbsp;mm bleed + crop marks</small></label>
+            </div>
+          </div>
+
+          <div class="card pm-card">
+            <h3>2 · What goes on it?</h3>
+            <label class="pm-chk" id="rowTix"><input type="checkbox" id="cbTix" checked><span>Ticket box with QR code<small id="tixHint"></small></span></label>
+            <label class="pm-chk" id="rowPerf"><input type="checkbox" id="cbPerf" checked><span>“Performing? Book your spot” box with QR code<small id="perfHint"></small></span></label>
+            <label class="pm-chk" id="rowSpots"><input type="checkbox" id="cbSpots" checked><span>Say “Limited to <b id="spotsNow">84</b> performance spots”<small>Only use this when it is true — it comes from the event's blocks × slots.</small></span></label>
+            <div class="pm-two" style="margin-top:.4rem">
+              <div class="form-group"><label class="form-label" for="fSpots">Spots to show</label><input class="form-input" type="number" min="1" max="999" id="fSpots"></div>
+              <div class="form-group"><label class="form-label" for="fStudios">Contact details</label><select class="form-select" id="fStudios"><option value="all">Both studios</option></select></div>
+            </div>
+            <div id="leafOpts">
+              <div class="form-group"><label class="form-label" for="lfQR">Leaflet QR code</label>
+                <select class="form-select" id="lfQR"><option value="tickets">Tickets (for families)</option><option value="book">Performer booking</option></select></div>
+              <label class="pm-chk" id="rowLfPerf"><input type="checkbox" id="cbLfPerf"><span>Add a “Performing? Book by …” line to the leaflet footer</span></label>
+            </div>
+          </div>
+
+          <div class="card pm-card">
+            <h3>3 · Wording <span style="font-weight:400;color:var(--mid-grey)">(edit freely — the picture updates as you type)</span></h3>
+            <div class="pm-two">
+              <div class="form-group"><label class="form-label" for="fPill">Top label</label><input class="form-input" id="fPill" maxlength="40"></div>
+              <div class="form-group"><label class="form-label" for="fKicker">Small heading</label><input class="form-input" id="fKicker" maxlength="60"></div>
+              <div class="form-group"><label class="form-label" for="fH1">Headline, line 1</label><input class="form-input" id="fH1" maxlength="24"></div>
+              <div class="form-group"><label class="form-label" for="fH2">Headline, line 2 (orange)</label><input class="form-input" id="fH2" maxlength="24"></div>
+            </div>
+            <div class="form-group"><label class="form-label" for="fLead">Invitation sentence (poster)</label><textarea class="form-input" id="fLead" maxlength="300"></textarea></div>
+            <div class="form-group"><label class="form-label" for="fHL">Extra details, one per line</label><textarea class="form-input" id="fHL" maxlength="600" placeholder="Doors open at 11:30 AM&#10;Parking available&#10;Lovely parks nearby to explore if you arrive early"></textarea>
+              <div class="form-hint">The first line sits under the time (for example “Doors open at 11:30 AM”). Each line after that gets its own little icon beside the venue.</div></div>
+            <div class="form-group"><label class="form-label" for="fNote">Note under the booking steps (poster)</label><textarea class="form-input" id="fNote" maxlength="300"></textarea></div>
+            <div class="pm-two">
+              <div class="form-group"><label class="form-label" for="fStrip">Strip on the ticket box</label><input class="form-input" id="fStrip" maxlength="50"></div>
+              <div class="form-group"><label class="form-label" for="fLfKicker">Leaflet heading</label><input class="form-input" id="fLfKicker" maxlength="60"></div>
+            </div>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+              <button class="btn btn-secondary btn-sm" id="saveBtn" onclick="saveWording()">💾 Remember this wording for the event</button>
+              <button class="btn btn-ghost btn-sm" onclick="resetAll()">↺ Start again from the event</button>
+            </div>
+            <div class="form-hint" id="saveHint" style="margin-top:.4rem">Saves the invitation sentence, extra details and booking note, so next time they are filled in for you.</div>
+          </div>
+        </div>
+
+        <!-- ================= PREVIEW ================= -->
+        <div>
+          <div class="pm-bar no-print">
+            <button class="btn btn-primary" onclick="printIt()">🖨️ Print or save as PDF</button>
+            <span style="font-size:.78rem;color:var(--mid-grey)" id="sizeNote"></span>
+          </div>
+          <div class="pm-help no-print" id="printHelp"></div>
+          <div class="pm-stage" id="stage"><div class="pm-frame-box" id="frameBox"><iframe id="frame" title="Preview"></iframe></div></div>
+
+          <div class="card pm-card no-print" style="margin-top:1rem">
+            <h3>QR codes and links</h3>
+            <div class="pm-qrs">
+              <button class="btn btn-secondary btn-sm" id="qrT" onclick="dlQr('tickets')">⬇ Tickets QR (PNG)</button>
+              <button class="btn btn-secondary btn-sm" id="qrB" onclick="dlQr('book')">⬇ Performer booking QR (PNG)</button>
+            </div>
+            <div class="form-hint" style="margin-top:.4rem">The PNGs are for newsletters, slides, social media or a sign you make yourself. Scan one with your phone before you print a lot of copies.</div>
+          </div>
+
+          <div class="card pm-card no-print">
+            <h3>Words for an email or social post</h3>
+            <textarea class="form-input pm-share" id="shareTxt"></textarea>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem">
+              <button class="btn btn-secondary btn-sm" onclick="copyText()">📋 Copy</button>
+              <button class="btn btn-primary btn-sm" onclick="draftEmail()">✉️ Draft an announcement email…</button>
+            </div>
+            <div class="form-hint" style="margin-top:.4rem">The email draft opens in Notifications for you to check and send — nothing is sent from here.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="toastWrap" class="toast-wrap"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/events-common.js"></script>
+<script src="js/qrcode-generator.js"></script>
+<script src="js/event-promo.js"></script>
+<script>
+const PF = window.PFEvents;
+const $ = id => document.getElementById(id);
+const esc = PF.esc ?? (s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])));
+
+let me = null, events = [], studios = [], ev = null, S = null, hasPromoCols = false, timer = null;
+
+function toggleSidebar() { $('sidebar').classList.toggle('open'); }
+function show(html, cls) { $('msg').innerHTML = `<div class="${cls || 'pm-warn'}">${html}</div>`; }
+
+/** Base URL of the portal's folder, so fonts and the logo load inside the preview/print frame */
+const here = p => new URL(p, location.href).href;
+const ASSETS = () => ({ logo: here('img/logo-white.png'), fontBase: here('fonts/') });
+
+(async () => {
+  me = await requireAuth(['superuser', 'admin']);
+  if (!me) return;
+  renderTopNavUser(me);
+  renderSidebar();
+  if (window.innerWidth < 900) $('menuToggle').style.display = '';
+
+  const [e, s] = await Promise.all([
+    db.from('events').select('*').order('event_date', { ascending: false }),
+    db.from('studios').select('id,name').eq('status', 'active').order('name'),
+  ]);
+  if (e.error) { show('Could not load events: ' + esc(e.error.message)); return; }
+  events = e.data ?? [];
+  studios = s.data ?? [];
+  if (!events.length) { show('There are no events yet. Create one under <a href="events.html">Events</a> and come back.', 'pm-help'); return; }
+  hasPromoCols = events[0] && 'promo_tagline' in events[0];
+  if (!hasPromoCols) {
+    $('saveBtn').disabled = true;
+    $('saveHint').innerHTML = '⚠ To remember wording for an event, the database script <b>event-promo.sql</b> needs to be run once. Everything else works without it.';
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const want = new URLSearchParams(location.search).get('event');
+  const upcoming = events.filter(x => x.event_date >= today).sort((a, b) => a.event_date.localeCompare(b.event_date));
+  const pick = events.find(x => x.id === want) || upcoming[0] || events[0];
+  $('evSel').innerHTML = events.map(x => `<option value="${x.id}">${esc(x.name)} — ${PF.fmtDate(x.event_date, true)}</option>`).join('');
+  $('evSel').value = pick.id;
+  $('evSel').addEventListener('change', () => { history.replaceState({}, '', 'event-promo.html?event=' + $('evSel').value); load($('evSel').value); });
+  $('app').classList.remove('hidden');
+
+  document.querySelectorAll('.pm-card input, .pm-card textarea, .pm-card select').forEach(el => el.addEventListener('input', () => { readControls(); schedule(); }));
+  window.addEventListener('resize', fit);
+  load(pick.id);
+})();
+
+// ------------------------------------------------------------
+// Load an event into the controls
+// ------------------------------------------------------------
+function studioNameFor(e) { return e.studio_id ? (studios.find(x => x.id === e.studio_id)?.name || '') : ''; }
+
+function load(id) {
+  ev = events.find(x => x.id === id);
+  $('backLink').href = 'events.html?event=' + id;
+  S = PFPromo.fromEvent(ev, { origin: PFPromo.SITE, studioName: studioNameFor(ev), assets: ASSETS() });
+  // studio picker
+  const names = PFPromo.STUDIOS.map(x => x.name);
+  $('fStudios').innerHTML = '<option value="all">Both studios</option>' + names.map(n => `<option value="${esc(n)}">${esc(n)} only</option>`).join('');
+  $('fStudios').value = S.studios.length === 1 ? S.studios[0].name : 'all';
+  writeControls();
+  readControls();
+  render();
+}
+function resetAll() { load($('evSel').value); showToast('Back to the event\'s own details.'); }
+
+function writeControls() {
+  const tixOK = !!ev.tickets_enabled, perfOK = ev.status === 'open';
+  $('cbTix').checked = S.tickets.on; $('cbTix').disabled = !tixOK;
+  $('rowTix').classList.toggle('off', !tixOK);
+  $('tixHint').textContent = tixOK ? `${S.tickets.price} per ticket — sold online at pathfindermusiclessons.com.au/tickets` : 'Online ticket sales are switched off for this event (Events → Edit).';
+  $('cbPerf').checked = S.perf.on;
+  $('rowPerf').classList.toggle('off', !perfOK);
+  $('perfHint').textContent = perfOK ? (S.perf.deadline ? `Students book in the Portal. Last day: ${S.perf.deadline}.` : 'Students book in the Portal.')
+    : `This event is ${ev.status === 'draft' ? 'a draft' : 'closed to bookings'} — open it for booking first, or leave this off.`;
+  $('cbSpots').checked = S.perf.showSpots;
+  $('fSpots').value = S.perf.spots; $('spotsNow').textContent = S.perf.spots;
+  $('lfQR').value = S.leaflet.qr; $('cbLfPerf').checked = S.leaflet.performerLine;
+  $('fPill').value = S.pill; $('fKicker').value = S.kicker; $('fH1').value = S.headline1; $('fH2').value = S.headline2;
+  $('fLead').value = S.lead;
+  $('fHL').value = [S.doorsLine, ...S.extras].filter(Boolean).join('\n');
+  $('fNote').value = S.perf.note; $('fStrip').value = S.tickets.strip; $('fLfKicker').value = S.leaflet.kicker;
+}
+
+function readControls() {
+  S.tickets.on = $('cbTix').checked && !!ev.tickets_enabled;
+  S.perf.on = $('cbPerf').checked;
+  S.perf.showSpots = $('cbSpots').checked;
+  const n = parseInt($('fSpots').value, 10);
+  S.perf.spots = n > 0 ? n : PFPromo.capacity(ev);
+  $('spotsNow').textContent = S.perf.spots;
+  const f = $('fStudios').value;
+  S.studios = f === 'all' ? PFPromo.STUDIOS.slice() : PFPromo.STUDIOS.filter(x => x.name === f);
+  S.leaflet.qr = $('lfQR').value; S.leaflet.performerLine = $('cbLfPerf').checked;
+  S.pill = $('fPill').value.trim(); S.kicker = $('fKicker').value.trim();
+  S.headline1 = $('fH1').value.trim(); S.headline2 = $('fH2').value.trim();
+  S.lead = $('fLead').value.trim();
+  const hl = $('fHL').value.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+  S.doorsLine = hl[0] || ''; S.extras = hl.slice(1, 5);
+  S.perf.note = $('fNote').value.trim(); S.tickets.strip = $('fStrip').value.trim(); S.leaflet.kicker = $('fLfKicker').value.trim();
+}
+
+// ------------------------------------------------------------
+// Preview
+// ------------------------------------------------------------
+const kind = () => document.querySelector('input[name="kind"]:checked').value;
+const mode = () => document.querySelector('input[name="mode"]:checked').value;
+/** What is actually produced: office leaflets are four-up on an A4 sheet */
+function product() {
+  const k = kind(), m = mode();
+  return { k: k === 'leaflet' && m === 'office' ? 'sheet' : k, m };
+}
+function schedule() { clearTimeout(timer); timer = setTimeout(render, 160); }
+document.querySelectorAll('input[name="kind"], input[name="mode"]').forEach(r => r.addEventListener('change', () => { readControls(); render(); }));
+
+function render() {
+  const { k, m } = product();
+  const html = PFPromo.html(k, S, m);
+  const size = PFPromo.pageSize(k, m);
+  const fr = $('frame');
+  fr.dataset.w = size.w; fr.dataset.h = size.h;
+  fr.srcdoc = html;
+  $('leafOpts').classList.toggle('hidden', kind() !== 'leaflet');
+  $('officeHint').textContent = kind() === 'leaflet' ? 'Four leaflets per A4 sheet' : 'Exact size, no extras';
+  $('sizeNote').textContent = k === 'sheet' ? 'A4 sheet with four A6 leaflets — cut along the dashed lines'
+    : (m === 'print' ? `${size.w} × ${size.h} mm including bleed and crop marks` : (k === 'poster' ? 'A3 · 297 × 420 mm' : 'A6 · 105 × 148 mm'));
+  $('printHelp').innerHTML = k === 'sheet'
+    ? '<b>To print:</b> click the button, choose your printer (or “Save as PDF”), paper <b>A4</b>, scale <b>100%</b>, margins <b>None</b>. Cut along the dashed lines with a guillotine.'
+    : (m === 'print'
+      ? '<b>For the print shop:</b> choose “Save as PDF”, margins <b>None</b>, scale <b>100%</b>, and send the PDF. It is larger than the finished piece on purpose — the shop trims at the crop marks.'
+      : `<b>To print:</b> click the button, choose your printer (or “Save as PDF”), paper <b>${k === 'poster' ? 'A3' : 'A6'}</b>, scale <b>100%</b>, margins <b>None</b>.${k === 'poster' ? ' No A3 printer? Save as PDF and use a print shop or copy centre.' : ''}`);
+  $('shareTxt').value = PFPromo.shareText(S);
+  $('qrT').classList.toggle('hidden', !ev.tickets_enabled);
+  fit();
+}
+
+/** Show the page at a size that fits the available width */
+function fit() {
+  const fr = $('frame'); const w = +fr.dataset.w, h = +fr.dataset.h;
+  if (!w) return;
+  const pxW = w * 96 / 25.4, pxH = h * 96 / 25.4;
+  const avail = $('stage').clientWidth - 32;
+  const maxH = Math.max(480, window.innerHeight - 140);
+  const k = Math.min(1, avail / pxW, maxH / pxH);
+  fr.style.width = pxW + 'px'; fr.style.height = pxH + 'px'; fr.style.transform = `scale(${k})`;
+  $('frameBox').style.width = pxW * k + 'px'; $('frameBox').style.height = pxH * k + 'px';
+}
+
+// ------------------------------------------------------------
+// Print / download / copy
+// ------------------------------------------------------------
+function printIt() {
+  readControls();
+  const { k, m } = product();
+  const html = PFPromo.html(k, S, m);
+  const old = document.getElementById('printFrame'); if (old) old.remove();
+  const fr = document.createElement('iframe');
+  fr.id = 'printFrame'; fr.setAttribute('aria-hidden', 'true');
+  fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  fr.onload = async () => {
+    try { await fr.contentWindow.document.fonts.ready; } catch (_) {}
+    setTimeout(() => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (_) { showToast('Could not open the print window. Try again.', 'error'); } }, 250);
+  };
+  fr.srcdoc = html;
+  document.body.appendChild(fr);
+}
+
+async function dlQr(which) {
+  const url = which === 'tickets' ? S.tickets.url : S.perf.url;
+  const blob = await PFPromo.qrPngBlob(url, 1000);
+  const slug = String(ev.name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = `QR-${slug}-${which === 'tickets' ? 'tickets' : 'performer-booking'}.png`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+async function copyText() {
+  const el = $('shareTxt');
+  try { await navigator.clipboard.writeText(el.value); showToast('Copied.'); }
+  catch (_) { el.select(); showToast('Press Ctrl+C (Cmd+C on Mac) to copy the selected text.', 'warning'); }
+}
+
+function draftEmail() {
+  readControls();
+  const when = `${S.dateLine} ${S.year}, ${S.timeLine}`;
+  const where = [S.venueName, S.venueAddress].filter(Boolean).join(', ');
+  let body = `Hi {{first_name}},\n\n**${ev.name}** is coming up on ${when}${where ? ' at ' + where : ''}.`;
+  if (S.tickets.on) body += `\n\nYou, your family and your friends are all welcome. Tickets are ${S.tickets.price} each and can be bought online:\n\n[Buy tickets](${S.tickets.url})`;
+  if (S.perf.on) body += `\n\nWould you like to perform? Book your spot in the Student Portal${S.perf.deadline ? ' by **' + S.perf.deadline + '**' : ''}${S.perf.showSpots && S.perf.spots ? ` — spots are limited to ${S.perf.spots} performances` : ''}:\n\n[Book your performance](${S.perf.url})`;
+  if (S.doorsLine) body += `\n\n${S.doorsLine}.`;
+  body += '\n\nWe look forward to seeing you there!';
+  const subject = S.tickets.on ? `${ev.name}: tickets on sale now` : `${ev.name}: you're invited`;
+  sessionStorage.setItem('notifPrefill', JSON.stringify({ drafts: [{ audience: 'students', subject, studioId: ev.studio_id ?? null, body }] }));
+  location.href = 'notifications.html';
+}
+
+async function saveWording() {
+  readControls();
+  const v = (x, max) => { x = (x || '').trim(); return x ? x.slice(0, max) : null; };
+  const payload = {
+    promo_tagline: v(S.lead, 300),
+    promo_highlights: v([S.doorsLine, ...S.extras].join('\n'), 600),
+    promo_performer_note: v(S.perf.note, 300),
+  };
+  const { error } = await db.from('events').update(payload).eq('id', ev.id);
+  if (error) { showToast('Could not save: ' + error.message, 'error'); return; }
+  Object.assign(ev, payload);
+  showToast('Saved — next time this event opens with this wording.');
+}
+
+// ============================================================
+// SIDEBAR (same as Events, with Events highlighted)
+// ============================================================
+function renderSidebar() {
+  const item = (href, label, path, active) => `
+    <a class="nav-item ${active ? 'active' : ''}" href="${href}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${path}</svg>
+      ${label}
+    </a>`;
+  const I = {
+    people:  '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>',
+    person:  '<circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/>',
+    cal:     '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+    mail:    '<path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/>',
+    clipboard: '<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/>',
+    check:   '<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+    task:    '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+    inbox:   '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+    home:    '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    shield:  '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+    book:    '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
+    list:    '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
+    help:    '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+    ticket:  '<path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/>',
+    award:   '<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>',
+    star:    '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+    gift:  '<polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>',
+  };
+  let html = `<div class="sidebar-section">Front desk</div>
+      ${item('tasks.html','Tasks',I.task)}
+      ${item('enquiries.html','Enquiries',I.inbox)}
+      ${item('notifications.html','Notifications',I.mail)}
+      ${item('day-sheet.html','Day Sheet',I.clipboard)}
+      ${item('events.html','Events',I.star,true)}
+      ${item('vouchers.html','Vouchers',I.gift)}
+      <div class="sidebar-section">Teaching</div>
+      ${item('lessons.html','Lessons',I.cal)}
+      ${item('students.html','Students',I.people)}
+      ${item('teachers.html','Teachers',I.person)}
+      <div class="sidebar-section">Curriculum</div>
+      ${item('bok-artefacts.html','Artefact Library',I.book)}
+      <div class="sidebar-section">Reports</div>
+      ${item('attendance-report.html','Attendance',I.check)}
+      ${item('grading-report.html','Grading',I.award)}
+      ${item('credits.html','Credits',I.ticket)}
+      ${item('distribution-lists.html','Distribution Lists',I.list)}`;
+  if (me.role === 'superuser') {
+    html += `<div class="sidebar-section">Super User</div>
+      ${item('studios.html','Studios',I.home)}
+      ${item('admins.html','Admins',I.shield)}
+      ${item('teacher-utilisation.html','Teachers utilisation','<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>')}`;
+  }
+  html += `<div class="sidebar-section">Manuals</div>
+      ${item('manuals/index.html','How-To Guide',I.help)}`;
+  $('sidebar').innerHTML = html;
+}
+</script>
+</body>
+</html>

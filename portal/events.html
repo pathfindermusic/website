@@ -552,6 +552,7 @@ function renderDetail() {
       ${s === 'closed' ? '<button class="btn btn-secondary btn-sm" onclick="setStatus(\'open\')">Reopen bookings</button>' : ''}
       ${tixAvailable ? `<a class="btn btn-secondary btn-sm" href="ticket-sales.html?event=${ev.id}">🎟️ Ticket sales</a>` : ''}
       <button class="btn btn-secondary btn-sm" onclick="openEventModal('${ev.id}')">✏️ Edit</button>
+      <button class="btn btn-secondary btn-sm" onclick="location.href='event-promo.html?event=${ev.id}'">📣 Posters &amp; leaflets</button>
       <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ Print</button>
       <button class="btn btn-danger btn-sm" onclick="deleteEvent()">Delete</button>`;
     const panel = document.getElementById('sharePanel');
@@ -691,6 +692,8 @@ We are holding **${ev.name}** on ${when}${where ? ' at ' + where : ''}.
 Would you like to perform? Please book your spot here — sign in with your usual Portal login:
 
 [Book your performance](${url})
+
+If you have not signed in before, or have forgotten your password, choose **Forgot password?** on the sign-in page and we will email you a link to set a new one. If you still cannot get in, just reply to this email and we will sort it out.
 
 Choose up to three time blocks you would like, and the Portal will place you in the first one that still has room. You will see everyone's performances build up on the same page, and you can change or cancel your booking at any time while bookings are open.${ev.booking_deadline ? `\n\nPlease book by **${PF.fmtDate(ev.booking_deadline)}**.` : ''}
 

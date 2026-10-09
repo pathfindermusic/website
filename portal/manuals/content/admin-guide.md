@@ -390,6 +390,37 @@ before.
 </p>
 </div>
 
+<h3 id="posters">Posters &amp; Leaflets</h3>
+<p>
+Open an event under <strong>Events</strong> and choose <strong>Posters &amp; leaflets</strong>
+to make an A3 poster for the studio wall or an A6 leaflet to hand out. The event's
+name, date, times, venue, ticket price and booking deadline are filled in for you,
+along with two QR codes: one for buying tickets and one for performers to book
+their spot. The number of performance spots comes from the event's blocks and
+slots (for a 12&ndash;7 PM concert with 12 performances an hour, that is 84).
+</p>
+<ol>
+<li>Pick <strong>Poster</strong> or <strong>Leaflet</strong>, then <strong>Office printer</strong>
+(exact size; leaflets come four to an A4 sheet) or <strong>Print shop</strong> (3&nbsp;mm bleed
+and crop marks).</li>
+<li>Switch the ticket box, the performer box and the &ldquo;limited to N spots&rdquo; line on or off.
+Only keep the spots line when it is true.</li>
+<li>Adjust the wording if you like. The picture updates as you type. Put things like
+&ldquo;Doors open at 11:30 AM&rdquo;, &ldquo;Parking available&rdquo; in <strong>Extra details</strong>, one per line.</li>
+<li>Click <strong>Print or save as PDF</strong>. In the print window choose paper size A3 (poster) or
+A4 (leaflet sheet), scale 100%, margins None.</li>
+</ol>
+<div class="callout callout-tip">
+<strong>Good to know</strong>
+<p>
+<strong>Remember this wording for the event</strong> keeps your invitation sentence and extra
+details so the next poster for that event starts with them. The QR code buttons give you
+PNG pictures for newsletters and social media, and <strong>Draft an announcement email</strong>
+opens a ready-made message in Notifications for you to check and send &mdash; nothing is sent
+from the poster page. Always scan a QR code with your phone before printing a lot of copies.
+</p>
+</div>
+
 <h2 id="teaching">Teaching</h2>
 <p>
 Teaching covers the actual timetable: scheduling lessons, managing the

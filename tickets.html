@@ -94,6 +94,13 @@ footer { background: var(--charcoal); padding: 3.5rem 2rem 2rem; border-top: 3px
 .tk-card-body{padding:1.6rem 1.75rem 1.75rem;}
 .f-hint{font-size:0.75rem;color:var(--mid-grey);line-height:1.5;}
 .f-group+.f-group{margin-top:1rem;}
+.f-suggest{display:none;background:#fff7ed;border:1px solid #fed7aa;border-left:3px solid #d97706;border-radius:var(--r-sm);padding:0.65rem 0.85rem;font-size:0.85rem;line-height:1.55;color:#7c2d12;margin-top:0.45rem;}
+.f-suggest.show{display:block;}
+.f-suggest b{word-break:break-all;}
+.f-suggest .sg-btns{display:flex;gap:0.6rem;flex-wrap:wrap;margin-top:0.5rem;}
+.f-suggest button{font:inherit;font-weight:600;font-size:0.8rem;padding:0.4rem 0.85rem;border-radius:var(--r-sm);cursor:pointer;border:1.5px solid #d97706;background:var(--white);color:#7c2d12;}
+.f-suggest button.sg-yes{background:#d97706;color:#fff;}
+.f-bad input{border-color:#dc2626 !important;}
 .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;}
 .stepper{display:flex;align-items:center;gap:0.6rem;}
 .stepper button{width:44px;height:44px;border-radius:var(--r-sm);border:1.5px solid var(--light-grey);background:var(--white);font-size:1.4rem;font-weight:700;color:var(--charcoal);cursor:pointer;line-height:1;}
@@ -197,6 +204,15 @@ footer { background: var(--charcoal); padding: 3.5rem 2rem 2rem; border-top: 3px
               <label for="fEmail">Your email address *</label>
               <input id="fEmail" name="email" type="email" maxlength="254" autocomplete="email" inputmode="email" required>
               <span class="f-hint">Your tickets and payment receipt are sent here.</span>
+            </div>
+            <div class="f-group" id="gEmail2">
+              <label for="fEmail2">Confirm your email address *</label>
+              <input id="fEmail2" name="email_confirm" type="email" maxlength="254" autocomplete="off" inputmode="email" required>
+              <span class="f-hint">Please type it again — it is the only place your tickets are sent.</span>
+              <div class="f-suggest" id="emailSuggest" role="status" aria-live="polite">
+                Did you mean <b id="sgAddr"></b>?
+                <div class="sg-btns"><button type="button" class="sg-yes" id="sgYes">Yes, use that</button><button type="button" id="sgNo">No, mine is correct</button></div>
+              </div>
             </div>
             <div class="f-group">
               <label for="fPerf">Who are you coming to watch? *</label>
@@ -365,9 +381,49 @@ document.querySelectorAll("a[href^=\"#\"]").forEach(a=>a.addEventListener("click
     renderEvent(); update();
   }
 
+  // ---- email checks: retype to confirm + "did you mean gmail.com?" ----
+  var DOMAINS = ['gmail.com', 'hotmail.com', 'hotmail.com.au', 'outlook.com', 'outlook.com.au', 'yahoo.com', 'yahoo.com.au',
+    'icloud.com', 'live.com', 'live.com.au', 'msn.com', 'me.com', 'ymail.com', 'protonmail.com', 'bigpond.com', 'bigpond.net.au',
+    'optusnet.com.au', 'tpg.com.au', 'iinet.net.au', 'internode.on.net', 'westnet.com.au', 'aapt.net.au', 'telstra.com'];
+  var dismissed = {};   // addresses the visitor said are right as typed
+  function dist(a, b) {  // edit distance where swapping two neighbouring letters counts as one slip
+    var d = [], i, j, c;
+    for (i = 0; i <= a.length; i++) { d[i] = [i]; }
+    for (j = 1; j <= b.length; j++) { d[0][j] = j; }
+    for (i = 1; i <= a.length; i++) {
+      for (j = 1; j <= b.length; j++) {
+        c = a[i - 1] === b[j - 1] ? 0 : 1;
+        d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + c);
+        if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+      }
+    }
+    return d[a.length][b.length];
+  }
+  function suggestEmail(email) {
+    var m = /^([^@\s]+)@([^@\s]+)$/.exec(email);
+    if (!m) return null;
+    var dom = m[2].toLowerCase();
+    if (DOMAINS.indexOf(dom) >= 0) return null;
+    var best = null, bd = 99, i, x;
+    for (i = 0; i < DOMAINS.length; i++) { x = dist(dom, DOMAINS[i]); if (x < bd) { bd = x; best = DOMAINS[i]; } }
+    return best && bd <= (dom.length <= 9 ? 1 : 2) ? m[1] + '@' + best : null;
+  }
+  function hideSuggest() { $('emailSuggest').classList.remove('show'); }
+  function showSuggest(addr) { $('sgAddr').textContent = addr; $('emailSuggest').dataset.addr = addr; $('emailSuggest').classList.add('show'); }
+  function pendingSuggestion() {   // a suggestion we have not been told to ignore
+    var e = $('fEmail').value.trim(), s = suggestEmail(e);
+    return s && !dismissed[e.toLowerCase()] ? s : null;
+  }
+  function emailsMatch() { return $('fEmail').value.trim().toLowerCase() === $('fEmail2').value.trim().toLowerCase(); }
+  function markMismatch() {
+    var two = $('fEmail2').value.trim() !== '';
+    $('gEmail2').classList.toggle('f-bad', two && !emailsMatch());
+  }
+
   function restore() {
     $('fName').value = store('pf_tk_name') || '';
     $('fEmail').value = store('pf_tk_email') || '';
+    $('fEmail2').value = $('fEmail').value;   // it was already confirmed when it was saved
     $('fPerf').value = store('pf_tk_perf') || '';
     var q = parseInt(store('pf_tk_qty'), 10);
     if (q >= 1 && q <= maxQty) $('fQty').value = q;
@@ -407,6 +463,20 @@ document.querySelectorAll("a[href^=\"#\"]").forEach(a=>a.addEventListener("click
   $('fQty').addEventListener('input', update);
   $('fQty').addEventListener('change', function () { setQty(qty() || 1); });
 
+  $('fEmail').addEventListener('blur', function () {
+    var s = pendingSuggestion(); if (s) showSuggest(s); else hideSuggest();
+  });
+  $('fEmail').addEventListener('input', function () { hideSuggest(); markMismatch(); });
+  $('fEmail2').addEventListener('input', markMismatch);
+  $('fEmail2').addEventListener('paste', function (e) { e.preventDefault(); showErr('Please type your email address again rather than pasting it — that is how we catch typos.'); });
+  $('sgYes').addEventListener('click', function () {
+    var a = $('emailSuggest').dataset.addr || '';
+    $('fEmail').value = a; $('fEmail2').value = a; hideSuggest(); markMismatch(); showErr('');
+  });
+  $('sgNo').addEventListener('click', function () {
+    dismissed[$('fEmail').value.trim().toLowerCase()] = true; hideSuggest(); showErr('');
+  });
+
   $('form').addEventListener('submit', async function (ev) {
     ev.preventDefault();
     if (busy || !current) return;
@@ -418,6 +488,17 @@ document.querySelectorAll("a[href^=\"#\"]").forEach(a=>a.addEventListener("click
     if (!perf) bad.push('the name of the performer you are coming to watch');
     if (!(n >= 1 && n <= maxQty)) bad.push('a number of tickets from 1 to ' + maxQty);
     if (bad.length) { showErr('Please enter ' + bad.join(', ') + '.'); return; }
+    if (!emailsMatch()) {
+      markMismatch();
+      showErr('The two email addresses do not match. Please check them — your tickets are sent to this address.');
+      $('fEmail2').focus(); return;
+    }
+    var sg = pendingSuggestion();
+    if (sg) {
+      showSuggest(sg);
+      showErr('Please check your email address — it looks like it may contain a typo.');
+      return;
+    }
 
     busy = true; $('pay').disabled = true; $('pay').textContent = 'Taking you to the payment page…';
     remember();

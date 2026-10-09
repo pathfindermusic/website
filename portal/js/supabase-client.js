@@ -22,6 +22,17 @@ async function getSession() {
   return session;
 }
 
+/** Headers for our own Netlify functions that need to know who is asking
+ *  (the signed-in user's access token goes in as a Bearer token). */
+async function authHeaders() {
+  const h = { 'Content-Type': 'application/json' };
+  try {
+    const { data } = await db.auth.getSession();
+    if (data?.session?.access_token) h.Authorization = 'Bearer ' + data.session.access_token;
+  } catch (_) {}
+  return h;
+}
+
 /** Returns the full profile row for the current user */
 async function getProfile() {
   const session = await getSession();

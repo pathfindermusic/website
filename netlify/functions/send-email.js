@@ -77,29 +77,34 @@ exports.handler = async (event) => {
     // ============================================================
     const mode = body.mode;
 
-    // Teacher addresses are staff details, so unlike the long-standing
-    // student modes this one insists on a signed-in admin: the caller's
-    // Portal session token is checked against Supabase and their role read
-    // from profiles. (The student modes are unchanged.)
-    if (mode === 'teachers') {
-      const token = (event.headers?.authorization ?? event.headers?.Authorization ?? '').replace(/^Bearer\s+/i, '');
-      let role = null;
-      if (token) {
-        try {
-          const ur = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-            headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${token}` },
-          });
-          const u = ur.ok ? await ur.json() : null;
-          if (u?.id) {
-            const pr = await get(`profiles?id=eq.${u.id}&status=eq.active&select=role`);
-            role = pr?.[0]?.role ?? null;
-          }
-        } catch (_) { role = null; }
-      }
-      if (role !== 'admin' && role !== 'superuser') {
-        return json(403, { error: 'Only a signed-in admin can email teachers.' });
-      }
+    // Only a signed-in member of staff may send or preview email. The
+    // caller's Portal session token is checked against Supabase and their
+    // role read from profiles: without this, anyone who knew this address
+    // could post a request and have the studio send email to students.
+    // Teachers may write to students (their own lessons' notes, a student
+    // they teach); emailing teachers is an admin job.
+    const token = (event.headers?.authorization ?? event.headers?.Authorization ?? '').replace(/^Bearer\s+/i, '');
+    let role = null;
+    if (token) {
+      try {
+        const ur = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+          headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${token}` },
+        });
+        const u = ur.ok ? await ur.json() : null;
+        if (u?.id) {
+          const pr = await get(`profiles?id=eq.${u.id}&status=eq.active&select=role`);
+          role = pr?.[0]?.role ?? null;
+        }
+      } catch (_) { role = null; }
     }
+    const isAdminRole = role === 'admin' || role === 'superuser';
+    if (!isAdminRole && role !== 'teacher') {
+      return json(403, { error: 'Please sign in to the Portal again to send email.' });
+    }
+    if (mode === 'teachers' && !isAdminRole) {
+      return json(403, { error: 'Only a signed-in admin can email teachers.' });
+    }
+
     let studentIds = [];
     let teacherRows   = [];  // 'teachers' mode only
     let lessonContext  = null; // for occurrence-driven emails

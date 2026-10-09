@@ -316,7 +316,7 @@ async function loadList(which) {
   try {
     const res = await fetch('/.netlify/functions/send-email', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await authHeaders(),
       body: JSON.stringify(spec),
     });
     const data = await res.json();

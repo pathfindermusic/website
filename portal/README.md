@@ -2299,6 +2299,48 @@ reconcile issue/abandon/re-email, admin resend/check/refund and studio scoping);
 `events.html` additions; 10 for the login redirect; a bundling check with esbuild;
 PDFs rendered and inspected. **Not yet tested against real eWAY or Resend.**
 
+## Posters & leaflets (Oct 2026, migration #47) — `event-promo.html`
+
+Admin-only page (reached from Events → an event → **Posters & leaflets**, or
+`event-promo.html?event=<id>`) that builds an A3 poster or A6 leaflet from the event row
+and prints it from the browser. Nothing is stored except three optional text columns.
+
+- **Template:** `js/event-promo.js` (`PFPromo`, UMD, no DOM/database access, also runs in
+  Node). `fromEvent(ev, {origin, studioName, assets})` → editable settings object;
+  `html(kind, settings, mode)` → a complete HTML document (`kind` = poster | leaflet |
+  sheet; `mode` = office | print). Page sizes: poster 297×420, leaflet 105×148, sheet =
+  four leaflets at 92.4% on A4 (office only); print mode adds 3 mm bleed + 7 mm slug with
+  crop marks (page 317×440 / 125×168). `PFPromo.boxes()` gives the TrimBox/BleedBox if you
+  stamp a PDF made in a headless browser.
+- **Capacity line:** `PFPromo.capacity(ev)` = blocks × `slots_per_block` — the same rule as
+  `PF.capacity` (checked in the tests). The "Spots to show" box on the page lets an admin
+  override it (for example when manual add-ons are allowed).
+- **QR codes:** `js/qrcode-generator.js` is the MIT-licensed `qrcode-generator` 1.4.4,
+  vendored (no CDN at print time). Error correction M, 4-module quiet zone. Tickets QR →
+  `/tickets?event=<id>`; performer QR → `portal/event-book.html?event=<id>`; both on the
+  public site origin (`PFPromo.SITE`), never the preview URL you happen to be browsing.
+- **Fonts / logo:** `fonts/promo-Inter-*.woff2` (Latin subset of Inter 4, six weights) and
+  `img/logo-white.png`. They load by absolute URL inside the preview/print iframe.
+  Printing uses a hidden iframe (`srcdoc`) so only the artwork prints; Chrome honours the
+  `@page` size, so "Save as PDF" comes out at the right paper size.
+- **Studio contacts:** `PFPromo.STUDIOS` (names, phones, emails) is a constant in the
+  module — edit it there if a number changes. An event tied to one studio shows only that
+  studio; "All studios" events show both.
+- **Database:** `supabase/event-promo.sql` adds `events.promo_tagline`,
+  `promo_highlights` (first line = under the time, the rest get icons) and
+  `promo_performer_note`, each length-checked. The page works without it (it just cannot
+  remember wording; it probes for the columns). Step 2 of the script fills in the 2026
+  Year-end Concert by name.
+- **Email draft:** hands a draft to Notifications through `sessionStorage.notifPrefill`
+  (same mechanism as the event invitations). Nothing is sent from this page.
+- **Tests run:** unit checks of the template (name splitting, money/time formatting,
+  capacity parity with `PF.capacity`, every layout variant with and without tickets /
+  booking / venue / deadline, HTML escaping, no `undefined`/`NaN`); 17 browser checks of
+  the page with a stubbed database (preview, toggles, escaping, leaflet 4-up and print
+  marks, studio filter, save payload, QR PNGs decoded back to the right URLs, print
+  iframe, email draft, draft-event defaults, event switch, phone width); PDFs produced
+  from the same template, QR codes decoded from the PDFs at 400 dpi.
+
 ## Traps that have already cost time
 
 - **Check which environment you're looking at.** Local dev runs against the same
@@ -2489,6 +2531,8 @@ Run in order. All are re-runnable.
     `ticket_orders`, `tickets`, guard triggers, admin-read RLS, `ticket_issue_order()`,
     `ticket_check_in()` (see Concert ticket sales section above). Run statement by
     statement **before** deploying the ticket pages and functions
+47. `event-promo.sql` — optional `events.promo_tagline/promo_highlights/promo_performer_note`
+    (see Posters & leaflets section above). The page works without it
 
 *(Several migrations applied between 27 and 35 — schedule performance
 indexes, BoK grading, fortnightly lessons, recurring tasks, and others —

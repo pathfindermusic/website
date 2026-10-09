@@ -542,6 +542,9 @@
       <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:0.75rem;" id="studentsSection">
         <div class="form-label" style="margin-bottom:0.65rem;" id="studentsLabel">Student *</div>
         <div class="students-list" id="studentsList"></div>
+        <div id="instrWarn" class="hidden"
+             style="background:#fff7ed;border:1px solid #fed7aa;border-left:3px solid #d97706;border-radius:var(--r-sm);
+                    padding:0.55rem 0.8rem;margin:0.5rem 0;font-size:0.8rem;line-height:1.5;color:#92400e;"></div>
         <div class="add-student-row">
           <select class="form-select" id="studentPicker">
             <option value="">— Select student —</option>
@@ -931,6 +934,7 @@ let weekStart       = getWeekStart(new Date());
 let allStudios      = [];
 let allTeachers     = [];
 let allStudents     = [];
+let instrByStudent  = {};   // student id -> lower-cased instruments on their profile (for the Add Lesson heads-up)
 let lessonStudents  = []; // students added to current lesson being edited
 let attByOccurrence = {}; // occurrenceId -> { studentId: status }, for the grid
 let allOccurrences  = []; // cached occurrences for current view
@@ -1058,6 +1062,22 @@ async function loadStudents() {
     return { ...s, profile };
   });
 
+  // What each student plays, so Add Lesson can say when a booking is for an
+  // instrument that isn't on their profile. Advisory only: failing to load
+  // it just means no heads-up.
+  try {
+    const rows = [];
+    for (let from = 0; ; from += 1000) {
+      const { data: part, error } = await db.from('student_instruments')
+        .select('student_id,instrument').order('student_id').range(from, from + 999);
+      if (error) throw error;
+      rows.push(...(part ?? []));
+      if (!part || part.length < 1000) break;
+    }
+    instrByStudent = {};
+    rows.forEach(r => { (instrByStudent[r.student_id] ??= []).push(String(r.instrument).toLowerCase()); });
+  } catch (e) { instrByStudent = null; console.warn('student_instruments not loaded:', e?.message); }
+
   const filterSel = document.getElementById('filterStudent');
   if (filterSel) {
     filterSel.innerHTML = '<option value="">All students</option>' +
@@ -1093,6 +1113,7 @@ function onInstrumentChange() {
     onTypeChange();
     showToast('Band lessons are automatically set to Group.', 'warning');
   }
+  refreshInstrumentWarning();
 }
 
 // ============================================================
@@ -2497,6 +2518,7 @@ function onNoStudentChange() {
     document.getElementById('lType').value = 'private';
     updateRecurrenceForTrial();
   }
+  refreshInstrumentWarning();
 }
 
 function onTeacherChange() {
@@ -2522,6 +2544,7 @@ function onTeacherChange() {
     teacherStudios.forEach(s => { studioSel.innerHTML += `<option value="${s.id}">${s.name}</option>`; });
   }
 
+  refreshInstrumentWarning();   // the instrument list was just rebuilt
   checkAvailability();
 }
 
@@ -2591,8 +2614,39 @@ function updateRecurrenceForTrial() {
   toggleRecurrenceFields();
 }
 
+// Heads-up (not a block) when a student is being booked for an instrument
+// that isn't on their profile: usually a wrong pick in the form, sometimes
+// a new instrument whose profile hasn't been updated yet.
+function refreshInstrumentWarning() {
+  const box = document.getElementById('instrWarn');
+  if (!box) return;
+  const hide = () => { box.classList.add('hidden'); box.innerHTML = ''; };
+  const inst = document.getElementById('lInstrument')?.value ?? '';
+  if (!instrByStudent || !inst || inst === 'Band' || inst === 'Other' ||
+      document.getElementById('lNoStudent')?.checked || !lessonStudents.length) return hide();
+  const want = inst.toLowerCase();
+  const esc = (t) => String(t).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[ch]));
+  const lines = [];
+  lessonStudents.forEach(sid => {
+    const s = allStudents.find(x => x.id === sid);
+    if (!s) return;
+    const have = instrByStudent[sid] ?? [];
+    if (have.includes(want)) return;
+    const name = `${s.profile?.first_name ?? ''} ${s.profile?.last_name ?? ''}`.trim() || 'This student';
+    const plays = (instrByStudent[sid] ?? []).length
+      ? `their profile lists ${(instrByStudent[sid]).map(i => INSTRUMENTS.find(x => x.toLowerCase() === i) ?? i).join(', ')}`
+      : `no instruments are on their profile`;
+    lines.push(`<b>${esc(name)}</b> isn’t down as playing ${esc(inst)} — ${esc(plays)}.`);
+  });
+  if (!lines.length) return hide();
+  box.innerHTML = '⚠️ ' + lines.join('<br>⚠️ ') +
+    '<div style="margin-top:0.25rem;color:#a16207;">You can still save this lesson. If it is right, add the instrument to the student’s profile.</div>';
+  box.classList.remove('hidden');
+}
+
 function renderLessonStudents() {
   const list = document.getElementById('studentsList');
+  refreshInstrumentWarning();
   if (!lessonStudents.length) {
     list.innerHTML = `<div class="text-sm text-muted">No students added yet.</div>`;
     refreshMakeupCreditPicker();
@@ -3826,7 +3880,7 @@ async function sendOnlineLessonEmail(occId, occ) {
   try {
     const res = await fetch('/.netlify/functions/send-email', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await authHeaders(),
       body: JSON.stringify({
         action:       'send',
         mode:         'occurrence',
@@ -4381,6 +4435,7 @@ async function editSeriesInner() {
     document.getElementById('lInstrumentText').value = l.instrument ?? '';
   } else {
     document.getElementById('lInstrument').value = l.instrument;
+    refreshInstrumentWarning();
   }
 
   // Reflect the actual pattern, not the form's default. onPatternChange()
@@ -4606,7 +4661,7 @@ async function sendCancellationEmail(occId, occ, scope = 'single') {
   try {
     const res = await fetch('/.netlify/functions/send-email', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await authHeaders(),
       body: JSON.stringify({
         action:       'send',
         mode:         'occurrence',

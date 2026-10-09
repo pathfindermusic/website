@@ -627,7 +627,7 @@ async function sendStudentMessage() {
   try {
     const res = await fetch('/.netlify/functions/send-email', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await authHeaders(),
       body: JSON.stringify({
         action:     'send',
         mode:       'students',

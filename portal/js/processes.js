@@ -577,7 +577,7 @@ async function maybeSendConfirmation(studentId, sentBy) {
     try {
       const res = await fetch('/.netlify/functions/send-email', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders(),
         body: JSON.stringify({
           action: 'send', mode: 'students', studentIds: [studentId],
           from: lesson.studioEmail,
@@ -633,7 +633,7 @@ async function sendStudentEmail(studentId, subject, bodyText, sentBy) {
   try {
     const res = await fetch('/.netlify/functions/send-email', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await authHeaders(),
       body: JSON.stringify({
         action: 'send', mode: 'students', studentIds: [studentId],
         from: studio.email,

@@ -285,9 +285,11 @@
       return;
     }
 
-    // If must change password, redirect to change password page
+    // If must change password, redirect to change password page — and
+    // carry the booking link along so they land on the event afterwards
     if (profile.must_change_password) {
-      window.location.href = 'change-password.html';
+      const keep = safeNext();
+      window.location.href = 'change-password.html' + (keep && !TICKET_NEXT.test(keep) ? '?next=' + encodeURIComponent(keep) : '');
       return;
     }
 
@@ -303,6 +305,13 @@
       showError(errorEl, 'Please enter your email address.');
       return;
     }
+
+    // The reset link opens in a new tab or on another device, so remember
+    // where this person was heading (the same browser picks it up again).
+    try {
+      const keep = safeNext();
+      if (keep && !TICKET_NEXT.test(keep)) localStorage.setItem('pf_next', keep);
+    } catch (_) {}
 
     const { error } = await db.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/portal/change-password.html`,
