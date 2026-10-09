@@ -331,6 +331,48 @@ redeems a voucher, and check it here.
 </p>
 </div>
 
+<h4 id="online-vouchers">Vouchers bought on the website</h4>
+<p>
+Gift vouchers are also sold on the public <strong>Gift Vouchers</strong> page.
+The buyer chooses a voucher (5-Lesson or 10-Lesson), enters their own name and
+email (twice, to catch typing slips), the recipient's name, the recipient's email
+if they would like it sent straight to them, a description (it starts as
+“5-Lesson Voucher for <em>name</em>” and can be changed) and a personal message,
+then pays on eWAY's secure page. As soon as eWAY confirms the payment the Portal
+creates the voucher and emails it — you don't need to do anything for a normal
+sale.
+</p>
+<ul>
+<li>The <strong>buyer</strong> gets the voucher PDF by email, with both studio
+mailboxes blind-copied so you see every sale. The <strong>recipient</strong>
+gets their own email with the voucher and the personal message (only if the buyer
+gave an address). The buyer sees a thank-you page straight after paying.</li>
+<li>These vouchers show an <strong>Online</strong> label on the Vouchers page; use
+the <strong>Source</strong> filter to list just them. They aren't tied to a studio
+and can be used at either one. Click a voucher to see the payment (order number,
+eWAY transaction, amount) and whether each email was delivered.</li>
+<li><strong>Email again.</strong> Open the voucher and press <strong>Email
+again</strong>. Choose the buyer, the recipient or both, and correct an address
+first if it was mistyped (a corrected address is saved on the voucher).</li>
+<li><strong>Needs a look.</strong> If something needs attention (a paid voucher
+whose email hasn't gone, a payment eWAY approved that couldn't be turned into a
+voucher, or a payment still waiting after half an hour) a panel at the top of the
+page lists it. Press <strong>Check payment</strong> to ask eWAY again, or
+<strong>Open</strong> to resend. The Portal also re-checks and retries by itself
+every few minutes, so most of these clear without help.</li>
+<li><strong>Refunds.</strong> Refund the customer in MYeWAY first, then open the
+voucher and press <strong>Mark refunded…</strong>. The voucher is voided so it
+can't be used. (Use <em>Void</em> only for a voucher that was <em>not</em> paid
+for online.)</li>
+</ul>
+<div class="callout callout-tip">
+<strong>Changing prices</strong>
+<p>
+The two prices are set in the website code, not in the Portal. Ask your developer
+to change them; the Gift Vouchers page picks the new prices up automatically.
+</p>
+</div>
+
 <h3 id="ticket-sales">Concert Ticket Sales</h3>
 <p>
 Concert tickets are sold online on the public <strong>Tickets</strong> page of

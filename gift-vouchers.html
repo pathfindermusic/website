@@ -133,6 +133,70 @@ footer { background: var(--charcoal); padding: 3.5rem 2rem 2rem; border-top: 3px
   .vouchers-grid{grid-template-columns:1fr;max-width:480px;}
   .order-grid{grid-template-columns:1fr;}
 }
+/* VOUCHER SHOP */
+.gv-pick{width:100%;justify-content:center;margin-top:auto;}
+.voucher-card .v-check{display:none;}
+.voucher-card.sel{border-color:var(--orange);box-shadow:0 0 0 3px rgba(232,73,30,0.2),var(--shadow);}
+.voucher-card.sel .v-check{display:inline;}
+.voucher-card.sel .gv-pick{background:var(--charcoal);}
+.v-save{display:inline-block;margin-top:0.55rem;font-size:0.72rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;background:rgba(255,255,255,0.2);color:var(--white);padding:0.2rem 0.65rem;border-radius:3px;}
+.gv-wrap{margin-top:3rem;scroll-margin-top:90px;}
+.gv-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:1.75rem;align-items:start;}
+.gv-card{background:var(--white);border:1.5px solid var(--border-l);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;}
+.gv-card-top{background:var(--charcoal);padding:1.4rem 1.75rem;border-bottom:3px solid var(--orange);}
+.gv-card-top h3{font-size:1.15rem;font-weight:800;color:var(--white);}
+.gv-card-top p{font-size:0.8rem;color:rgba(255,255,255,0.6);margin-top:0.2rem;}
+.gv-card-body{padding:1.6rem 1.75rem 1.75rem;}
+.gv-h{font-size:0.72rem;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--orange);margin:1.6rem 0 0.9rem;padding-top:1.4rem;border-top:1px solid var(--border-l);}
+.gv-h:first-child{margin-top:0;padding-top:0;border-top:none;}
+.f-hint{font-size:0.75rem;color:var(--mid-grey);line-height:1.5;}
+.f-hint a{color:var(--orange);cursor:pointer;text-decoration:underline;}
+.f-group+.f-group{margin-top:1rem;}
+.f-opt{font-weight:400;color:var(--mid-grey);}
+.f-suggest{display:none;background:#fff7ed;border:1px solid #fed7aa;border-left:3px solid #d97706;border-radius:var(--r-sm);padding:0.65rem 0.85rem;font-size:0.85rem;line-height:1.55;color:#7c2d12;margin-top:0.45rem;}
+.f-suggest.show{display:block;}
+.f-suggest b{word-break:break-all;}
+.f-suggest .sg-btns{display:flex;gap:0.6rem;flex-wrap:wrap;margin-top:0.5rem;}
+.f-suggest button{font:inherit;font-weight:600;font-size:0.8rem;padding:0.4rem 0.85rem;border-radius:var(--r-sm);cursor:pointer;border:1.5px solid #d97706;background:var(--white);color:#7c2d12;}
+.f-suggest button.sg-yes{background:#d97706;color:#fff;}
+.f-bad input{border-color:#dc2626 !important;}
+.f-note{display:none;font-size:0.78rem;line-height:1.5;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:var(--r-sm);padding:0.45rem 0.7rem;}
+.f-note.show{display:block;}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;}
+.gv-total{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;border-top:1.5px solid var(--light-grey);margin-top:1.5rem;padding-top:1.1rem;}
+.gv-total .calc{font-size:0.85rem;color:var(--dark-grey);}
+.gv-total .amt{font-size:2rem;font-weight:800;line-height:1;white-space:nowrap;}
+.gv-total .amt span{font-size:0.9rem;font-weight:500;color:var(--mid-grey);}
+.gv-pay{width:100%;justify-content:center;margin-top:1.1rem;padding:0.95rem 1.6rem;font-size:1rem;}
+.gv-pay:disabled{opacity:.6;cursor:default;transform:none;}
+.gv-err{display:none;background:#fdecea;border:1px solid #f5c2bd;color:#9b2a1d;border-radius:var(--r-sm);padding:0.75rem 0.95rem;font-size:0.85rem;margin-top:1rem;line-height:1.5;}
+.gv-err.show{display:block;}
+.gv-secure{font-size:0.78rem;color:var(--mid-grey);text-align:center;margin-top:0.9rem;line-height:1.6;}
+.gv-test{background:#fff7e0;border:1px solid #f1d98a;color:#7a5b00;border-radius:var(--r-sm);padding:0.7rem 0.95rem;font-size:0.82rem;margin-bottom:1.1rem;line-height:1.5;}
+.gv-none{text-align:center;padding:1.5rem 1rem;color:var(--dark-grey);font-size:0.95rem;line-height:1.7;}
+.gv-steps{list-style:none;counter-reset:s;margin-top:1.1rem;display:flex;flex-direction:column;gap:0.55rem;}
+.gv-steps li{counter-increment:s;display:flex;gap:0.65rem;font-size:0.83rem;color:var(--dark-grey);line-height:1.5;}
+.gv-steps li::before{content:counter(s);flex-shrink:0;width:1.45rem;height:1.45rem;border-radius:50%;background:var(--orange);color:#fff;font-size:0.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px;}
+.gv-aside{position:sticky;top:90px;display:flex;flex-direction:column;gap:1.25rem;}
+/* live preview — a miniature of the PDF */
+.gv-prev{display:flex;border-radius:12px;overflow:hidden;background:var(--charcoal);box-shadow:var(--shadow-h);min-height:250px;}
+.gv-prev-main{flex:1;min-width:0;padding:1.15rem 1.25rem 1rem;color:var(--white);}
+.gv-prev-logo{height:20px;width:auto;display:block;margin-bottom:1rem;}
+.gv-prev-eye{font-size:0.58rem;font-weight:700;letter-spacing:0.18em;color:var(--orange);}
+.gv-prev-title{font-size:1.2rem;font-weight:800;line-height:1.15;margin:0.3rem 0 0.5rem;word-wrap:break-word;}
+.gv-prev-pill{display:inline-block;background:var(--orange);font-size:0.68rem;font-weight:700;padding:0.15rem 0.6rem;border-radius:99px;}
+.gv-prev-row{display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin:0.85rem 0;padding-top:0.7rem;border-top:1px solid var(--charcoal-light);}
+.gv-prev-row b,.gv-prev-msg b{display:block;font-size:0.5rem;letter-spacing:0.16em;color:var(--orange);margin-bottom:0.15rem;}
+.gv-prev-row span{font-size:0.78rem;font-weight:600;word-wrap:break-word;overflow-wrap:anywhere;}
+.gv-prev-msg{background:var(--charcoal-mid);border-left:3px solid var(--orange);border-radius:3px;padding:0.5rem 0.65rem;}
+.gv-prev-msg p{font-size:0.72rem;font-style:italic;color:#CECED2;line-height:1.5;white-space:pre-line;max-height:5.4em;overflow:hidden;word-wrap:break-word;overflow-wrap:anywhere;}
+.gv-prev-stub{width:76px;flex-shrink:0;background:var(--orange);color:var(--white);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-weight:800;font-size:0.82rem;line-height:1.2;border-left:2px dashed rgba(255,255,255,0.45);}
+.gv-prev-stub i{display:block;width:34px;height:34px;border-radius:50%;background:#C43A14;border:5px solid #D6421A;margin-top:0.7rem;box-shadow:inset 0 0 0 5px #C43A14,inset 0 0 0 9px #fff;}
+@media(max-width:900px){
+  .gv-grid{grid-template-columns:1fr;}
+  .gv-aside{position:static;}
+  .gv-card-body,.gv-card-top{padding-left:1.25rem;padding-right:1.25rem;}
+}
 </style>
 </head><body>
 <nav>
@@ -185,76 +249,134 @@ footer { background: var(--charcoal); padding: 3.5rem 2rem 2rem; border-top: 3px
 </section>
 
 <!-- VOUCHER PURCHASE -->
-<div class="vouchers-section">
+<div class="vouchers-section" id="buy">
   <div class="container">
     <p class="sec-label">Purchase Online</p>
     <h2 class="sec-title">Choose Your Voucher</h2>
-    <p class="sec-body">Select a voucher below and pay securely online via eWay. Your voucher will be emailed to you once payment is confirmed.</p>
-    <div class="vouchers-grid">
+    <p class="sec-body">Pick a voucher, tell us who it's for, and pay securely online. Your personalised voucher is emailed to you the moment your payment is confirmed &mdash; and straight to the lucky recipient too, if you give us their email address.</p>
+    <noscript><p class="gv-test" style="margin-top:1.25rem;">Please turn on JavaScript to order online, or call us and we'll arrange your voucher over the phone (details below).</p></noscript>
 
-      <!-- 5-LESSON VOUCHER -->
-      <div class="voucher-card">
-        <div class="voucher-top">
-          <div class="v-title">5-Lesson Voucher</div>
-          <div class="v-subtitle">One-on-one music lessons · Kilsyth or Ringwood</div>
-          <div class="v-price">$240 <span>AUD</span></div>
-        </div>
-        <div class="voucher-body">
-          <ul class="v-features">
-            <li>5 x one-on-one lessons with an expert Pathfinder teacher</li>
-            <li>Any instrument — guitar, drums, piano, voice, violin &amp; more</li>
-            <li>Suitable for all ages and experience levels</li>
-            <li>Redeemable at Kilsyth or Ringwood studio</li>
-            <li>Recipient books at a time that suits them</li>
-          </ul>
-          <div class="v-pay">
-            <script src="https://secure.ewaypayments.com/scripts/eCrypt.js"
-              class="eway-paynow-button"
-              data-publicapikey="epk-7A965C79-0371-424B-8499-23463D938D5C"
-              data-amount="24000"
-              data-label="Buy Now — $240"
-              data-invoicedescription="Voucher for 5 Music Lessons"
-              data-currency="AUD"
-              data-allowedit="true"
-              data-resulturl="https://pathfindermusiclessons.com.au/thank-you-voucher-purchase.html">
-            </script>
-          </div>
-        </div>
-      </div>
-
-      <!-- 10-LESSON VOUCHER -->
-      <div class="voucher-card featured">
-        <div class="voucher-top">
-          <div class="v-badge">Best Value</div>
-          <div class="v-title">10-Lesson Voucher</div>
-          <div class="v-subtitle">One-on-one music lessons · Kilsyth or Ringwood</div>
-          <div class="v-price">$456 <span>AUD</span></div>
-        </div>
-        <div class="voucher-body">
-          <ul class="v-features">
-            <li>10 x one-on-one lessons with an expert Pathfinder teacher</li>
-            <li>Any instrument — guitar, drums, piano, voice, violin &amp; more</li>
-            <li>Suitable for all ages and experience levels</li>
-            <li>Redeemable at Kilsyth or Ringwood studio</li>
-            <li>Recipient books at a time that suits them</li>
-            <li>Save $24 compared to two 5-lesson vouchers</li>
-          </ul>
-          <div class="v-pay">
-            <script src="https://secure.ewaypayments.com/scripts/eCrypt.js"
-              class="eway-paynow-button"
-              data-publicapikey="epk-7A965C79-0371-424B-8499-23463D938D5C"
-              data-amount="45600"
-              data-label="Buy Now — $456"
-              data-invoicedescription="Voucher for 10 Music Lessons"
-              data-currency="AUD"
-              data-allowedit="true">
-            </script>
-          </div>
-        </div>
-      </div>
-
+    <div id="gvLoading" class="gv-none">Loading vouchers&hellip;</div>
+    <div id="gvDown" class="gv-none" style="display:none">
+      <b>We couldn't load the vouchers just now.</b><br>Please refresh the page, or call or email us (details below) and we'll arrange your voucher over the phone.
     </div>
-    <p style="font-size:0.8rem;color:var(--mid-grey);margin-top:1.25rem;text-align:center;">🔒 Payments processed securely via eWay. Your card details are never stored on our servers.</p>
+
+    <div id="gvShop" style="display:none">
+      <div class="gv-test" id="gvTest" style="display:none;margin-top:1.5rem;"><b>Test mode.</b> This is not the live shop &mdash; no real payment will be taken and no real voucher is valid.</div>
+
+      <div class="vouchers-grid" id="gvCards"></div>
+
+      <div class="gv-wrap" id="gvForm">
+        <div class="gv-grid">
+
+          <!-- the order form -->
+          <form class="gv-card" id="gvOrder" novalidate autocomplete="on">
+            <div class="gv-card-top">
+              <h3>Your voucher details</h3>
+              <p>Takes about two minutes. Your voucher arrives by email straight after payment.</p>
+            </div>
+            <div class="gv-card-body">
+
+              <div class="gv-h">From you</div>
+              <div class="f-group">
+                <label for="gName">Your name *</label>
+                <input id="gName" name="name" type="text" maxlength="120" autocomplete="name" required>
+                <span class="f-hint">Printed on the voucher as the person giving the gift.</span>
+              </div>
+              <div class="f-group">
+                <label for="gEmail">Your email address *</label>
+                <input id="gEmail" name="email" type="email" maxlength="254" autocomplete="email" inputmode="email" required>
+                <span class="f-hint">Your voucher and payment confirmation are sent here.</span>
+                <div class="f-suggest" id="sugP" role="status" aria-live="polite">
+                  Did you mean <b class="sg-addr"></b>?
+                  <div class="sg-btns"><button type="button" class="sg-yes">Yes, use that</button><button type="button" class="sg-no">No, mine is correct</button></div>
+                </div>
+              </div>
+              <div class="f-group" id="gEmail2Group">
+                <label for="gEmail2">Confirm your email address *</label>
+                <input id="gEmail2" name="email_confirm" type="email" maxlength="254" autocomplete="off" inputmode="email" required>
+                <span class="f-hint">Please type it again &mdash; it is the only place your voucher is sent.</span>
+              </div>
+
+              <div class="gv-h">For the lucky recipient</div>
+              <div class="f-group">
+                <label for="gTo">Recipient's name *</label>
+                <input id="gTo" name="recipient" type="text" maxlength="120" autocomplete="off" required>
+                <span class="f-hint">Printed on the voucher.</span>
+              </div>
+              <div class="f-group">
+                <label for="gToEmail">Recipient's email address <span class="f-opt">(optional)</span></label>
+                <input id="gToEmail" name="recipient_email" type="email" maxlength="254" autocomplete="off" inputmode="email">
+                <span class="f-hint">Add it and we'll email the voucher to them as well as to you. Leave it empty if you'd rather give it to them yourself.</span>
+                <div class="f-suggest" id="sugR" role="status" aria-live="polite">
+                  Did you mean <b class="sg-addr"></b>?
+                  <div class="sg-btns"><button type="button" class="sg-yes">Yes, use that</button><button type="button" class="sg-no">No, it is correct</button></div>
+                </div>
+              </div>
+
+              <div class="gv-h">Make it personal</div>
+              <div class="f-group">
+                <label for="gSubject">Voucher description *</label>
+                <input id="gSubject" name="subject" type="text" maxlength="120" autocomplete="off">
+                <span class="f-hint">The headline on the voucher. <a id="gSubjectReset" style="display:none">Use the suggested wording</a></span>
+              </div>
+              <div class="f-group">
+                <label for="gMsg">Personal message <span class="f-opt">(optional)</span></label>
+                <textarea id="gMsg" name="message" maxlength="500" rows="4" style="min-height:96px;" placeholder="e.g. Happy birthday! I can't wait to hear you play. Love, Mum"></textarea>
+                <span class="f-hint"><span id="gMsgCount">0</span>/500 &middot; printed on the voucher.</span>
+                <div class="f-note" id="gMsgNote">Emoji and some special characters can't be printed on the voucher, so they will be left out.</div>
+              </div>
+
+              <div class="hp" aria-hidden="true"><label>Leave this empty <input id="gWeb" name="website" type="text" tabindex="-1" autocomplete="off"></label></div>
+
+              <div class="gv-total">
+                <div class="calc" id="gvCalc">Choose a voucher above</div>
+                <div class="amt" id="gvAmt"></div>
+              </div>
+              <div class="gv-err" id="gvErr" role="alert"></div>
+              <button class="btn btn-orange gv-pay" id="gvPay" type="submit">Pay securely</button>
+              <p class="gv-secure">🔒 You'll be taken to eWAY's secure payment page. Your card details never touch our website and are never stored by us.</p>
+            </div>
+          </form>
+
+          <!-- preview + how it works -->
+          <div class="gv-aside">
+            <div class="gv-card">
+              <div class="gv-card-body">
+                <p class="sec-label" style="margin-bottom:0.7rem">Your voucher</p>
+                <div class="gv-prev" aria-hidden="true">
+                  <div class="gv-prev-main">
+                    <img class="gv-prev-logo" src="Logo_-_long.png" alt="">
+                    <div class="gv-prev-eye">A GIFT OF MUSIC</div>
+                    <div class="gv-prev-title" id="pvTitle">Choose a voucher</div>
+                    <span class="gv-prev-pill" id="pvValue" style="display:none"></span>
+                    <div class="gv-prev-row">
+                      <div><b>TO</b><span id="pvTo">&nbsp;</span></div>
+                      <div><b>FROM</b><span id="pvFrom">&nbsp;</span></div>
+                    </div>
+                    <div class="gv-prev-msg"><b id="pvMsgLabel">FROM ALL OF US AT PATHFINDER</b><p id="pvMsg"></p></div>
+                  </div>
+                  <div class="gv-prev-stub">GIFT<br>VOUCHER<i></i></div>
+                </div>
+                <p class="f-hint" style="margin-top:0.7rem">A preview &mdash; the voucher you receive is a polished PDF with its own voucher number, valid for a year from the day you buy it.</p>
+              </div>
+            </div>
+            <div class="gv-card">
+              <div class="gv-card-body">
+                <p class="sec-label" style="margin-bottom:0.2rem">How it works</p>
+                <ol class="gv-steps">
+                  <li>Choose a voucher and tell us who it's for.</li>
+                  <li>Pay securely by card on eWAY's payment page.</li>
+                  <li>We confirm your payment and email the voucher as a PDF &mdash; to you, and to the recipient if you gave us their address.</li>
+                  <li>The recipient books their lessons by emailing the studio of their choice and quoting the voucher number.</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -338,5 +460,236 @@ footer { background: var(--charcoal); padding: 3.5rem 2rem 2rem; border-top: 3px
 const nt=document.getElementById("nt"),nl=document.getElementById("nl");
 nt.addEventListener("click",()=>nl.classList.toggle("open"));
 document.querySelectorAll("a[href^=\"#\"]").forEach(a=>a.addEventListener("click",()=>nl.classList.remove("open")));
+</script>
+<script>
+(function () {
+  var API = '/.netlify/functions/';
+  var $ = function (id) { return document.getElementById(id); };
+  var types = [], sel = null, maxMsg = 500, maxSubject = 120, busy = false, subjectTouched = false;
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function money(c) { return '$' + (c % 100 === 0 ? String(c / 100) : (c / 100).toFixed(2)); }
+  function store(k, v) { try { if (v === undefined) return sessionStorage.getItem(k); sessionStorage.setItem(k, v); } catch (e) { return null; } }
+  function showErr(msg) { var e = $('gvErr'); e.textContent = msg || ''; e.classList.toggle('show', !!msg); }
+  function val(id) { return $(id).value.trim(); }
+
+  // ---- what the voucher can print: Latin letters (accents are fine); emoji and other scripts are left out
+  function printableChar(cp) {
+    return (cp >= 0x20 && cp < 0x7F) || (cp >= 0xA0 && cp < 0x250) || (cp >= 0x2010 && cp < 0x2028) || (cp >= 0x1E00 && cp < 0x1F00) ||
+      cp === 0x20AC || cp === 0x2122 || cp === 0x2030 || cp === 0x2039 || cp === 0x203A || cp === 0x266A || cp === 0x266B;
+  }
+  function printable(s) {
+    var out = '', ch, i, cp;
+    for (ch of String(s || '')) { cp = ch.codePointAt(0); if (ch === '\n' || ch === '\t' || ch === '\r' || printableChar(cp)) out += ch; }
+    return out.replace(/\s+/g, ' ').trim();
+  }
+  function hasUnprintable(s) {
+    var ch, cp;
+    for (ch of String(s || '')) { cp = ch.codePointAt(0); if (ch === '\n' || ch === '\t' || ch === '\r' || cp === 0xFE0F || cp === 0x200D) continue; if (!printableChar(cp)) return true; }
+    return false;
+  }
+
+  // ---- the vouchers
+  function cardHtml(t) {
+    return '<div class="voucher-card' + (t.badge ? ' featured' : '') + '" data-key="' + esc(t.key) + '">' +
+      '<div class="voucher-top">' + (t.badge ? '<div class="v-badge">' + esc(t.badge) + '</div>' : '') +
+        '<div class="v-title">' + esc(t.title) + '</div>' +
+        '<div class="v-subtitle">One-on-one music lessons &middot; Kilsyth or Ringwood</div>' +
+        '<div class="v-price">' + esc(money(t.priceCents)) + ' <span>AUD</span></div>' +
+        (t.saveCents ? '<div class="v-save">Save ' + esc(money(t.saveCents)) + '</div>' : '') +
+      '</div>' +
+      '<div class="voucher-body"><ul class="v-features">' +
+        '<li>' + t.lessons + ' x one-on-one lessons with an expert Pathfinder teacher</li>' +
+        '<li>Any instrument &mdash; guitar, drums, piano, voice, violin &amp; more</li>' +
+        '<li>Suitable for all ages and experience levels</li>' +
+        '<li>Redeemable at Kilsyth or Ringwood studio</li>' +
+        '<li>Recipient books at a time that suits them</li>' +
+      '</ul><button type="button" class="btn btn-orange gv-pick" data-key="' + esc(t.key) + '"><span class="v-check">✓ </span><span class="pick-label">Choose this voucher</span></button></div></div>';
+  }
+  function renderCards() {
+    $('gvCards').innerHTML = types.map(cardHtml).join('');
+    $('gvCards').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-key]'); if (!b) return;
+      choose(b.getAttribute('data-key'), true);
+    });
+  }
+  function typeByKey(k) { return types.filter(function (t) { return t.key === k; })[0] || null; }
+  function defaultSubject() {
+    if (!sel) return '';
+    var to = printable(val('gTo'));
+    return sel.title + ' for ' + (to || '…');
+  }
+  function choose(key, scroll) {
+    sel = typeByKey(key); if (!sel) return;
+    store('pf_gv_type', sel.key);
+    if (/choose a voucher/.test($('gvErr').textContent)) showErr('');
+    Array.prototype.forEach.call(document.querySelectorAll('#gvCards .voucher-card'), function (c) {
+      var on = c.getAttribute('data-key') === sel.key;
+      c.classList.toggle('sel', on);
+      c.querySelector('.pick-label').textContent = on ? 'Selected' : 'Choose this voucher';
+    });
+    syncSubject(); update();
+    if (scroll) { $('gvForm').scrollIntoView({ behavior: 'smooth', block: 'start' }); setTimeout(function () { if (!val('gName')) $('gName').focus({ preventScroll: true }); }, 450); }
+  }
+  function syncSubject() {
+    if (!subjectTouched) $('gSubject').value = defaultSubject();
+    $('gSubjectReset').style.display = subjectTouched ? '' : 'none';
+  }
+
+  // ---- totals + the live preview
+  function update() {
+    var cnt = $('gMsg').value.length;
+    $('gMsgCount').textContent = cnt;
+    $('gMsgNote').classList.toggle('show', hasUnprintable($('gMsg').value) || hasUnprintable($('gTo').value) || hasUnprintable($('gName').value) || hasUnprintable($('gSubject').value));
+    if (sel) {
+      $('gvCalc').textContent = sel.title;
+      $('gvAmt').innerHTML = esc(money(sel.priceCents)) + ' <span>AUD</span>';
+      $('gvPay').textContent = 'Pay ' + money(sel.priceCents) + ' securely';
+      $('pvValue').textContent = 'Value  ' + money(sel.priceCents); $('pvValue').style.display = '';
+    } else {
+      $('gvCalc').textContent = 'Choose a voucher above'; $('gvAmt').textContent = ''; $('gvPay').textContent = 'Pay securely';
+      $('pvValue').style.display = 'none';
+    }
+    var subj = printable($('gSubject').value) || (sel ? defaultSubject() : 'Choose a voucher');
+    $('pvTitle').textContent = subj;
+    $('pvTo').textContent = printable($('gTo').value) || ' ';
+    $('pvFrom').textContent = printable($('gName').value) || ' ';
+    var raw = $('gMsg').value.replace(/\r/g, '');
+    var shown = [...raw].filter(function (c) { return c === '\n' || printableChar(c.codePointAt(0)); }).join('').trim();
+    $('pvMsgLabel').textContent = shown ? 'A PERSONAL MESSAGE' : 'FROM ALL OF US AT PATHFINDER';
+    $('pvMsg').textContent = shown || 'Happy playing! We can’t wait to make some music with you.';
+  }
+
+  // ---- email checks: retype to confirm + "did you mean gmail.com?"
+  var DOMAINS = ['gmail.com', 'hotmail.com', 'hotmail.com.au', 'outlook.com', 'outlook.com.au', 'yahoo.com', 'yahoo.com.au',
+    'icloud.com', 'live.com', 'live.com.au', 'msn.com', 'me.com', 'ymail.com', 'protonmail.com', 'bigpond.com', 'bigpond.net.au',
+    'optusnet.com.au', 'tpg.com.au', 'iinet.net.au', 'internode.on.net', 'westnet.com.au', 'aapt.net.au', 'telstra.com'];
+  function dist(a, b) {  // edit distance where swapping two neighbouring letters counts as one slip
+    var d = [], i, j, c;
+    for (i = 0; i <= a.length; i++) { d[i] = [i]; }
+    for (j = 1; j <= b.length; j++) { d[0][j] = j; }
+    for (i = 1; i <= a.length; i++) {
+      for (j = 1; j <= b.length; j++) {
+        c = a[i - 1] === b[j - 1] ? 0 : 1;
+        d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + c);
+        if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+      }
+    }
+    return d[a.length][b.length];
+  }
+  function suggestEmail(email) {
+    var m = /^([^@\s]+)@([^@\s]+)$/.exec(email);
+    if (!m) return null;
+    var dom = m[2].toLowerCase();
+    if (DOMAINS.indexOf(dom) >= 0) return null;
+    var best = null, bd = 99, i, x;
+    for (i = 0; i < DOMAINS.length; i++) { x = dist(dom, DOMAINS[i]); if (x < bd) { bd = x; best = DOMAINS[i]; } }
+    return best && bd <= (dom.length <= 9 ? 1 : 2) ? m[1] + '@' + best : null;
+  }
+  // one typo hint per email box (yours, and the recipient's)
+  function hint(inputId, boxId, onFix) {
+    var box = $(boxId), dismissed = {};
+    var h = {
+      pending: function () { var e = val(inputId), s = suggestEmail(e); return s && !dismissed[e.toLowerCase()] ? s : null; },
+      show: function (a) { box.querySelector('.sg-addr').textContent = a; box.setAttribute('data-addr', a); box.classList.add('show'); },
+      hide: function () { box.classList.remove('show'); },
+    };
+    $(inputId).addEventListener('blur', function () { var s = h.pending(); if (s) h.show(s); else h.hide(); });
+    $(inputId).addEventListener('input', h.hide);
+    box.querySelector('.sg-yes').addEventListener('click', function () { $(inputId).value = box.getAttribute('data-addr') || ''; h.hide(); showErr(''); if (onFix) onFix(); });
+    box.querySelector('.sg-no').addEventListener('click', function () { dismissed[val(inputId).toLowerCase()] = true; h.hide(); showErr(''); });
+    return h;
+  }
+  var hintP, hintR;
+  function emailsMatch() { return val('gEmail').toLowerCase() === val('gEmail2').toLowerCase(); }
+  function markMismatch() { $('gEmail2Group').classList.toggle('f-bad', val('gEmail2') !== '' && !emailsMatch()); }
+
+  var FIELDS = { gName: 'pf_gv_name', gEmail: 'pf_gv_email', gTo: 'pf_gv_to', gToEmail: 'pf_gv_toemail', gMsg: 'pf_gv_msg' };
+  function restore() {
+    Object.keys(FIELDS).forEach(function (id) { $(id).value = store(FIELDS[id]) || ''; });
+    $('gEmail2').value = $('gEmail').value;     // it was already confirmed when it was saved
+  }
+  function remember() { Object.keys(FIELDS).forEach(function (id) { store(FIELDS[id], $(id).value); }); }
+
+  async function load() {
+    try {
+      var r = await fetch(API + 'voucher-config', { cache: 'no-store' });
+      var j = await r.json();
+      if (!r.ok || !j.types || !j.types.length) throw new Error('config');
+      types = j.types; maxMsg = j.maxMessage || 500; maxSubject = j.maxSubject || 120;
+      $('gMsg').maxLength = maxMsg; $('gSubject').maxLength = maxSubject;
+      $('gvLoading').style.display = 'none';
+      $('gvShop').style.display = '';
+      $('gvTest').style.display = j.testMode ? '' : 'none';
+      renderCards();
+      restore();
+      hintP = hint('gEmail', 'sugP', function () { $('gEmail2').value = $('gEmail').value; markMismatch(); });
+      hintR = hint('gToEmail', 'sugR');
+      var want = new URLSearchParams(location.search).get('voucher') || store('pf_gv_type');
+      if (want && typeByKey(want)) choose(want, false); else update();
+    } catch (e) {
+      $('gvLoading').style.display = 'none'; $('gvDown').style.display = '';
+    }
+  }
+
+  $('gTo').addEventListener('input', function () { syncSubject(); update(); });
+  $('gName').addEventListener('input', update);
+  $('gMsg').addEventListener('input', update);
+  $('gSubject').addEventListener('input', function () {
+    subjectTouched = val('gSubject') !== '' && $('gSubject').value !== defaultSubject();
+    $('gSubjectReset').style.display = subjectTouched ? '' : 'none';
+    update();
+  });
+  $('gSubject').addEventListener('blur', function () { if (!val('gSubject')) { subjectTouched = false; syncSubject(); update(); } });
+  $('gSubjectReset').addEventListener('click', function () { subjectTouched = false; syncSubject(); update(); });
+  $('gEmail').addEventListener('input', markMismatch);
+  $('gEmail2').addEventListener('input', markMismatch);
+  $('gEmail2').addEventListener('paste', function (e) { e.preventDefault(); showErr('Please type your email address again rather than pasting it — that is how we catch typos.'); });
+
+  $('gvOrder').addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    if (busy) return;
+    showErr('');
+    if (!sel) { showErr('Please choose a voucher first.'); $('gvCards').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+    var name = val('gName'), email = val('gEmail'), to = val('gTo'), toEmail = val('gToEmail'), msg = $('gMsg').value.replace(/\r/g, '').trim(), subject = val('gSubject') || defaultSubject();
+    var ok = function (a) { return /^[^@\s]+@[^@\s.]+(\.[^@\s.]+)+$/.test(a); };
+    var bad = [];
+    if (!name) bad.push('your name');
+    if (!ok(email)) bad.push('a valid email address for yourself');
+    if (!to) bad.push('the name of the person the voucher is for');
+    if (toEmail && !ok(toEmail)) bad.push('a valid email address for the recipient (or leave it empty)');
+    if (bad.length) { showErr('Please enter ' + bad.join(', ') + '.'); return; }
+    if ((name && !printable(name)) || (to && !printable(to))) { showErr('Names are printed on the voucher, which can show letters (including accents) but not emoji or other scripts. Please use English letters for the names.'); return; }
+    if (!emailsMatch()) { markMismatch(); showErr('The two email addresses do not match. Please check them — your voucher is sent to this address.'); $('gEmail2').focus(); return; }
+    if ([...msg].length > maxMsg) { showErr('Please keep your personal message to ' + maxMsg + ' characters or fewer.'); return; }
+    if ([...subject].length > maxSubject) { showErr('Please keep the voucher description to ' + maxSubject + ' characters or fewer.'); return; }
+    var sp = hintP.pending(), sr = toEmail ? hintR.pending() : null;
+    if (sp) { hintP.show(sp); showErr('Please check your email address — it looks like it may contain a typo.'); return; }
+    if (sr) { hintR.show(sr); showErr('Please check the recipient’s email address — it looks like it may contain a typo.'); return; }
+
+    busy = true; $('gvPay').disabled = true; $('gvPay').textContent = 'Taking you to the payment page…';
+    remember();
+    try {
+      var r = await fetch(API + 'voucher-checkout', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: sel.key, purchaserName: name, purchaserEmail: email, recipientName: to, recipientEmail: toEmail,
+          subject: subjectTouched ? subject : '', message: msg, website: $('gWeb').value,
+        }),
+      });
+      var j = await r.json().catch(function () { return {}; });
+      if (!r.ok || !j.url) throw new Error(j.error || 'Something went wrong. Please try again.');
+      location.href = j.url;
+    } catch (e) {
+      showErr(e.message || 'Something went wrong. Please try again.');
+      busy = false; $('gvPay').disabled = false; update();
+    }
+  });
+
+  // coming back from eWAY with the Back button: unfreeze the button
+  window.addEventListener('pageshow', function (e) { if (e.persisted) { busy = false; $('gvPay').disabled = false; update(); } });
+
+  load();
+})();
 </script>
 </body></html>

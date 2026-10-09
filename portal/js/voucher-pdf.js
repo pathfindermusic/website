@@ -10,7 +10,7 @@
 //     recipientName, purchaserName,
 //     purchaseDate, expiresOn,                   // 'YYYY-MM-DD'
 //     message,                                   // optional
-//     studio: { name, email },
+//     studio: { name, email },                   // or emails: [..] when several studios honour it
 //   });
 //   out.blob / out.base64 / out.filename / out.url
 //
@@ -194,6 +194,16 @@
     doc.lines([[3.2, 2.2, 3.4, 4.6, 1.4, 6.2]], n4[0] + 1.75, n4[1] - 9);
   }
 
+  /** One address ("a@x"), or several for a voucher redeemable at more than one
+   *  studio ("a@x or b@x" / "a@x, b@x or c@x"). Accepts studio.emails (array)
+   *  or studio.email (string). */
+  function redeemEmails(studio) {
+    const list = (Array.isArray(studio?.emails) ? studio.emails : [studio?.email])
+      .map(e => PFV.clean(e)).filter(Boolean);
+    if (list.length <= 1) return list[0] || '';
+    return list.slice(0, -1).join(', ') + ' or ' + list[list.length - 1];
+  }
+
   // ---------- the voucher ----------
   /**
    * Builds the voucher. Resolves to { doc, blob, base64, filename, url }.
@@ -214,7 +224,7 @@
       expires:   data.expiresOn || PFV.addOneYear(data.purchaseDate),
       message:   PFV.clean(data.message, true),
       studioName:  PFV.clean(data.studio?.name),
-      studioEmail: PFV.clean(data.studio?.email),
+      studioEmail: redeemEmails(data.studio),
     };
 
     const doc = new JsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: true });

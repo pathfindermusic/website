@@ -609,6 +609,8 @@ module.exports = {
   makeDb, canManage,
   ewayCreatePayment, ewayGetResult,
   settleOrder, settleAndDeliver, buildTicketsPdf, sendOrderEmail, ticketEmailText,
+  // shared with lib/vouchers.js (the gift-voucher shop uses the same eWAY and email plumbing)
+  ewayCall, splitName, emailTemplate, DEFAULT_FROM,
 };
 
 // ============================================================

@@ -71,6 +71,11 @@ exports.handler = async (event) => {
     if (!/^[0-9a-f-]{36}$/i.test(voucherId)) return json(400, { error: 'voucherId is required.' });
     const v = (await get(`gift_vouchers?id=eq.${voucherId}&select=*`))[0];
     if (!v) return json(404, { error: 'Voucher not found.' });
+    if (v.source === 'online') {
+      // bought on the website: sent by the voucher-admin function from the website's
+      // mailbox (the Vouchers page does this for you with “Email again”)
+      return json(409, { error: 'This voucher was bought online — use “Email again” on the Vouchers page.', code: 'online' });
+    }
     if (v.status !== 'issued') {
       return json(409, { error: `This voucher is ${v.status} — it can't be emailed.`, code: 'not_issued' });
     }
@@ -94,7 +99,7 @@ exports.handler = async (event) => {
     if (!isValidEmail(fromEmail)) {
       return json(400, { error: 'The issuing studio has no email address on file (Studios page).', code: 'no-studio-email' });
     }
-    const to = String(body.to ?? v.recipient_email).trim();
+    const to = String(body.to ?? v.recipient_email ?? '').trim();
     if (!isValidEmail(to)) return json(400, { error: 'The recipient email address is not valid.' });
     const cc = [];
     if (body.ccPurchaser !== false && isValidEmail(v.purchaser_email) &&

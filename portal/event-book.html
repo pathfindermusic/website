@@ -32,6 +32,26 @@
     .eb-banner { padding: .7rem .95rem; border-radius: var(--r-sm); font-size: .84rem; margin-bottom: 1rem; background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; }
     .eb-back { background: none; border: none; color: var(--orange); font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; padding: 0; margin-bottom: .6rem; }
     .hidden { display: none !important; }
+    /* Spots-left counter: always orange, with a gentle pulse so it is noticed */
+    .eb-spots {
+      display: flex; align-items: center; gap: .85rem; flex-wrap: wrap;
+      padding: .8rem 1rem; margin-bottom: 1rem; border-radius: var(--r-sm);
+      background: rgba(232,73,30,.08); border: 1.5px solid var(--orange);
+      animation: ebPulse 2.2s ease-in-out infinite;
+    }
+    .eb-spots-dot { width: .7rem; height: .7rem; border-radius: 50%; background: var(--orange); flex: none; animation: ebBlink 1.4s ease-in-out infinite; }
+    .eb-spots-main { flex: 1 1 240px; font-size: .9rem; line-height: 1.4; color: var(--charcoal); }
+    .eb-spots-main b { color: var(--orange-dark, #c2370f); font-size: 1.05rem; }
+    .eb-spots-main small { display: block; color: var(--dark-grey); font-size: .78rem; margin-top: .1rem; }
+    .eb-spots .ev-meter { flex: 0 1 180px; max-width: none; }
+    .eb-spots.low { background: rgba(220,38,38,.09); border-color: #dc2626; }
+    .eb-spots.low .eb-spots-dot, .eb-spots.low .ev-meter > span { background: #dc2626; }
+    .eb-spots.low .eb-spots-main b { color: #b91c1c; }
+    .eb-spots.full { animation: none; background: var(--off-white); border-color: var(--border); }
+    .eb-spots.full .eb-spots-dot { background: var(--mid-grey); animation: none; }
+    @keyframes ebPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(232,73,30,.35); } 50% { box-shadow: 0 0 0 6px rgba(232,73,30,0); } }
+    @keyframes ebBlink { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+    @media (prefers-reduced-motion: reduce) { .eb-spots, .eb-spots-dot { animation: none; } }
   </style>
 </head>
 <body>
@@ -93,6 +113,7 @@
       </div>
       <div id="eHead"></div>
       <div id="eBanner"></div>
+      <div id="spotsBar" aria-live="polite"></div>
 
       <div id="doneCard"></div>
 
@@ -264,6 +285,22 @@ async function loadGrid() {
   return true;
 }
 
+/** "Only 31 of 84 performance spots left" — shown while bookings are open */
+function spotsBarHtml(ev, taken, open) {
+  if (!open) return '';
+  const cap = PF.capacity(ev), left = Math.max(0, cap - taken);
+  const pct = cap ? Math.min(100, Math.round(taken * 100 / cap)) : 100;
+  if (left === 0) {
+    return `<div class="eb-spots full"><span class="eb-spots-dot"></span>
+      <div class="eb-spots-main"><b>All ${cap} performance spots are booked.</b><small>Please contact the studio if you would still like to perform.</small></div></div>`;
+  }
+  const low = left <= Math.max(5, Math.ceil(cap * 0.15));
+  return `<div class="eb-spots${low ? ' low' : ''}"><span class="eb-spots-dot"></span>
+    <div class="eb-spots-main">${taken === 0 ? `<b>${cap}</b> performance spot${cap === 1 ? '' : 's'} available`
+      : `${low ? 'Nearly full — only' : 'Only'} <b>${left}</b> of ${cap} performance spot${cap === 1 ? '' : 's'} left`}<small>Book soon to secure your preferred time.</small></div>
+    <span class="ev-meter" title="${taken} of ${cap} booked"><span style="width:${pct}%"></span></span></div>`;
+}
+
 function myBookings() { return (grid?.bookings ?? []).filter(b => b.own); }
 
 function render() {
@@ -278,6 +315,9 @@ function render() {
     `<div class="eb-banner">${ev.status === 'open'
        ? 'The booking deadline has passed. You can still see the running order below — please contact the studio if you need to make a change.'
        : 'Bookings for this event are closed. You can still see the running order below — please contact the studio if you need to make a change.'}</div>`;
+
+  // spots left (only while people can still book)
+  document.getElementById('spotsBar').innerHTML = spotsBarHtml(ev, grid.bookings.length, open);
 
   // my performances
   const mine = myBookings();

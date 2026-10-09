@@ -78,3 +78,18 @@
 # ------------------------------------------------------------
 [functions."reconcile-ticket-orders"]
   schedule = "*/10 * * * *"
+
+# ------------------------------------------------------------
+# Gift vouchers — safety net for payments
+#
+# Every 10 minutes (offset by five from the ticket job so the two
+# don't start together): asks eWAY about voucher orders that were
+# started but never confirmed (a buyer who paid and then closed the
+# page before being sent back to the website), issues and emails
+# their vouchers, tidies up orders nobody finished paying for, and
+# retries any voucher email that failed to send.
+#
+# Needs the EWAY_* environment variables, like the voucher functions.
+# ------------------------------------------------------------
+[functions."reconcile-voucher-orders"]
+  schedule = "5-55/10 * * * *"

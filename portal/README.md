@@ -2083,6 +2083,16 @@ shared code in `js/events-common.js`; database in `supabase/events.sql`.
   Supabase and Resend). **Not yet tested live** — run the SQL
   first, then follow the go-live checks in the hand-over notes.
 
+**Spots-left counter (student booking page).** `event-book.html` shows a pulsing orange
+banner — "Only 31 of 84 performance spots left" — while an event is open for booking and
+the deadline has not passed. It turns red at 15% remaining (or 5 spots, whichever is more),
+says "All 84 performance spots are booked" when full, and is hidden once bookings close.
+It is `spotsBarHtml()`: capacity (`PF.capacity`) minus the bookings already in the grid the
+page polls, so it needs no database change and updates with the grid. Animation stops for
+visitors who prefer reduced motion. Deliberately **not** on the public Events/Tickets pages
+(ticket buyers don't need it). Manual add-ons by admins count as bookings, so they use up
+spots too.
+
 ## Gift vouchers (Oct 2026) — front-desk PDF vouchers
 
 Admins issue a gift voucher on demand and the Portal emails it as a PDF.
@@ -2136,12 +2146,136 @@ Email: `netlify/functions/send-voucher.js`. Database: `supabase/gift-vouchers.sq
   `recipient_student_id`; overwriting the name unlinks it (the voucher is then
   for someone else). Picker data comes from `students` (active/trial/prospective),
   email = the student's contact email, else the parent's.
+- **Online sales (migration #48).** Vouchers bought on the website land in the same
+  register with `source = 'online'` and `order_id` → `voucher_orders` (see *Gift
+  voucher online sales* below). Their recipient email is **optional** (the column is
+  nullable; a CHECK requires it for `source = 'manual'`), `send-voucher.js` answers
+  **409** for them (the online flow has its own delivery in `voucher-admin`), and the
+  guard trigger locks `source`/`order_id`.
 - **Tested** against a local Postgres (guard trigger, RLS, privileges, leap day,
   idempotent re-run), the function with a mocked Resend (auth, status gating,
   attachment, cc/bcc, failure handling) and the page in jsdom with a fake
   database (picker, validation, preview, save-then-fail-then-retry, resend,
   redeem, expiry, number clash). **Not yet tested live** — run the SQL first,
   then send a voucher to yourself.
+
+## Gift voucher online sales (Oct 2026, migration #48) — `gift-vouchers.html`
+
+The same shape as the concert ticket sales above, for gift vouchers. A visitor picks a
+voucher, gives their name/email (typed twice), the recipient's name (and email, if
+they want it sent straight to them), a description and a personal message, and pays on
+eWAY's hosted page. Only when **eWAY's server confirms** the payment does the Portal
+create the voucher (the usual `PF-XXXX-XXXX` PDF from `js/voucher-pdf.js` — the
+*same* file the front-desk page uses, so both look identical) and email it. Before
+this, staff made each voucher by hand from the eWAY receipt.
+
+**Pieces**
+
+| What | Where |
+| --- | --- |
+| Database | `supabase/voucher-sales.sql` — `voucher_orders`; `gift_vouchers.recipient_email` nullable + `source` + `order_id`; guards; admin-read RLS; `voucher_issue_order()` (service role only) |
+| Public pages | `/gift-vouchers.html` (choose + form + live preview), `/voucher-result.html` (where eWAY returns the buyer; thank-you / try again) |
+| Functions | `voucher-config` (public: types + prices), `voucher-checkout` (validate, rate-limit, create order + eWAY page), `voucher-confirm` (verify + issue + email), `voucher-admin` (resend / check / refund; admin bearer token), `reconcile-voucher-orders` (scheduled, every 10 min at `5-55/10`) |
+| Shared code | `netlify/functions/lib/vouchers.js` (types, validation, settle, PDF, emails). It builds on `lib/tickets.js` (eWAY client, Supabase client, branded email shell), which now also exports `ewayCall, splitName, emailTemplate, DEFAULT_FROM` |
+| PDF assets (server) | `netlify/functions/lib/voucher-assets.js` is **generated** (base64 of the four Inter TTFs + the logo). After changing `portal/fonts/*` or `portal/img/voucher-logo.png` run `node scripts/build-voucher-assets.js` and commit the result |
+| Dependencies | repo-root `package.json` now also lists `jspdf` (2.5.1 — the same version the portal loads from jsDelivr; the server runs the shared `voucher-pdf.js` under Node) |
+| Admin UI | `portal/vouchers.html`: *Online* pill and source filter, a **"Needs a look"** panel, order details (eWAY transaction, purchaser/recipient delivery), **Email again** to purchaser / recipient / both (with corrected addresses), **Check payment**, **Mark refunded…** |
+
+**Prices live in one place:** `VOUCHER_TYPES` in `netlify/functions/lib/vouchers.js`
+(5-Lesson $240, 10-Lesson $456, in cents). The page reads them from `voucher-config`,
+and the server charges from this table, never from the browser. Add or change a
+voucher there only; the cards, the "Save $…" pill and the totals follow.
+
+**Flow and why it is safe** (identical in spirit to tickets)
+
+1. `voucher-checkout` validates (names must contain real letters; emoji-only names
+   are refused; description ≤120, message ≤500 characters), ignores the hidden
+   `website` honeypot, rate-limits (8 orders / 10 min per hashed IP), inserts the
+   order `pending` with the **server-side** price, calls eWAY `POST /AccessCodesShared`
+   (`InvoiceReference = order_no` e.g. `VO-K7M2QX`, `RedirectUrl = /voucher-result.html`,
+   `CancelUrl = /gift-vouchers.html`) and stores the access code.
+   A recipient email identical to the purchaser's is stored as null (one email, not two).
+2. eWAY redirects to `voucher-result.html?AccessCode=…`; the page posts it to
+   `voucher-confirm`, which finds the order **by access code** and asks eWAY.
+3. `settleOrder()` accepts the payment only if `TransactionStatus` is true, the response
+   code is approved, the **amount equals the stored total** and the invoice reference
+   matches. Otherwise the order is `failed` (with a note) and nothing is issued.
+4. `voucher_issue_order()` flips `pending|failed|abandoned → paid` **and** inserts the
+   voucher in one statement; of any number of concurrent callers (page refresh,
+   scheduled job, admin button) exactly one wins and creates it. Purchase date = today
+   in Melbourne, `studio_id` is NULL (redeemable at either studio), value = price.
+5. `deliver()` then emails: **purchaser** (BCC to the studios; subject
+   `Your gift voucher: {description}`; PDF attached) and — only if an email was given —
+   the **recipient** (no BCC; subject `A gift of music from {purchaser}`). Each message
+   is sent once, has its own `Idempotency-Key`, and records `*_emailed_at` /
+   `*_email_error` / `*_send_count` on the order and `emailed_at/emailed_to/send_count`
+   on the register. An email failure never loses the voucher.
+6. A declined payment → `failed`; **Try again** on the result page creates a **new
+   order** (one eWAY access code ⇄ one order).
+7. `reconcile-voucher-orders` settles `pending` orders older than 5 minutes (a buyer who
+   paid and closed the tab still gets the voucher), abandons orders with no attempt after
+   3 hours (a late payment on an abandoned order is still honoured), and retries
+   undelivered emails for orders paid within 3 days (max 12 attempts, purchaser and
+   recipient tracked separately so a recipient-only failure never re-mails the purchaser).
+
+The public `voucher-confirm` never returns the voucher number — only the validity date
+and the masked addresses it emailed (`j***@example.com`) — so the result page can't be
+used to harvest redeemable numbers.
+
+**Refunds.** Refund in MYeWAY first, then **Mark refunded…** on the voucher's detail
+panel (or `voucher-admin` `refund`). `voucher_orders_after_refund()` voids the voucher
+(`status='issued'` only; a redeemed voucher is left as is). `refunded` is final.
+
+**Environment variables.** Nothing new is required — it reuses `EWAY_API_KEY`,
+`EWAY_API_PASSWORD`, `EWAY_ENDPOINT`, `SITE_URL`, `TICKETS_FROM_EMAIL` (the From address
+for vouchers too), `SUPABASE_*` and `RESEND_API_KEY` from the ticket flow. Optional:
+
+| Variable | Value |
+| --- | --- |
+| `VOUCHERS_BCC` | comma-separated addresses blind-copied on the purchaser's email. Default: the email of **every active studio** (Studios page — today kilsyth@ and ringwood@). Set it to override |
+
+**Go-live checklist**
+
+1. Run `supabase/voucher-sales.sql` **statement by statement before pushing** (STEP 3a–3e
+   are separate statements; the verify queries at the end are commented out). It is safe
+   to re-run. Until it is run the new admin panels stay hidden, but the public
+   purchase will fail at checkout — so run it first.
+2. Push. With `EWAY_ENDPOINT=sandbox` the purchase page shows a **Test mode** banner.
+   Buy a voucher with an eWAY test card (e.g. `4444333322221111`, future expiry, CVN
+   123) using your own email as purchaser *and* a second address as recipient. Check:
+   amount and description on the eWAY page, the thank-you page, both emails arrive with
+   the PDF, the studios are on BCC of the purchaser's only, and the voucher shows on
+   *Vouchers* with an **Online** pill. Then try a declined card → **Try again**.
+3. **Unverified against live eWAY and Resend** (the same eWAY endpoints as tickets, which
+   are already proven in production; the new parts are the PDF attachment built on the
+   server and the BCC list). Failures are logged by the functions:
+   `voucher-checkout: eWAY …`, `voucher-confirm: settle …`, `voucher-confirm: deliver …`.
+4. Switch to `EWAY_ENDPOINT=production`, make one real purchase, then **Mark refunded** in
+   the Portal after refunding it in MYeWAY.
+5. Retire the old Pay Now buttons: they are gone from `gift-vouchers.html`;
+   `thank-you-voucher-purchase.html` is kept only for old receipts.
+
+**Known limits.** Names (purchaser/recipient/description) must use Latin letters — the
+embedded Inter subset can't print other scripts; emoji in the message are dropped from the
+PDF (the page warns while typing). The cap is one voucher per order (buy twice for two).
+No scheduled delivery date (it is delivered immediately by decision). "Mark refunded"
+does not call eWAY. Each voucher function bundles jsPDF + fonts (~1.2 MB zipped) — fine for
+Netlify, but the first deploy after this change builds slower. `voucher-assets.js` must be
+regenerated whenever the fonts/logo change or online vouchers will drift from the
+front-desk ones.
+
+**Tests run.** `voucher-sales.sql` on local Postgres 16 (re-run, issue-once, refund voids
+the voucher, guards); 112 end-to-end function checks over a real Postgres with fake
+eWAY/Resend (config prices, validation incl. emoji-only names, honeypot, client price
+ignored, eWAY request contents, decline + retry, amount mismatch never issues, 5
+concurrent confirms → one voucher and two emails, BCC on purchaser only, valid PDF
+attachment, no recipient email, Resend down then reconcile delivers, recipient-only retry,
+retry cap, reconcile issue/abandon/late payment, rate limit, eWAY create failure, admin
+auth/resend/check/refund); the same suite again against the real esbuild bundles
+(`@netlify/zip-it-and-ship-it`); Playwright on the purchase and result pages (desktop and
+mobile, no horizontal scroll, typo hints, validation, remembered fields, redirect) and
+the admin page (including before the migration exists); the PDF rendered and inspected.
+**Not yet tested against real eWAY or Resend.**
 
 ## Teachers utilisation report (Oct 2026) — superuser only
 
@@ -2533,6 +2667,10 @@ Run in order. All are re-runnable.
     statement **before** deploying the ticket pages and functions
 47. `event-promo.sql` — optional `events.promo_tagline/promo_highlights/promo_performer_note`
     (see Posters & leaflets section above). The page works without it
+48. `voucher-sales.sql` — `voucher_orders`, `gift_vouchers.recipient_email` nullable +
+    `source` + `order_id`, guard triggers, admin-read RLS, `voucher_issue_order()` (see
+    Gift voucher online sales section above). Run statement by statement **before**
+    deploying the voucher pages and functions
 
 *(Several migrations applied between 27 and 35 — schedule performance
 indexes, BoK grading, fortnightly lessons, recurring tasks, and others —

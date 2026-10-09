@@ -26,6 +26,17 @@
     .vpill.void     { background: #fee2e2; color: #dc2626; }
     .vpill.expired  { background: #fef3c7; color: #b45309; }
     .vpill.unsent   { background: #fef3c7; color: #b45309; }
+    .vpill.online   { background: #e0f2fe; color: #0369a1; margin-left: 0.35rem; }
+    .vpill.waiting  { background: #f3f4f6; color: #6b7280; }
+    .vpill.paid     { background: #dcfce7; color: #16a34a; }
+    .vpill.failed   { background: #fee2e2; color: #dc2626; }
+    .att-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding: 0.85rem 1.1rem 0.5rem; }
+    .att-head b { color: var(--charcoal); font-size: 0.9rem; }
+    .att-head span { font-size: 0.76rem; color: var(--mid-grey); }
+    .att-row { display: flex; align-items: center; gap: 0.85rem; padding: 0.6rem 1.1rem; border-top: 1px solid var(--border); font-size: 0.82rem; flex-wrap: wrap; }
+    .att-row .grow { flex: 1; min-width: 200px; }
+    .att-row .att-note { color: var(--mid-grey); font-size: 0.75rem; }
+    .att-card { border-left: 3px solid #d97706; }
     .v-search { min-width: 220px; background-image: none; padding-right: 0.75rem; }
 
     .kv { display: grid; grid-template-columns: 120px 1fr; gap: 0.45rem 0.85rem; font-size: 0.86rem; margin-bottom: 1rem; }
@@ -99,9 +110,17 @@
         <option value="expired">Expired</option>
         <option value="all">All</option>
       </select>
+      <select class="filter-select" id="filterSource" onchange="render()">
+        <option value="all">All sources</option>
+        <option value="online">Bought online</option>
+        <option value="manual">Issued at the desk</option>
+      </select>
     </div>
 
     <div id="setupBox" class="warn-box hidden"></div>
+
+    <!-- online orders that need a look (paid but not delivered, or stuck waiting) -->
+    <div id="attention" class="card att-card hidden" style="margin-bottom:1rem;"></div>
 
     <div class="card">
       <div style="overflow-x:auto;">
@@ -201,7 +220,7 @@
 </div>
 
 <!-- ============ PREVIEW / SEND ============ -->
-<div class="modal-overlay hidden" id="prevModal">
+<div class="modal-overlay hidden" id="prevModal" style="z-index:110;"><!-- above the detail dialog, which the PDF view opens from -->
   <div class="modal" style="max-width:860px;">
     <div class="modal-header">
       <span class="modal-title" id="pTitle">Preview</span>
@@ -256,6 +275,33 @@
   </div>
 </div>
 
+<!-- ============ RESEND (online voucher) ============ -->
+<div class="modal-overlay hidden" id="orModal">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <span class="modal-title">Email the voucher again</span>
+      <button class="modal-close" onclick="closeOnlineResend()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="orErr" class="form-error-box hidden"></div>
+      <p class="text-sm" style="margin-bottom:.9rem;">The voucher PDF is rebuilt and sent from the website's mailbox. Change an address if it was wrong — the order and the register are updated to match.</p>
+      <div class="form-group">
+        <label class="check-row" style="margin-bottom:.35rem;"><input type="checkbox" id="orP" checked> <span id="orPLabel">Purchaser</span></label>
+        <input class="form-input" type="email" id="orPEmail" maxlength="254">
+      </div>
+      <div class="form-group">
+        <label class="check-row" style="margin-bottom:.35rem;"><input type="checkbox" id="orR"> <span id="orRLabel">Recipient</span></label>
+        <input class="form-input" type="email" id="orREmail" maxlength="254" placeholder="No email address on file — type one to send it to them">
+      </div>
+      <div class="send-summary" id="orSummary"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeOnlineResend()">Cancel</button>
+      <button class="btn btn-primary" id="orSend" onclick="doOnlineResend()">Send</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ VOID / REDEEM ============ -->
 <div class="modal-overlay hidden" id="statusModal">
   <div class="modal" style="max-width:460px;">
@@ -296,6 +342,8 @@ let studios = [];
 let myStudioIds = [];
 let students = [];              // for the recipient picker
 let vouchers = [];
+let orders = [];                // online voucher orders (voucher_orders); empty until migration #48 is run
+let orderOf = {};               // voucher id → its order
 let tableMissing = false;
 
 // state of the "new voucher" flow
@@ -306,6 +354,7 @@ let linkedStudent = null;       // { id, name, email } chosen in the picker
 let detailId = null;            // voucher open in the detail modal
 let statusMode = null;          // 'redeem' | 'void'
 let resendVoucher = null;
+let onlineResendVoucher = null;
 let sending = false;
 
 const $ = id => document.getElementById(id);
@@ -424,7 +473,58 @@ async function loadVouchers() {
   }
   $('setupBox').classList.add('hidden');
   vouchers = data ?? [];
+  await loadOrders();
   render();
+}
+
+// Online orders (migration #48). Until that has been run the table doesn't
+// exist; that is not an error here — there simply are no online vouchers yet.
+async function loadOrders() {
+  const { data, error } = await db.from('voucher_orders').select('*')
+    .order('created_at', { ascending: false }).limit(500);
+  orders = error ? [] : (data ?? []);
+  const byId = Object.fromEntries(orders.map(o => [o.id, o]));
+  orderOf = {};
+  vouchers.forEach(v => { if (v.order_id) orderOf[v.id] = byId[v.order_id] ?? null; });
+  renderAttention();
+}
+
+const ageMin = iso => (Date.now() - Date.parse(iso)) / 60000;
+const money = c => '$' + (c / 100).toFixed(2);
+
+function renderAttention() {
+  const box = $('attention');
+  const need = [];
+  orders.forEach(o => {
+    if (o.status === 'paid') {
+      const missing = [];
+      if (!o.purchaser_emailed_at) missing.push('purchaser');
+      if (o.recipient_email && !o.recipient_emailed_at) missing.push('recipient');
+      if (!missing.length) return;
+      const err = o.purchaser_email_error || o.recipient_email_error;
+      need.push({ o, pill: '<span class="vpill unsent">Not delivered</span>', btn: 'email',
+        note: `Paid — the voucher hasn't reached the ${missing.join(' or ')} yet.` +
+              ((o.delivery_attempts ?? 0) < 12 ? ' The website is retrying every few minutes.' : ' Automatic retries have stopped.') +
+              (err ? ` Last error: ${err}` : '') });
+    } else if (o.status === 'failed' && /not issued/i.test(o.status_note ?? '')) {
+      need.push({ o, pill: '<span class="vpill failed">Needs a look</span>', btn: 'check', note: o.status_note });
+    } else if (o.status === 'pending' && o.eway_access_code && ageMin(o.created_at) > 30 && ageMin(o.created_at) < 3 * 1440) {
+      need.push({ o, pill: '<span class="vpill waiting">Waiting for payment</span>', btn: 'check',
+        note: "A payment was started but eWAY hasn't confirmed it. The website keeps checking for a few hours — or check it now." });
+    }
+  });
+  if (!need.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  box.classList.remove('hidden');
+  box.innerHTML = `<div class="att-head"><b>Online orders that need a look (${need.length})</b><span>Everything else on this page is running by itself.</span></div>` +
+    need.map(n => {
+      const o = n.o, v = vouchers.find(x => x.order_id === o.id);
+      return `<div class="att-row">
+        <div class="grow"><b>${esc(o.order_no)}</b> · ${esc(o.purchaser_name)} → ${esc(o.recipient_name)} · ${esc(money(o.amount_cents))} ${n.pill}
+          <div class="att-note">${esc(n.note)}</div></div>
+        <div>${n.btn === 'email' && v
+          ? `<button class="btn btn-secondary btn-sm" onclick="openDetail('${v.id}')">Open</button>`
+          : `<button class="btn btn-secondary btn-sm" onclick="checkOrder('${o.id}', this)">Check payment</button>`}</div></div>`;
+    }).join('');
 }
 
 async function loadStudents() {
@@ -468,12 +568,14 @@ function render() {
   $('pageSub').textContent = `${counts.issued} active · ${counts.redeemed} redeemed` +
     (counts.expired ? ` · ${counts.expired} expired` : '') + (counts.void ? ` · ${counts.void} void` : '');
 
+  const src = $('filterSource').value;
   const rows = vouchers.filter(v => {
     const s = effStatus(v);
+    if (src !== 'all' && (v.source ?? 'manual') !== src) return false;
     if (f === 'active' && s !== 'issued') return false;
     if (f !== 'active' && f !== 'all' && s !== f) return false;
     if (q) {
-      const hay = [v.voucher_no, v.recipient_name, v.recipient_email, v.purchaser_name, v.purchaser_email, v.subject].join(' ').toLowerCase();
+      const hay = [v.voucher_no, v.recipient_name, v.recipient_email, v.purchaser_name, v.purchaser_email, v.subject, orderOf[v.id]?.order_no].join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -482,17 +584,23 @@ function render() {
   if (!rows.length) {
     $('vBody').innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">🎁</div>
       <h3>${vouchers.length ? 'No vouchers match' : 'No vouchers yet'}</h3>
-      <p>${vouchers.length ? 'Try a different filter.' : 'Press “+ New voucher” when someone buys one.'}</p></div></td></tr>`;
+      <p>${vouchers.length ? 'Try a different filter.' : 'Vouchers bought on the website appear here by themselves. Press “+ New voucher” for one sold by phone or at the desk.'}</p></div></td></tr>`;
     return;
   }
   $('vBody').innerHTML = rows.map(v => {
     const s = effStatus(v);
-    const emailed = v.emailed_at
+    let emailed = v.emailed_at
       ? `<span class="v-sub">Sent ${esc(dmy(v.emailed_at.slice(0, 10)))}</span>`
       : (s === 'issued' ? '<span class="vpill unsent">Not sent</span>' : '<span class="v-sub">—</span>');
+    const ord = orderOf[v.id];
+    if (ord && s === 'issued') {          // online: delivered only when everyone who should have it has it
+      const all = ord.purchaser_emailed_at && (!ord.recipient_email || ord.recipient_emailed_at);
+      const any = ord.purchaser_emailed_at || ord.recipient_emailed_at;
+      if (!all) emailed = any ? '<span class="vpill unsent">Part sent</span>' : '<span class="vpill unsent">Not sent</span>';
+    }
     return `<tr onclick="openDetail('${v.id}')">
-      <td class="v-no">${esc(v.voucher_no)}</td>
-      <td><div class="v-name">${esc(v.recipient_name)}</div><div class="v-sub">${esc(v.recipient_email)}</div></td>
+      <td class="v-no">${esc(v.voucher_no)}${v.source === 'online' ? '<span class="vpill online">Online</span>' : ''}</td>
+      <td><div class="v-name">${esc(v.recipient_name)}</div><div class="v-sub">${v.recipient_email ? esc(v.recipient_email) : 'no email — given by the buyer'}</div></td>
       <td class="v-hide-sm">${esc(v.purchaser_name)}</td>
       <td>${esc(v.subject)}${v.value_amount != null ? `<div class="v-sub">$${Number(v.value_amount).toFixed(2)}</div>` : ''}</td>
       <td class="v-hide-sm">${esc(dmy(v.purchase_date))}</td>
@@ -770,17 +878,18 @@ function openDetail(id) {
   detailId = id;
   const s = effStatus(v);
   const studio = studios.find(x => x.id === v.studio_id);
-  $('dTitle').innerHTML = `${esc(v.voucher_no)} <span class="vpill ${s}" style="margin-left:.5rem;">${STATUS_LABEL[s]}</span>`;
+  const ord = orderOf[v.id] ?? null;
+  $('dTitle').innerHTML = `${esc(v.voucher_no)} <span class="vpill ${s}" style="margin-left:.5rem;">${STATUS_LABEL[s]}</span>${ord ? '<span class="vpill online">Online</span>' : ''}`;
   $('dBody').innerHTML = `<dl class="kv">
       <dt>Gift</dt><dd><b>${esc(v.subject)}</b>${v.value_amount != null ? ` · $${Number(v.value_amount).toFixed(2)}` : ''}</dd>
-      <dt>To</dt><dd>${esc(v.recipient_name)}<br><span class="v-sub">${esc(v.recipient_email)}</span></dd>
+      <dt>To</dt><dd>${esc(v.recipient_name)}<br><span class="v-sub">${v.recipient_email ? esc(v.recipient_email) : 'no email address given'}</span></dd>
       <dt>From</dt><dd>${esc(v.purchaser_name)}${v.purchaser_email ? `<br><span class="v-sub">${esc(v.purchaser_email)}</span>` : ''}</dd>
       <dt>Purchased</dt><dd>${esc(dmy(v.purchase_date))}</dd>
       <dt>Valid until</dt><dd>${esc(dmy(v.expires_on))}</dd>
-      <dt>Studio</dt><dd>${esc(studio?.name ?? '—')}</dd>
+      ${ord ? orderRowsHtml(ord) : `<dt>Studio</dt><dd>${esc(studio?.name ?? '—')}</dd>
       <dt>Email</dt><dd>${v.emailed_at
         ? `Sent to ${esc(v.emailed_to ?? v.recipient_email)} on ${esc(dmy(v.emailed_at.slice(0, 10)))}${v.send_count > 1 ? ` (${v.send_count} times)` : ''}`
-        : '<span class="vpill unsent">Not sent</span>'}${v.email_error ? `<br><span class="v-sub" style="color:#b91c1c;">Last error: ${esc(v.email_error)}</span>` : ''}</dd>
+        : '<span class="vpill unsent">Not sent</span>'}${v.email_error ? `<br><span class="v-sub" style="color:#b91c1c;">Last error: ${esc(v.email_error)}</span>` : ''}</dd>`}
       ${v.status_changed_at ? `<dt>${s === 'void' ? 'Voided' : 'Redeemed'}</dt><dd>${esc(dmy(v.status_changed_at.slice(0, 10)))}${v.status_note ? ` — ${esc(v.status_note)}` : ''}</dd>` : ''}
     </dl>
     ${v.message ? `<div class="form-label" style="margin-bottom:.35rem;">Personal message</div><div class="v-msg">${esc(v.message)}</div>` : ''}`;
@@ -789,12 +898,34 @@ function openDetail(id) {
     <button class="btn btn-secondary btn-sm" onclick="viewPdf()">View / download PDF</button>
     ${live && s !== 'expired' ? `<button class="btn btn-secondary btn-sm" onclick="openResend()">${v.emailed_at ? 'Email again' : 'Send email'}</button>` : ''}
     ${live ? `<button class="btn btn-primary btn-sm" onclick="openStatus('redeem')">Mark redeemed</button>
+              ${ord && ord.status === 'paid' ? `<button class="btn btn-danger btn-sm" onclick="openStatus('refund')">Mark refunded…</button>` : ''}
               <button class="btn btn-danger btn-sm" onclick="openStatus('void')">Void</button>` : ''}`;
   $('detModal').classList.remove('hidden');
 }
 function closeDetail() { $('detModal').classList.add('hidden'); detailId = null; }
 
+// the extra rows an online voucher shows: where it came from, what was paid, who it reached
+function orderRowsHtml(o) {
+  const when = iso => esc(dmy(iso.slice(0, 10)));
+  const sent = (at, to, n, err) => at
+    ? `Sent to ${esc(to)} on ${when(at)}${n > 1 ? ` (${n} times)` : ''}`
+    : `<span class="vpill unsent">Not sent</span>${err ? `<br><span class="v-sub" style="color:#b91c1c;">Last error: ${esc(err)}</span>` : ''}`;
+  return `<dt>Bought</dt><dd>Online · order <b>${esc(o.order_no)}</b><br><span class="v-sub">${money(o.amount_cents)} paid ${o.paid_at ? when(o.paid_at) : ''}${o.eway_transaction_id ? ` · eWAY transaction ${esc(o.eway_transaction_id)}` : ''}</span></dd>
+      <dt>Emailed to purchaser</dt><dd>${sent(o.purchaser_emailed_at, o.purchaser_email, o.purchaser_send_count, o.purchaser_email_error)}</dd>
+      <dt>Emailed to recipient</dt><dd>${o.recipient_email ? sent(o.recipient_emailed_at, o.recipient_email, o.recipient_send_count, o.recipient_email_error) : '<span class="v-sub">No recipient email — the buyer gives it to them</span>'}</dd>
+      ${o.status === 'refunded' ? `<dt>Refunded</dt><dd><span class="v-sub">${esc(o.status_note ?? '')}</span></dd>` : ''}`;
+}
+
 function voucherPdfData(v) {
+  if (v.source === 'online') {   // honoured at either studio — same wording the website prints
+    const emails = [...new Set(studios.map(x => String(x.email ?? '').trim().toLowerCase()).filter(validEmail))];
+    return {
+      voucherNo: v.voucher_no, subject: v.subject, valueAmount: v.value_amount,
+      recipientName: v.recipient_name, purchaserName: v.purchaser_name,
+      purchaseDate: v.purchase_date, expiresOn: v.expires_on, message: v.message,
+      studio: { name: 'Pathfinder Music Lessons', emails },
+    };
+  }
   const studio = studios.find(x => x.id === v.studio_id) ?? { name: '', email: '' };
   return {
     voucherNo: v.voucher_no, subject: v.subject, valueAmount: v.value_amount,
@@ -824,6 +955,7 @@ async function viewPdf() {
 // ============================================================
 function openResend() {
   const v = vouchers.find(x => x.id === detailId); if (!v) return;
+  if (orderOf[v.id]) return openOnlineResend(v);
   resendVoucher = v;
   hideErr('rErr');
   $('rTo').value = v.recipient_email;
@@ -861,6 +993,72 @@ async function doResend() {
   } finally { sending = false; }
 }
 
+// ---- online vouchers: the website's mailbox sends them, from the server ----
+async function callAdmin(payload) {
+  const res = await fetch('/.netlify/functions/voucher-admin', {
+    method: 'POST', headers: await authHeaders(), body: JSON.stringify(payload),
+  });
+  let j = {}; try { j = await res.json(); } catch (_) {}
+  if (!res.ok) throw new Error(j.error || `The server answered ${res.status}.`);
+  return j;
+}
+
+function openOnlineResend(v) {
+  const o = orderOf[v.id]; if (!o) return;
+  onlineResendVoucher = v;
+  hideErr('orErr');
+  $('orPLabel').textContent = `Purchaser — ${o.purchaser_name}`;
+  $('orRLabel').textContent = `Recipient — ${o.recipient_name}`;
+  $('orPEmail').value = o.purchaser_email;
+  $('orREmail').value = o.recipient_email ?? '';
+  // by default: whoever hasn't had it yet; if everyone has, just the purchaser
+  const needP = !o.purchaser_emailed_at, needR = !!o.recipient_email && !o.recipient_emailed_at;
+  $('orP').checked = needP || !needR;
+  $('orR').checked = needR;
+  $('orSummary').innerHTML = `<b>From</b><span>The website's mailbox</span>
+    <b>Bcc</b><span>The studios (on the purchaser's copy only)</span>
+    <b>Subject</b><span>${esc('Your gift voucher: ' + v.subject)} · ${esc('A gift of music from ' + o.purchaser_name)}</span>`;
+  $('orSend').disabled = false; $('orSend').textContent = 'Send';
+  $('orModal').classList.remove('hidden');
+}
+function closeOnlineResend() { $('orModal').classList.add('hidden'); onlineResendVoucher = null; }
+async function doOnlineResend() {
+  const v = onlineResendVoucher, o = v && orderOf[v.id]; if (!o || sending) return;
+  hideErr('orErr');
+  const wantP = $('orP').checked, wantR = $('orR').checked;
+  const pe = $('orPEmail').value.trim(), re = $('orREmail').value.trim();
+  if (!wantP && !wantR) { showErr('orErr', 'Choose who to send it to.'); return; }
+  if (wantP && !validEmail(pe)) { showErr('orErr', 'Enter a valid email address for the purchaser.'); return; }
+  if (wantR && !validEmail(re)) { showErr('orErr', 'Enter a valid email address for the recipient.'); return; }
+  if (re && !validEmail(re)) { showErr('orErr', 'The recipient’s email address doesn’t look right.'); return; }
+  sending = true; $('orSend').disabled = true; $('orSend').textContent = 'Sending…';
+  try {
+    const payload = { action: 'resend', orderId: o.id, target: wantP && wantR ? 'both' : wantP ? 'purchaser' : 'recipient' };
+    if (pe && pe.toLowerCase() !== o.purchaser_email) payload.purchaserEmail = pe;
+    if (re.toLowerCase() !== (o.recipient_email ?? '')) payload.recipientEmail = re;
+    const r = await callAdmin(payload);
+    showToast(`Voucher ${v.voucher_no} emailed to ${[r.purchaser, r.recipient].filter(Boolean).join(' and ')}.`, 'success');
+    closeOnlineResend(); closeDetail();
+    await loadVouchers();
+  } catch (e) {
+    showErr('orErr', e.message);
+    $('orSend').disabled = false; $('orSend').textContent = 'Send';
+  } finally { sending = false; }
+}
+
+// ask eWAY again about an order that never got confirmed
+async function checkOrder(id, btn) {
+  btn.disabled = true; const label = btn.textContent; btn.textContent = 'Checking…';
+  try {
+    const r = await callAdmin({ action: 'check', orderId: id });
+    showToast(r.message || 'Checked.', r.state === 'paid' ? 'success' : 'info');
+    await loadVouchers();
+  } catch (e) {
+    showToast(e.message, 'error');
+    btn.disabled = false; btn.textContent = label;
+  }
+}
+
 // ============================================================
 // REDEEM / VOID
 // ============================================================
@@ -872,9 +1070,16 @@ function openStatus(mode) {
     $('sIntro').textContent = `Use this once ${v.recipient_name} has used the voucher (or the value has been booked in). It will no longer count as active.`;
     $('sLabel').textContent = 'Note (optional) — e.g. which lessons it was used for';
     $('sGo').className = 'btn btn-primary'; $('sGo').textContent = 'Mark redeemed';
+  } else if (mode === 'refund') {
+    const o = orderOf[v.id];
+    $('sTitle').textContent = 'Mark order refunded';
+    $('sIntro').textContent = `Do this AFTER you have refunded ${money(o?.amount_cents ?? 0)} to the customer in MYeWAY (this page doesn't move any money). Order ${o?.order_no ?? ''} is marked refunded and voucher ${v.voucher_no} is voided so it can't be used. This can't be undone.`;
+    $('sLabel').textContent = 'Reason (optional)';
+    $('sGo').className = 'btn btn-danger'; $('sGo').textContent = 'Mark refunded';
   } else {
     $('sTitle').textContent = 'Void this voucher';
-    $('sIntro').textContent = `Voiding ${v.voucher_no} means it can no longer be honoured or emailed. This can't be undone — if you need a corrected voucher, issue a new one.`;
+    $('sIntro').textContent = `Voiding ${v.voucher_no} means it can no longer be honoured or emailed. This can't be undone — if you need a corrected voucher, issue a new one.` +
+      (orderOf[v.id] ? ' It does not refund the customer — if they are owed a refund, use “Mark refunded” instead.' : '');
     $('sLabel').textContent = 'Reason (optional)';
     $('sGo').className = 'btn btn-danger'; $('sGo').textContent = 'Void voucher';
   }
@@ -883,6 +1088,18 @@ function openStatus(mode) {
 function closeStatus() { $('statusModal').classList.add('hidden'); }
 async function doStatus() {
   const v = vouchers.find(x => x.id === detailId); if (!v) return;
+  if (statusMode === 'refund') {
+    const o = orderOf[v.id]; if (!o) return;
+    $('sGo').disabled = true;
+    try {
+      await callAdmin({ action: 'refund', orderId: o.id, note: $('sNote').value.trim() });
+    } catch (e) { $('sGo').disabled = false; showErr('sErr', e.message); return; }
+    $('sGo').disabled = false;
+    showToast('Order marked refunded and the voucher voided.', 'success');
+    closeStatus(); closeDetail();
+    await loadVouchers();
+    return;
+  }
   $('sGo').disabled = true;
   const { error } = await db.from('gift_vouchers').update({
     status: statusMode === 'redeem' ? 'redeemed' : 'void',
@@ -897,7 +1114,7 @@ async function doStatus() {
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
-  for (const id of ['statusModal', 'resendModal', 'prevModal', 'detModal', 'newModal']) {
+  for (const id of ['statusModal', 'orModal', 'resendModal', 'prevModal', 'detModal', 'newModal']) {
     const m = $(id);
     if (!m.classList.contains('hidden')) { id === 'newModal' ? closeNew() : id === 'prevModal' ? closePrev() : m.classList.add('hidden'); break; }
   }
