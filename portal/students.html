@@ -243,6 +243,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
       Distribution Lists
     </a>
+    <a class="nav-item" href="portal-logins.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+      Portal Logins
+    </a>
     <div class="sidebar-section hidden" id="superuserSection">Super User</div>
     <a class="nav-item hidden" href="studios.html" id="studiosLink">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
@@ -895,6 +899,17 @@ async function loadProcesses() {
   // process — the sequential version meant every newly-auto-completed
   // process on the page added its own full round trip, one after
   // another, before the page could finish loading.
+  // Once their lessons have ended, the student's other open tasks are
+  // closed quietly (a no-op after the first time). Done before the
+  // checklist is marked complete below, because only an ending still in
+  // progress qualifies.
+  for (const p of procs) {
+    if (p.process_type === 'end_enrolment' && p.status === 'in_progress'
+        && !p.tasks_closed_at && checksFor[p.student_id]?.lessons_ended) {
+      await closeTasksForEndedStudent(p.student_id, currentProfile.id);
+    }
+  }
+
   const toComplete = procs.filter(p =>
     p.status === 'in_progress' &&
     processProgress(byProc[p.id] ?? [], checksFor[p.student_id] ?? {}).complete);
@@ -1391,6 +1406,12 @@ async function syncProcessStatus(studentId) {
   const p = processProgress(items, checks);
   const want = p.complete ? 'complete' : 'in_progress';
   if (proc.status === want) return;
+
+  // Normally already done when the lessons ended; this catches the rest.
+  // Has to come first — only an ending still in progress qualifies.
+  if (want === 'complete' && proc.process_type === 'end_enrolment') {
+    await closeTasksForEndedStudent(studentId, currentProfile.id);
+  }
 
   await db.from('student_processes').update({
     status: want,
@@ -2174,9 +2195,16 @@ async function endLessonsFor(studentId) {
       .ilike('title', 'Mark student inactive%');
     if (tErr) console.error('[students] could not re-date the inactive task', tErr);
 
+    // The student's other open tasks (check-ins, payment follow-ups,
+    // recurring ones) have no point now — close them quietly. Does
+    // nothing unless an end-enrolment checklist is under way.
+    const closed = await closeTasksForEndedStudent(studentId, currentProfile.id, endDate);
+    const closedNote = closed.tasks
+      ? ` ${closed.tasks} other open task${closed.tasks !== 1 ? 's were' : ' was'} closed.` : '';
+
     showToast(
       `${lessons.length} series ended. Last lesson ${formatShortDate(parseLocalDate(endDate))}, ` +
-      `and the follow-up task moves to ${formatShortDate(d)}.`,
+      `and the follow-up task moves to ${formatShortDate(d)}.` + closedNote,
       'success');
     await loadStudents();
     if (procByStudent[studentId]) openProcess(studentId);

@@ -633,6 +633,16 @@ until then they may show "Leaving after [date]" while their status column
 still reads Active. That's expected, not a bug.
 </p>
 </div>
+<div class="callout callout-tip">
+<strong>Ending lessons tidies up their tasks</strong>
+<p>
+When you end a student's lessons during End enrolment, the Portal quietly
+closes their other open tasks (including recurring ones) and takes them off
+any recurring task they were on. Each closed task gets a note saying "Task
+completed due to student stopping lessons", with the last lesson date. "Mark
+student inactive" and the End enrolment checklist's own tasks are left for you.
+</p>
+</div>
 
 <h3 id="teachers">Teachers</h3>
 <p>
@@ -742,6 +752,45 @@ deliberate: it's the incentive for marking attendance promptly.
 Teacher-cancelled lessons are tracked (visible in the CSV export) but
 don't count for or against the student's rate, since the lesson not
 happening wasn't their doing.
+</p>
+</div>
+
+<h3 id="portal-logins">Portal Logins</h3>
+<p>
+Shows, for every active and trial student, whether they have ever signed in
+to the Student Portal and whether they have finished setting their own
+password. Use it to see who still hasn't started using the Portal, and to
+nudge them with one click. The cards at the top count <strong>logins</strong>,
+not children: siblings who share one family login are a single row (tagged
+"family login") and get a single reminder.
+</p>
+<ul>
+<li><strong>Never signed in</strong> — the account exists but has never been used.</li>
+<li><strong>Setup unfinished</strong> — they signed in (for example by clicking
+the original link) but haven't changed the temporary password yet.</li>
+<li><strong>Set up</strong> — signed in and chose their own password.</li>
+<li><strong>No login yet</strong> — the student has no Portal account at all.
+They can't be reminded from here; use <strong>Add login</strong> on the Students
+page first.</li>
+</ul>
+<p>
+The page opens on <strong>Needs a reminder</strong> (never signed in plus
+setup unfinished), filtered to your studio. Tick the people you want, or
+click <strong>Select all shown</strong>, then <strong>Send reminder…</strong>.
+You can edit the wording before sending. The email lists what the Portal
+offers (lesson notes and feedback, progress and grading, shared materials,
+booking the concert) and asks them to visit the Portal sign-in page, using
+<strong>Forgot password?</strong> if they don't have their password handy.
+It is sent individually from each student's own studio address, parents on
+file receive it too, and the studio gets the usual summary copy.
+</p>
+<div class="callout callout-tip">
+<strong>No double-reminding</strong>
+<p>
+The <em>Last reminded</em> column shows when a login was last sent this
+reminder. <strong>Select all shown</strong> skips anyone reminded in the last
+3 days; you can still tick them by hand. <strong>Export CSV</strong>
+downloads the list currently on screen.
 </p>
 </div>
 

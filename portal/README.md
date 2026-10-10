@@ -972,6 +972,22 @@ no Deactivate button — it set a status and left the lessons running, so a
 "deactivated" student still appeared on their teacher's schedule. Ending an
 enrolment is a process, not a flag.
 
+**Ending lessons closes the student's other tasks.** When `End lessons…` runs
+(or the Students page notices their lessons have ended) while an End enrolment
+checklist is in progress, `closeTasksForEndedStudent()` in `js/processes.js`
+marks the student's other open tasks done, adds a log note ("Task completed due
+to student stopping lessons (last lesson 14 Oct 2026)."), removes them from
+recurring rules and switches off any rule left with nobody on it. It never
+touches "Mark student inactive", "End enrolment" or the end checklist's own
+blocked-item tasks. Once only per checklist, via
+`student_processes.tasks_closed_at` (`phase14-end-enrolment-close-tasks.sql`);
+without that column it does nothing. Enrolments ended before this are not swept.
+
+**Lessons grid filters narrow on the server.** Picking a student (or teacher)
+on the Lessons grid's monthly view looks up their lessons first and asks
+`schedule_view` for only those; it used to fetch the whole month and filter in
+the browser, which timed out for students.
+
 **Closing an "End enrolment — [name]" task is what starts the checklist**,
 in `tasks.html`'s `setStatus()` — not `planEndEnrolment()` itself, which only
 creates that task, due whenever the admin says the enrolment should end. The
@@ -2926,3 +2942,47 @@ policies were created by hand in Supabase and aren't in the repo; if a save on
 a cancelled occurrence is rejected ("Could not save note"), re-read them with
 `select policyname, cmd, qual, with_check from pg_policies where tablename =
 'lesson_notes';` and look for a `status` condition on `lesson_occurrences`.
+
+**A covering teacher's schedule was empty (Oct 2026) — `phase13-substitute-sees-usual-teacher.sql`.**
+The admin grid showed Bailey Tenace covering Vikatoa Tupou's lessons and RLS
+let him read the lessons, students and notes, yet his schedule was blank.
+`schedule_view` is `security_invoker` and does `JOIN teachers t ON t.id =
+l.teacher_id` — the **usual** teacher's row — so for a cover teacher that inner
+join found nothing and silently dropped every covered row. Diagnosed by
+impersonating him in a transaction (`set local role authenticated` + `set_config('request.jwt.claims', …)`):
+5 occurrences visible, usual-teacher row 0, `schedule_view` rows 0. Fix:
+`my_covered_original_teacher_ids()` (SECURITY DEFINER) and policy
+`teacher_reads_covered_original_teacher` on `teachers`. **Lesson for next time:**
+any new column or join added to `schedule_view` / `student_schedule_view` must
+be checked from the point of view of a substitute (and a student), because an
+inner join to a table they cannot read removes the whole row rather than erroring.
+
+**Portal Logins report + reminder email (Oct 2026) — `portal-logins.html`, `netlify/functions/login-status.js`.**
+Two days after the Portal-launch announcement many students still hadn't
+signed in. Admins now have **Reports → Portal Logins**: one row per *login*
+(siblings sharing a family login are one row and get one email), classified
+as **Never signed in** (`auth.users.last_sign_in_at` is null), **Setup
+unfinished** (signed in, `profiles.must_change_password` still true), **Set
+up**, or **No login yet** (`students.user_id` has no matching auth user —
+enquiry-created students). The browser can't read `auth.users`, so
+`login-status.js` returns `email` / `last_sign_in_at` / `created_at` for a
+requested list of user ids; unlike the older `create-user.js` actions it
+**requires a signed-in active admin** (Bearer token checked against Supabase
+and `profiles.role`) because it returns addresses and sign-in times. Studio-
+scoped admins only see the students RLS already lets them read, and only
+those ids are looked up.
+
+The **reminder** deliberately contains **no `{{portal_link}}`** — just the
+plain Sign-in page URL and "click *Forgot password?* if you don't have your
+password". A one-time recovery link expires within hours (Supabase's email
+OTP lifetime), so a link in a reminder would likely be dead by the time it's
+opened, and generating a fresh one invalidates the previous one. It goes
+through the existing `send-email` function in `students` mode (so it's logged
+to `email_log`, BCC/summary-copied to the studio, and also reaches
+`parent_email`). The subject is fixed (`REMINDER_SUBJECT`) because **Last
+reminded** is derived by finding earlier `email_log` rows with exactly that
+subject and matching recipient addresses; "Select all shown" skips anyone
+reminded in the last 3 days. One email per login, grouped per sending studio
+and per single/family variant (family emails open "Hello," instead of one
+child's name). No SQL migration. Sidebar link added to the 21 admin pages
+(static sidebars and the `renderSidebar()` ones).

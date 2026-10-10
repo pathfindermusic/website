@@ -978,3 +978,129 @@ async function deferredItemDueDate(studentId, processType, since, label = '') {
       return null;
   }
 }
+
+
+// ------------------------------------------------------------
+// When a student's lessons end, the follow-up work for them ends
+// too. The tasks queue would otherwise keep nagging about check-ins,
+// payment follow-ups and recurring rule tasks for someone who is no
+// longer coming. This closes them quietly — no emails, no prompts —
+// and leaves a log entry on each one saying why.
+//
+// Runs ONCE per end-enrolment process: it claims the process by
+// stamping student_processes.tasks_closed_at, so the several places
+// that notice "their lessons have ended" (ending the lessons, loading
+// the Students page, ticking the checklist off) can all call it and
+// only the first does anything. Only an end-enrolment still in
+// progress counts, so students who left long ago are never swept.
+//
+// Never touched: the end-enrolment process's own tasks ("Mark student
+// inactive", blocked checklist items) and the "End enrolment" planning
+// task — those are the work of leaving itself.
+//
+// Needs phase14-end-enrolment-close-tasks.sql (tasks_closed_at). Until
+// it has been run the claim fails and this does nothing.
+//
+// Returns { tasks, rules } — how many tasks were closed and how many
+// recurring rules were changed.
+// ------------------------------------------------------------
+async function lastLessonDateFor(studentId) {
+  // Permanent membership only, and including lessons that have since
+  // been ended — their occurrences up to the end date are still there.
+  const { data: ls } = await db.from('lesson_students')
+    .select('lesson_id').eq('student_id', studentId).is('added_for_occurrence_id', null);
+  const ids = (ls ?? []).map(r => r.lesson_id);
+  if (!ids.length) return null;
+  const { data: occ } = await db.from('lesson_occurrences')
+    .select('date').in('lesson_id', ids)
+    .neq('status', 'cancelled')
+    .order('date', { ascending: false }).limit(1);
+  return occ?.[0]?.date ?? null;
+}
+
+async function closeTasksForEndedStudent(studentId, loggedBy, lastLessonDate = null) {
+  const none = { tasks: 0, rules: 0 };
+  try {
+    // 1. Claim. Only an unclaimed, in-progress ending qualifies.
+    const { data: procs, error: pErr } = await db.from('student_processes')
+      .select('id').eq('student_id', studentId)
+      .eq('process_type', 'end_enrolment').eq('status', 'in_progress')
+      .is('tasks_closed_at', null);
+    if (pErr) { console.warn('[processes] close-tasks unavailable:', pErr.message); return none; }
+    if (!procs?.length) return none;
+
+    const { data: claimed, error: cErr } = await db.from('student_processes')
+      .update({ tasks_closed_at: new Date().toISOString() })
+      .in('id', procs.map(p => p.id)).is('tasks_closed_at', null)
+      .select('id');
+    if (cErr || !claimed?.length) return none;       // someone else got there first
+    const ownProcessIds = new Set(claimed.map(p => p.id));
+
+    // 2. The student's open tasks, minus the ones that belong to leaving.
+    const { data: open } = await db.from('tasks')
+      .select('id,title,process_id')
+      .eq('subject_type', 'student').eq('subject_id', studentId).eq('status', 'open');
+    const toClose = (open ?? []).filter(t => {
+      const title = String(t.title ?? '').toLowerCase();
+      if (title.startsWith('mark student inactive')) return false;
+      if (title.startsWith('end enrolment'))         return false;
+      if (t.process_id && ownProcessIds.has(t.process_id)) return false;
+      return true;
+    });
+
+    const last = lastLessonDate ?? await lastLessonDateFor(studentId);
+    const when = last ? ` (last lesson ${formatShortDate(parseLocalDate(last))})` : '';
+    const note = `Task completed due to student stopping lessons${when}.`;
+
+    let closed = 0;
+    if (toClose.length) {
+      const now = new Date().toISOString();
+      const ids = toClose.map(t => t.id);
+      // The status guard means a task someone closed a moment ago is
+      // neither re-closed nor given a second log entry.
+      const { data: done, error: uErr } = await db.from('tasks')
+        .update({ status: 'done', completed_at: now, completed_by: loggedBy ?? null })
+        .in('id', ids).eq('status', 'open').select('id');
+      if (uErr) console.error('[processes] could not close tasks', uErr);
+      const doneIds = (done ?? []).map(t => t.id);
+      closed = doneIds.length;
+      if (doneIds.length) {
+        const { error: nErr } = await db.from('task_notes').insert(
+          doneIds.map(id => ({ task_id: id, note_text: note, logged_by: loggedBy ?? null })));
+        if (nErr) console.error('[processes] could not log the closures', nErr);
+      }
+    }
+
+    // 3. Recurring rules. Take the student off each one so no further
+    //    tasks are generated for them. A rule left with nobody on it
+    //    would turn into a generic task for everyone, so it is switched
+    //    off instead. (Rules this admin can't see are left alone.)
+    let rules = 0;
+    const { data: subj } = await db.from('recurring_task_subjects')
+      .select('id,recurring_task_id')
+      .eq('subject_type', 'student').eq('subject_id', studentId);
+    if (subj?.length) {
+      const { error: dErr } = await db.from('recurring_task_subjects')
+        .delete().in('id', subj.map(s => s.id));
+      if (dErr) console.error('[processes] could not remove from recurring rules', dErr);
+      else {
+        const ruleIds = [...new Set(subj.map(s => s.recurring_task_id))];
+        rules = ruleIds.length;
+        const { data: left } = await db.from('recurring_task_subjects')
+          .select('recurring_task_id').in('recurring_task_id', ruleIds);
+        const stillUsed = new Set((left ?? []).map(r => r.recurring_task_id));
+        const empty = ruleIds.filter(id => !stillUsed.has(id));
+        if (empty.length) {
+          const { error: rErr } = await db.from('recurring_tasks')
+            .update({ is_active: false }).in('id', empty);
+          if (rErr) console.error('[processes] could not switch off empty rules', rErr);
+        }
+      }
+    }
+
+    return { tasks: closed, rules };
+  } catch (err) {
+    console.error('[processes] closeTasksForEndedStudent failed', err);
+    return none;
+  }
+}

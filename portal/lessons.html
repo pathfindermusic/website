@@ -362,6 +362,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
       Distribution Lists
     </a>
+    <a class="nav-item" href="portal-logins.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+      Portal Logins
+    </a>
     <div class="sidebar-section hidden" id="superuserSection">Super User</div>
     <a class="nav-item hidden" href="studios.html" id="studiosLink">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
@@ -1240,42 +1244,72 @@ async function loadMonthlyView() {
   const studentId = document.getElementById('filterStudent').value;
   const teacherId = document.getElementById('filterTeacher').value;
 
-  let q = db.from('schedule_view').select('*')   // includes is_makeup via the view
-    .gte('date', toISODate(first)).lte('date', toISODate(last))
-    .order('date').order('start_time');
-  if (studioId) q = q.eq('studio_id', studioId);
-  if (statusF)  q = q.eq('occurrence_status', statusF);
+  // Narrow on the server BEFORE touching schedule_view. The view is
+  // expensive (roster, makeup and cover details are worked out for every
+  // row), so asking it for the whole month and filtering in the browser
+  // is what used to time out as soon as a student was picked. Look up
+  // the teacher's / student's lessons first (cheap, indexed) and have
+  // the view fetch only those.
+  const fail = msg => { el.innerHTML = `<div class="empty-state"><p style="color:#dc2626;">${msg}</p></div>`; };
 
-  const { data, error } = await q;
-  if (error) {
-    el.innerHTML = `<div class="empty-state"><p style="color:#dc2626;">${error.message}</p></div>`;
-    return;
-  }
-
-  let rows = (data ?? []).filter(o =>
-    o.lesson_status !== 'active' ? o.occurrence_status !== 'cancelled' : true);
-
-  // Filtering by teacher: the view doesn't expose a teacher id, but it
-  // does carry lesson_id, so match on that (same approach as the student
-  // filter below).
+  // Teacher filter: the view doesn't expose a teacher id, but it does
+  // carry lesson_id, so match on that.
+  let teacherLessons = null;
   if (teacherId) {
-    const { data: tl } = await db.from('lessons').select('id').eq('teacher_id', teacherId);
-    const theirs = new Set((tl ?? []).map(l => l.id));
-    rows = rows.filter(r => theirs.has(r.lesson_id));
+    const { data: tl, error: tErr } = await db.from('lessons').select('id').eq('teacher_id', teacherId);
+    if (tErr) return fail(tErr.message);
+    teacherLessons = new Set((tl ?? []).map(l => l.id));
   }
 
-  // Filtering by student needs lesson membership, which the view
-  // doesn't carry — it holds one row per occurrence, not per student.
-  // A permanent row (added_for_occurrence_id NULL) matches every
+  // Student filter needs lesson membership, which the view doesn't
+  // carry — it holds one row per occurrence, not per student. A
+  // permanent row (added_for_occurrence_id NULL) matches every
   // occurrence of that lesson; an ad-hoc row matches only the one
   // occurrence it was added for.
+  let mineLessons = null, mineOccurrences = null;
   if (studentId) {
-    const { data: ls } = await db.from('lesson_students')
+    const { data: ls, error: lsErr } = await db.from('lesson_students')
       .select('lesson_id,added_for_occurrence_id').eq('student_id', studentId);
-    const mineLessons = new Set((ls ?? []).filter(r => !r.added_for_occurrence_id).map(r => r.lesson_id));
-    const mineOccurrences = new Set((ls ?? []).filter(r => r.added_for_occurrence_id).map(r => r.added_for_occurrence_id));
-    rows = rows.filter(r => mineLessons.has(r.lesson_id) || mineOccurrences.has(r.occurrence_id));
+    if (lsErr) return fail(lsErr.message);
+    mineLessons = new Set((ls ?? []).filter(r => !r.added_for_occurrence_id).map(r => r.lesson_id));
+    mineOccurrences = new Set((ls ?? []).filter(r => r.added_for_occurrence_id).map(r => r.added_for_occurrence_id));
   }
+
+  // Which lessons / occurrences may the view return?
+  let wantLessons = null, wantOccurrences = [];
+  if (studentId) {
+    wantLessons = [...mineLessons].filter(id => !teacherLessons || teacherLessons.has(id));
+    wantOccurrences = [...mineOccurrences];
+  } else if (teacherLessons) {
+    wantLessons = [...teacherLessons];
+  }
+
+  let data = [];
+  const nothingToShow = (studentId || teacherId) && !wantLessons.length && !wantOccurrences.length;
+  if (!nothingToShow) {
+    let q = db.from('schedule_view').select('*')   // includes is_makeup via the view
+      .gte('date', toISODate(first)).lte('date', toISODate(last))
+      .order('date').order('start_time');
+    if (studioId) q = q.eq('studio_id', studioId);
+    if (statusF)  q = q.eq('occurrence_status', statusF);
+    if (studentId || teacherId) {
+      const parts = [];
+      if (wantLessons.length)     parts.push(`lesson_id.in.(${wantLessons.join(',')})`);
+      if (wantOccurrences.length) parts.push(`occurrence_id.in.(${wantOccurrences.join(',')})`);
+      q = q.or(parts.join(','));
+    }
+    const res = await q;
+    if (res.error) return fail(res.error.message);
+    data = res.data ?? [];
+  }
+
+  let rows = data.filter(o =>
+    o.lesson_status !== 'active' ? o.occurrence_status !== 'cancelled' : true);
+
+  // The server has already narrowed the rows; these checks keep the exact
+  // matching rules as a safety net.
+  if (teacherLessons) rows = rows.filter(r => teacherLessons.has(r.lesson_id));
+  if (studentId)      rows = rows.filter(r => mineLessons.has(r.lesson_id) || mineOccurrences.has(r.occurrence_id));
 
   const byDate = {};
   rows.forEach(r => { (byDate[r.date?.slice(0,10)] ??= []).push(r); });

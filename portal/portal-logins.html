@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal Logins — Pathfinder Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/portal.css">
+  <style>
+    .report-toolbar { display:flex; align-items:flex-end; gap:0.75rem; flex-wrap:wrap; margin-bottom:1.25rem; }
+    .toolbar-field { display:flex; flex-direction:column; gap:0.3rem; }
+    .toolbar-field label { font-size:0.72rem; font-weight:600; color:var(--mid-grey); text-transform:uppercase; letter-spacing:0.04em; }
+    .toolbar-search { display:flex; align-items:center; gap:0.4rem; border:1px solid var(--border); border-radius:var(--r-sm); background:var(--white); padding:0.46rem 0.75rem; min-width:200px; }
+    .toolbar-search input { border:none; outline:none; font-size:0.82rem; font-family:'Inter',sans-serif; width:100%; background:transparent; color:var(--charcoal); }
+
+    .lp-pill { display:inline-block; padding:0.2rem 0.6rem; border-radius:999px; font-size:0.74rem; font-weight:600; white-space:nowrap; }
+    .lp-never   { background:#fee2e2; color:#b91c1c; }
+    .lp-partial { background:#fef3c7; color:#b45309; }
+    .lp-done    { background:#dcfce7; color:#15803d; }
+    .lp-none    { background:var(--light-grey); color:var(--mid-grey); }
+
+    .name-cell { font-weight:600; color:var(--charcoal); }
+    .family-tag { display:inline-block; margin-left:0.4rem; padding:0.05rem 0.4rem; border-radius:4px; font-size:0.68rem; font-weight:600; background:#e0e7ff; color:#4338ca; vertical-align:middle; }
+    .sub-cell { color:var(--dark-grey); font-size:0.82rem; }
+    .sub-cell.muted { color:var(--mid-grey); }
+    td.chk, th.chk { width:36px; text-align:center; }
+    td.chk input, th.chk input { accent-color:var(--orange); width:16px; height:16px; }
+
+    .send-bar { display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap; margin:0 0 0.9rem; }
+    .send-bar .count { font-size:0.82rem; color:var(--dark-grey); }
+    .info-note { background:#eff6ff; border:1px solid #93c5fd; color:#1d4ed8; border-radius:var(--r-sm); padding:0.6rem 0.8rem; font-size:0.8rem; line-height:1.55; margin-bottom:1.1rem; }
+    .msg-preview { width:100%; min-height:300px; font-family:'Inter',sans-serif; font-size:0.84rem; line-height:1.55; }
+  </style>
+</head>
+<body>
+<div class="portal-shell">
+
+  <nav class="topnav">
+    <a href="#" class="topnav-logo"><img src="../Logo_-_long.png" alt="Pathfinder Music Lessons"></a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">–</span>
+        </div>
+      </div>
+      <a href="change-password.html" class="btn-logout" style="text-decoration:none;">🔑 Password</a>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Front desk</div>
+    <a class="nav-item" href="tasks.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Tasks
+    </a>
+    <a class="nav-item" href="enquiries.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+      Enquiries
+    </a>
+    <a class="nav-item" href="notifications.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/></svg>
+      Notifications
+    </a>
+    <a class="nav-item" href="day-sheet.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
+      Day Sheet
+    </a>
+    <a class="nav-item" href="events.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      Events
+    </a>
+    <a class="nav-item" href="vouchers.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+      Vouchers
+    </a>
+    <div class="sidebar-section">Teaching</div>
+    <a class="nav-item" href="lessons.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Lessons
+    </a>
+    <a class="nav-item" href="students.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      Students
+    </a>
+    <a class="nav-item" href="teachers.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+      Teachers
+    </a>
+    <div class="sidebar-section">Curriculum</div>
+    <a class="nav-item" href="bok-artefacts.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Artefact Library
+    </a>
+    <div class="sidebar-section">Reports</div>
+    <a class="nav-item" href="attendance-report.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Attendance
+    </a>
+    <a class="nav-item" href="grading-report.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+      Grading
+    </a>
+    <a class="nav-item" href="credits.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/></svg>
+      Credits
+    </a>
+    <a class="nav-item" href="distribution-lists.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      Distribution Lists
+    </a>
+    <a class="nav-item active" href="portal-logins.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+      Portal Logins
+    </a>
+    <div class="sidebar-section hidden" id="superuserSection">Super User</div>
+    <a class="nav-item hidden" href="studios.html" id="studiosLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Studios
+    </a>
+    <a class="nav-item hidden" href="admins.html" id="adminsLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Admins
+    </a>
+    <a class="nav-item hidden" href="teacher-utilisation.html" id="utilLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Teachers utilisation
+    </a>
+    <div class="sidebar-section">Manuals</div>
+    <a class="nav-item" href="manuals/index.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      How-To Guide
+    </a>
+  </aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Portal Logins</div>
+        <div class="page-sub" id="pageSub">Loading…</div>
+      </div>
+      <div class="flex gap-1" style="flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm" onclick="exportCSV()">⬇ Export CSV</button>
+      </div>
+    </div>
+
+    <div class="info-note">
+      Shows every active and trial student's Portal login — whether they have ever signed in, and whether
+      they have finished setting their own password. A family that shares one login (siblings) appears as
+      <b>one row</b> and receives <b>one</b> reminder. Students with no login yet can't be reminded — use
+      <b>Add login</b> on the Students page first.
+    </div>
+
+    <div class="stats-row" id="statsRow">
+      <div class="stat-card"><div class="stat-card-top"><span class="stat-label">Logins</span><div class="stat-icon">👥</div></div>
+        <div class="stat-value" id="statTotal">–</div><div class="stat-sub" id="statTotalSub">in this studio filter</div></div>
+      <div class="stat-card"><div class="stat-card-top"><span class="stat-label">Never signed in</span><div class="stat-icon">🚪</div></div>
+        <div class="stat-value" id="statNever">–</div><div class="stat-sub">haven't opened the Portal</div></div>
+      <div class="stat-card"><div class="stat-card-top"><span class="stat-label">Setup unfinished</span><div class="stat-icon">🔑</div></div>
+        <div class="stat-value" id="statPartial">–</div><div class="stat-sub">signed in, password not changed</div></div>
+      <div class="stat-card"><div class="stat-card-top"><span class="stat-label">Set up</span><div class="stat-icon">✅</div></div>
+        <div class="stat-value" id="statDone">–</div><div class="stat-sub" id="statDoneSub">own password set</div></div>
+    </div>
+
+    <div class="report-toolbar">
+      <div class="toolbar-field">
+        <label for="filterStudio">Studio</label>
+        <select class="filter-select" id="filterStudio" onchange="renderTable()">
+          <option value="">All Studios</option>
+        </select>
+      </div>
+      <div class="toolbar-field">
+        <label for="filterStatus">Show</label>
+        <select class="filter-select" id="filterStatus" onchange="renderTable()">
+          <option value="todo">Needs a reminder (never signed in + setup unfinished)</option>
+          <option value="never">Never signed in</option>
+          <option value="partial">Setup unfinished</option>
+          <option value="done">Set up</option>
+          <option value="none">No login yet</option>
+          <option value="all">Everyone</option>
+        </select>
+      </div>
+      <div class="toolbar-search">
+        <span>🔍</span>
+        <input type="text" id="searchInput" placeholder="Search name or email…" oninput="renderTable()">
+      </div>
+    </div>
+
+    <div class="send-bar">
+      <button class="btn btn-secondary btn-sm" onclick="selectEligible()">Select all shown</button>
+      <button class="btn btn-ghost btn-sm" onclick="clearSelection()">Clear</button>
+      <button class="btn btn-primary btn-sm" id="sendBtn" onclick="openReminder()" disabled>Send reminder…</button>
+      <span class="count" id="selCount"></span>
+    </div>
+
+    <div class="schedule-wrap">
+      <table class="schedule-table">
+        <thead>
+          <tr>
+            <th class="chk"></th>
+            <th class="sortable" onclick="setSort('name')" style="cursor:pointer;">Student(s)<span id="arrow-name"></span></th>
+            <th>Studio</th>
+            <th>Login email</th>
+            <th class="sortable" onclick="setSort('status')" style="cursor:pointer;">Status<span id="arrow-status"></span></th>
+            <th class="sortable" onclick="setSort('last')" style="cursor:pointer;">Last sign-in<span id="arrow-last"></span></th>
+            <th class="sortable" onclick="setSort('reminded')" style="cursor:pointer;">Last reminded<span id="arrow-reminded"></span></th>
+          </tr>
+        </thead>
+        <tbody id="rowsBody">
+          <tr><td colspan="7"><div class="loading"><div class="spinner"></div> Loading…</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<!-- Reminder modal -->
+<div class="modal-overlay hidden" id="reminderModal">
+  <div class="modal" style="max-width:620px;">
+    <div class="modal-header">
+      <span class="modal-title">Send Portal login reminder</span>
+      <button class="modal-close" onclick="closeReminder()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-sm" style="line-height:1.7;margin-bottom:0.8rem;" id="reminderSummary"></p>
+      <div class="form-group">
+        <label class="form-label">Subject</label>
+        <input class="form-input" type="text" id="reminderSubject" readonly style="background:var(--off-white);">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Message</label>
+        <textarea class="form-textarea msg-preview" id="reminderBody"></textarea>
+        <div class="form-hint" style="margin-top:0.35rem;">
+          <code>{{first_name}}</code> is replaced with each student's first name. For a family that shares one
+          login, the opening "Hi {{first_name}}," is swapped for "Hello," so one child's name isn't used for everyone.
+          Each studio's emails are sent from that studio's own address, and the studio gets a summary copy.
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeReminder()">Cancel</button>
+      <button class="btn btn-primary" id="reminderSendBtn" onclick="doSend()">Send reminders</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastWrap" class="toast-wrap"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script>
+
+// The subject is fixed (and shown read-only in the modal) because "Last
+// reminded" is worked out by finding earlier sends in email_log with exactly
+// this subject.
+const REMINDER_SUBJECT = 'Reminder: your Pathfinder Student Portal is ready';
+const LOGIN_URL        = 'https://www.pathfindermusiclessons.com.au/portal/login.html';
+const RECENT_DAYS      = 3;      // "Select all shown" skips anyone reminded this recently
+
+const DEFAULT_BODY =
+`Hi {{first_name}},
+
+Your Pathfinder Student Portal is set up and waiting for you, but we can't see that you've signed in yet. Once you're in, you can:
+
+- read your teacher's lesson notes and feedback
+- follow your progress and grading
+- open the materials your teacher has shared with you
+- book your performance at the upcoming student concert
+
+Please visit [Sign In — Pathfinder Portal](${LOGIN_URL}) to sign in. If you don't have your password to hand, just click "Forgot password?" on that page and we'll email you a link to choose a new one — it only takes a minute.
+
+Not sure which email address to use? It's the one this message was sent to. And if you get stuck, just reply to this email and we'll help.
+
+Kind regards,
+Pathfinder Music Lessons`;
+
+let currentProfile = null;
+let studios   = [];            // all studios (id, name, email)
+let logins    = [];            // one entry per login (see buildLogins)
+let selected  = new Set();     // login keys
+let sortKey   = 'status';
+let sortDir   = 'asc';
+let remindedByEmail = {};      // lowercased address -> ISO time of the latest reminder
+
+const STATUS_ORDER = { never: 0, partial: 1, done: 2, none: 3 };
+const STATUS_LABEL = { never: 'Never signed in', partial: 'Setup unfinished', done: 'Set up', none: 'No login yet' };
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// ---- Init ----
+(async () => {
+  currentProfile = await requireAuth(['superuser','admin']);
+  if (!currentProfile) return;
+  renderTopNavUser(currentProfile);
+
+  if (currentProfile.role === 'superuser') {
+    document.getElementById('superuserSection').classList.remove('hidden');
+    document.getElementById('studiosLink').classList.remove('hidden');
+    document.getElementById('adminsLink').classList.remove('hidden');
+    document.getElementById('utilLink').classList.remove('hidden');
+  }
+  if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
+
+  document.getElementById('reminderSubject').value = REMINDER_SUBJECT;
+  document.getElementById('reminderBody').value    = DEFAULT_BODY;
+
+  await loadStudios();
+  await loadData();
+})();
+
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+async function loadStudios() {
+  const { data } = await db.from('studios').select('id, name, email, status').order('name');
+  studios = data ?? [];
+  const sel = document.getElementById('filterStudio');
+  studios.filter(s => s.status === 'active').forEach(s => {
+    sel.innerHTML += `<option value="${s.id}">${esc(s.name)}</option>`;
+  });
+
+  let myStudioIds = studios.filter(s => s.status === 'active').map(s => s.id);
+  if (currentProfile.role !== 'superuser') {
+    const { data: me } = await db.from('admins').select('studio_ids').eq('user_id', currentProfile.id).maybeSingle();
+    if (me?.studio_ids?.length) myStudioIds = me.studio_ids;
+  }
+  applyDefaultStudio('filterStudio', myStudioIds);
+}
+
+const studioName = id => studios.find(s => s.id === id)?.name ?? '';
+
+// PostgREST returns at most 1000 rows per request, so page through.
+async function fetchAll(makeQuery) {
+  const out = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await makeQuery().range(from, from + 999);
+    if (error) throw error;
+    out.push(...(data ?? []));
+    if (!data || data.length < 1000) break;
+  }
+  return out;
+}
+
+async function authHeaders() {
+  const h = { 'Content-Type': 'application/json' };
+  try {
+    const { data } = await db.auth.getSession();
+    if (data?.session?.access_token) h.Authorization = 'Bearer ' + data.session.access_token;
+  } catch (_) {}
+  return h;
+}
+
+// ---- Load everything and merge into one row per login ----
+async function loadData() {
+  const body = document.getElementById('rowsBody');
+  body.innerHTML = `<tr><td colspan="7"><div class="loading"><div class="spinner"></div> Loading…</div></td></tr>`;
+  try {
+    const students = await fetchAll(() => db.from('students')
+      .select('id, user_id, studio_id, status, first_name, last_name, email, parent_email, profiles(first_name, last_name)')
+      .in('status', ['active', 'trial']).order('id'));
+
+    const userIds = [...new Set(students.map(s => s.user_id).filter(Boolean))];
+
+    // must_change_password lives on profiles (RLS lets an admin read it)
+    const mustChange = {};
+    for (let i = 0; i < userIds.length; i += 150) {
+      const chunk = userIds.slice(i, i + 150);
+      const { data, error } = await db.from('profiles').select('id, must_change_password').in('id', chunk);
+      if (error) throw error;
+      (data ?? []).forEach(p => { mustChange[p.id] = p.must_change_password === true; });
+    }
+
+    // last_sign_in_at + login email live in auth.users — only the server can read them
+    const auth = {};
+    if (userIds.length) {
+      const res = await fetch('/.netlify/functions/login-status', {
+        method: 'POST', headers: await authHeaders(), body: JSON.stringify({ userIds }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error ?? 'Could not read login activity.');
+      (j.users ?? []).forEach(u => { auth[u.id] = u; });
+    }
+
+    await loadReminders();
+    logins = buildLogins(students, auth, mustChange);
+  } catch (err) {
+    console.error('[portal logins]', err);
+    body.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon">⚠️</div><h3>Couldn't load logins</h3><p>${esc(err.message ?? err)}</p></div></td></tr>`;
+    return;
+  }
+  renderTable();
+}
+
+// Earlier reminders, from email_log (admins can read it).
+async function loadReminders() {
+  remindedByEmail = {};
+  const { data } = await db.from('email_log')
+    .select('sent_at, recipients').eq('subject', REMINDER_SUBJECT)
+    .order('sent_at', { ascending: false }).limit(200);
+  (data ?? []).forEach(row => {
+    (row.recipients ?? []).forEach(r => (r.addresses ?? []).forEach(a => {
+      const k = String(a).trim().toLowerCase();
+      if (k && !remindedByEmail[k]) remindedByEmail[k] = row.sent_at;   // newest first
+    }));
+  });
+}
+
+function buildLogins(students, auth, mustChange) {
+  const map = new Map();
+  students.forEach(s => {
+    const a = s.user_id ? auth[s.user_id] : null;
+    // A student whose user_id has no auth user (e.g. created from a website
+    // enquiry) has no real login — each is its own "No login yet" row.
+    const key = a ? s.user_id : `nologin:${s.id}`;
+    if (!map.has(key)) map.set(key, { key, userId: a ? s.user_id : null, students: [], auth: a });
+    map.get(key).students.push(s);
+  });
+
+  return [...map.values()].map(l => {
+    const names = l.students.map(s =>
+      `${s.first_name ?? s.profiles?.first_name ?? ''} ${s.last_name ?? s.profiles?.last_name ?? ''}`.trim() || '(no name)');
+    let status;
+    if (!l.auth)                          status = 'none';
+    else if (!l.auth.last_sign_in_at)     status = 'never';
+    else if (mustChange[l.userId])        status = 'partial';
+    else                                  status = 'done';
+
+    const addrs = [l.auth?.email, ...l.students.flatMap(s => [s.email, s.parent_email])]
+      .filter(Boolean).map(a => String(a).trim().toLowerCase());
+    const reminded = addrs.map(a => remindedByEmail[a]).filter(Boolean).sort().pop() ?? null;
+
+    return {
+      key: l.key, userId: l.userId, status,
+      studentIds: l.students.map(s => s.id),
+      studioIds: [...new Set(l.students.map(s => s.studio_id).filter(Boolean))],
+      studentStudio: l.students.map(s => s.studio_id),
+      names, family: l.students.length > 1,
+      loginEmail: l.auth?.email ?? l.students[0]?.email ?? '',
+      lastSignIn: l.auth?.last_sign_in_at ?? null,
+      reminded,
+    };
+  });
+}
+
+// ---- Filtering / table ----
+function visibleLogins() {
+  const studio = document.getElementById('filterStudio').value;
+  const status = document.getElementById('filterStatus').value;
+  const q      = document.getElementById('searchInput').value.trim().toLowerCase();
+
+  let rows = logins.filter(l => !studio || l.studioIds.includes(studio));
+  const inStudio = rows;                                    // for the summary cards
+  rows = rows.filter(l => {
+    if (status === 'todo') return l.status === 'never' || l.status === 'partial';
+    if (status !== 'all' && l.status !== status) return false;
+    return true;
+  });
+  if (q) rows = rows.filter(l => (l.names.join(' ') + ' ' + l.loginEmail).toLowerCase().includes(q));
+
+  const dir = sortDir === 'asc' ? 1 : -1;
+  rows = rows.slice().sort((a, b) => {
+    let c = 0;
+    if (sortKey === 'name')          c = a.names[0].localeCompare(b.names[0]);
+    else if (sortKey === 'last')     c = String(a.lastSignIn ?? '').localeCompare(String(b.lastSignIn ?? ''));
+    else if (sortKey === 'reminded') c = String(a.reminded ?? '').localeCompare(String(b.reminded ?? ''));
+    else                             c = STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || a.names[0].localeCompare(b.names[0]);
+    return c * dir;
+  });
+  return { rows, inStudio };
+}
+
+function setSort(key) {
+  if (sortKey === key) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  else { sortKey = key; sortDir = 'asc'; }
+  renderTable();
+}
+
+const fmtDate = iso => iso
+  ? new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+function ago(iso) {
+  if (!iso) return '';
+  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  return d <= 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`;
+}
+const isEligible = l => l.userId && (l.status === 'never' || l.status === 'partial');
+const recentlyReminded = l => l.reminded && (Date.now() - new Date(l.reminded).getTime()) < RECENT_DAYS * 86400000;
+
+function renderTable() {
+  const { rows, inStudio } = visibleLogins();
+
+  // Summary cards follow the studio filter only (not the status filter)
+  const c = { never: 0, partial: 0, done: 0, none: 0 };
+  inStudio.forEach(l => c[l.status]++);
+  const withLogin = c.never + c.partial + c.done;
+  document.getElementById('statTotal').textContent   = withLogin;
+  document.getElementById('statNever').textContent   = c.never;
+  document.getElementById('statPartial').textContent = c.partial;
+  document.getElementById('statDone').textContent    = c.done;
+  document.getElementById('statDoneSub').textContent = withLogin ? `${Math.round(c.done / withLogin * 100)}% of logins` : 'own password set';
+  document.getElementById('statTotalSub').textContent = c.none ? `plus ${c.none} with no login yet` : 'in this studio filter';
+  document.getElementById('pageSub').textContent =
+    `${c.never + c.partial} of ${withLogin} logins still need to sign in or finish setup`;
+
+  ['name','status','last','reminded'].forEach(k => {
+    document.getElementById('arrow-' + k).textContent = sortKey === k ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
+  });
+
+  const body = document.getElementById('rowsBody');
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon">🎉</div><h3>Nothing to show</h3><p>No logins match this filter.</p></div></td></tr>`;
+  } else {
+    body.innerHTML = rows.map(l => {
+      const studioNames = l.studioIds.map(studioName).filter(Boolean).join(', ');
+      return `<tr>
+        <td class="chk">${isEligible(l)
+          ? `<input type="checkbox" ${selected.has(l.key) ? 'checked' : ''} onchange="toggleSel('${l.key}', this.checked)">` : ''}</td>
+        <td class="name-cell">${l.names.map(esc).join(', ')}${l.family ? '<span class="family-tag">family login</span>' : ''}</td>
+        <td class="sub-cell">${esc(studioNames)}</td>
+        <td class="sub-cell">${esc(l.loginEmail)}</td>
+        <td><span class="lp-pill lp-${l.status}">${STATUS_LABEL[l.status]}</span></td>
+        <td class="sub-cell ${l.lastSignIn ? '' : 'muted'}">${l.lastSignIn ? `${fmtDate(l.lastSignIn)} <span class="muted">(${ago(l.lastSignIn)})</span>` : '—'}</td>
+        <td class="sub-cell ${l.reminded ? '' : 'muted'}">${l.reminded ? `${fmtDate(l.reminded)} <span class="muted">(${ago(l.reminded)})</span>` : '—'}</td>
+      </tr>`;
+    }).join('');
+  }
+  updateSelCount();
+}
+
+// ---- Selection ----
+function toggleSel(key, on) { on ? selected.add(key) : selected.delete(key); updateSelCount(); }
+function clearSelection()   { selected.clear(); renderTable(); }
+function selectEligible() {
+  const { rows } = visibleLogins();
+  let skipped = 0;
+  rows.forEach(l => {
+    if (!isEligible(l)) return;
+    if (recentlyReminded(l)) { skipped++; return; }
+    selected.add(l.key);
+  });
+  renderTable();
+  if (skipped) showToast(`${skipped} skipped — already reminded in the last ${RECENT_DAYS} days (tick them by hand to include).`, 'warning');
+}
+function updateSelCount() {
+  const n = selected.size;
+  document.getElementById('selCount').textContent = n ? `${n} login${n !== 1 ? 's' : ''} selected` : 'None selected';
+  const btn = document.getElementById('sendBtn');
+  btn.disabled = n === 0;
+  btn.textContent = n ? `Send reminder to ${n}…` : 'Send reminder…';
+}
+
+// ---- Sending ----
+// One email per LOGIN (siblings share one), grouped by sending studio and by
+// single-student vs family so each gets the right greeting.
+function buildGroups() {
+  const studioFilter = document.getElementById('filterStudio').value;
+  const groups = {};
+  logins.filter(l => selected.has(l.key) && isEligible(l)).forEach(l => {
+    // The studio that sends: the filtered studio if this login has a student there, else their first student's
+    const idx = studioFilter ? l.studentStudio.indexOf(studioFilter) : 0;
+    const i = idx >= 0 ? idx : 0;
+    const studioId = l.studentStudio[i] ?? null;
+    const gk = `${studioId}|${l.family ? 'family' : 'single'}`;
+    (groups[gk] ??= { studioId, family: l.family, studentIds: [], logins: [] });
+    groups[gk].studentIds.push(l.studentIds[i]);
+    groups[gk].logins.push(l);
+  });
+  return Object.values(groups);
+}
+
+function openReminder() {
+  const groups = buildGroups();
+  if (!groups.length) return;
+  const total   = groups.reduce((n, g) => n + g.logins.length, 0);
+  const missing = groups.filter(g => !studios.find(s => s.id === g.studioId)?.email);
+  const byStudio = {};
+  groups.forEach(g => { const nm = studioName(g.studioId) || 'Unknown studio'; byStudio[nm] = (byStudio[nm] ?? 0) + g.logins.length; });
+  const recent = groups.flatMap(g => g.logins).filter(recentlyReminded).length;
+
+  document.getElementById('reminderSummary').innerHTML =
+    `This will send <strong>${total}</strong> individual email${total !== 1 ? 's' : ''} — ` +
+    Object.entries(byStudio).map(([n, c]) => `${esc(n)}: ${c}`).join(', ') + `. ` +
+    `Where a parent email is on file it receives the reminder too.` +
+    (recent ? `<br><span style="color:#b45309;">${recent} of these were already reminded in the last ${RECENT_DAYS} days.</span>` : '') +
+    (missing.length ? `<br><span style="color:#b91c1c;">A studio has no email address set, so its students will be skipped. Add one on the Studios page.</span>` : '');
+  document.getElementById('reminderModal').classList.remove('hidden');
+}
+function closeReminder() { document.getElementById('reminderModal').classList.add('hidden'); }
+document.getElementById('reminderModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeReminder(); });
+
+async function doSend() {
+  const bodyText = document.getElementById('reminderBody').value.trim();
+  if (!bodyText) { showToast('The message is empty.', 'error'); return; }
+  const groups = buildGroups();
+  const btn = document.getElementById('reminderSendBtn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+
+  let sent = 0, unreachable = 0, skippedStudio = 0, failed = 0;
+  for (const g of groups) {
+    const studio = studios.find(s => s.id === g.studioId);
+    if (!studio?.email) { skippedStudio += g.logins.length; continue; }
+    // Families: don't greet the whole household by one child's name
+    const text = g.family ? bodyText.replace(/^Hi \{\{\s*first_name\s*\}\},/m, 'Hello,') : bodyText;
+    try {
+      const res = await fetch('/.netlify/functions/send-email', {
+        method: 'POST', headers: await authHeaders(),
+        body: JSON.stringify({
+          action: 'send', mode: 'students', studentIds: g.studentIds,
+          from: studio.email, fromName: `Pathfinder Music Lessons (${studio.name})`,
+          subject: REMINDER_SUBJECT, bodyText: text,
+          bccStudioId: studio.id, sentBy: currentProfile.id,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { failed += g.logins.length; console.error('[reminder] send failed', data); }
+      else { sent += data.sent ?? 0; unreachable += data.unreachable ?? 0; if (data.partial) failed += (data.total ?? 0) - (data.sent ?? 0); }
+    } catch (err) { failed += g.logins.length; console.error('[reminder]', err); }
+  }
+
+  btn.disabled = false; btn.textContent = 'Send reminders';
+  closeReminder();
+  const notes = [];
+  if (unreachable)    notes.push(`${unreachable} skipped — no email on file`);
+  if (skippedStudio)  notes.push(`${skippedStudio} skipped — studio has no email address`);
+  if (failed)         notes.push(`${failed} failed — check the Resend dashboard`);
+  showToast(`Reminder sent to ${sent} login${sent !== 1 ? 's' : ''}.` + (notes.length ? ' ' + notes.join('; ') + '.' : ''),
+            notes.length ? 'warning' : 'success');
+
+  selected.clear();
+  await loadData();
+}
+
+// ---- CSV ----
+function exportCSV() {
+  const { rows } = visibleLogins();
+  const header = ['Student(s)', 'Studio', 'Login email', 'Status', 'Last sign-in', 'Last reminded'];
+  const out = rows.map(l => [
+    l.names.join(' / '), l.studioIds.map(studioName).join(' / '), l.loginEmail, STATUS_LABEL[l.status],
+    l.lastSignIn ? l.lastSignIn.slice(0, 10) : '', l.reminded ? l.reminded.slice(0, 10) : '',
+  ]);
+  const csv = [header, ...out].map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = `portal-logins_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
