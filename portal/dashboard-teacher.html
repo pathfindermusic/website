@@ -70,6 +70,7 @@
     }
     .att-select:focus { outline: none; border-color: var(--orange); }
 
+    .rl-older:disabled, .rl-newer:disabled { opacity:0.3; cursor:default !important; }
     .component-pill {
       display: inline-block; font-size: 0.68rem; font-weight: 600;
       padding: 0.1rem 0.45rem; border-radius: 3px; white-space: nowrap;
@@ -993,15 +994,15 @@ async function openLessonView(occurrenceId) {
     `<div class="text-muted" style="padding:1rem 0;font-size:0.875rem;">Loading…</div>`;
   document.getElementById('lessonViewModal').classList.remove('hidden');
 
-  const [prev, myArtefacts] = await Promise.all([
-    fetchPreviousLessonData(l.lesson_id, l.date),
+  const [history, myArtefacts] = await Promise.all([
+    fetchStudentHistory(l),
     fetchOccurrenceArtefacts(occurrenceId),
   ]);
 
   if (activeLessonViewOccurrenceId !== occurrenceId) return; // superseded by another open
 
   document.getElementById('lvBody').innerHTML = `
-    ${prev ? `<div style="margin-bottom:1rem;">${previousLessonBoxHtml(prev)}</div>` : ''}
+    ${history.length ? `<div style="margin-bottom:1rem;">${recentLessonsHtml(history, names.length)}</div>` : ''}
 
     <div style="background:var(--off-white);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.85rem;margin-bottom:1rem;">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.65rem;font-size:0.875rem;">
@@ -1068,7 +1069,7 @@ async function openNoteModal(occurrenceId, studentName, noteText, driveLink) {
   noteModalInstrument = instrument;
   const artefactsGroup = document.getElementById('noteArtefactsGroup');
 
-  loadPreviousLessonContext(row?.lesson_id, row?.date);
+  loadPreviousLessonContext(row);
 
   if (!instrument) {
     // This occurrence has no instrument on record (e.g. a non-teaching
@@ -1120,42 +1121,103 @@ async function fetchOccurrenceArtefacts(occurrenceId) {
   return (data ?? []).map(row => row.bok_artefacts).filter(Boolean);
 }
 
-// Shared "last lesson" logic, used by both the read-only lesson view
-// (opened by clicking a lesson card) and the note-editing modal — so a
-// teacher sees the previous occurrence's practice note, shared file, and
-// materials picked no matter which way they get into a lesson.
-// "Last lesson" means the most recent earlier occurrence of this same
-// series; for a group lesson that's the one shared note the whole group
-// saw, same as today's note will be.
-// Returns { date, noteText, driveLink, artefacts } or null if there's
-// nothing worth showing (no earlier occurrence, or nothing was recorded).
-async function fetchPreviousLessonData(lessonId, beforeDate) {
-  if (!lessonId || !beforeDate) return null;
+// Recent-lesson history, used by both the read-only lesson view (opened by
+// clicking a lesson card) and the note-editing modal — so a teacher sees the
+// same recap no matter which way they get into a lesson.
+//
+// Oct 2026: this used to show only the single previous occurrence of the
+// SAME lesson series. It now follows each student: for every student on the
+// lesson, their last RECENT_LESSONS_PER_STUDENT lessons (before this one) on
+// the same instrument that actually have something recorded — across series,
+// so makeups, one-offs and lessons they had as a guest count too. Students
+// sharing a group lesson share its notes, so the entries are merged (each
+// occurrence listed once) rather than repeated per student.
+//
+// What comes back is limited by what RLS lets THIS teacher read: their own
+// lessons, or — for a cover teacher — the lessons they are covering. A
+// student's lessons with some other teacher stay invisible, on purpose
+// (phase5-substitute-access.sql: nothing about a student's other lessons).
+//
+// Returns [] when there is nothing to show, else an array of
+//   { occurrenceId, date, isMakeup, noteText, driveLink, artefacts,
+//     studentNames: [names of THIS lesson's students who were in it] }
+// newest first.
+const RECENT_LESSONS_PER_STUDENT = 5;
 
-  const { data: prevOcc } = await db.from('lesson_occurrences')
-    .select('id, date')
-    .eq('lesson_id', lessonId)
+async function fetchStudentHistory(row) {
+  const roster = (row?.students ?? []).filter(s => s?.id);
+  if (!roster.length || !row.date) return [];
+  const beforeDate = String(row.date).slice(0, 10);
+  const sIds = roster.map(s => s.id);
+
+  // Every lesson (series) these students are in, regular or guest
+  const { data: ls } = await db.from('lesson_students')
+    .select('lesson_id,student_id,added_for_occurrence_id').in('student_id', sIds);
+  const memberships = ls ?? [];
+  const lessonIds = [...new Set(memberships.map(m => m.lesson_id))];
+  if (!lessonIds.length) return [];
+
+  // Recent earlier occurrences of those lessons. The cap keeps the URL and
+  // the payload small; a student's last five written-up lessons are always
+  // well inside the newest 80 occurrences of the lessons they attend.
+  const { data: occs } = await db.from('lesson_occurrences')
+    .select('id,date,lesson_id,is_makeup,status,lessons(instrument)')
+    .in('lesson_id', lessonIds)
     .lt('date', beforeDate)
+    .neq('status', 'cancelled')
     .order('date', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (!prevOcc) return null;
+    .limit(80);
+  const candidates = (occs ?? []).filter(o =>
+    !row.instrument || !o.lessons?.instrument || o.lessons.instrument === row.instrument);
+  if (!candidates.length) return [];
 
-  const [{ data: prevNote }, artefacts] = await Promise.all([
-    db.from('lesson_notes').select('note_text, drive_link')
-      .eq('lesson_occurrence_id', prevOcc.id).maybeSingle(),
-    fetchOccurrenceArtefacts(prevOcc.id),
+  const occIds = candidates.map(o => o.id);
+  const [{ data: noteRows }, { data: artRows }] = await Promise.all([
+    db.from('lesson_notes').select('lesson_occurrence_id,note_text,drive_link')
+      .in('lesson_occurrence_id', occIds),
+    db.from('lesson_occurrence_artefacts')
+      .select('occurrence_id,bok_artefacts(id,title,drive_url,component)')
+      .in('occurrence_id', occIds),
   ]);
+  const noteByOcc = {}, artsByOcc = {};
+  (noteRows ?? []).forEach(n => { noteByOcc[n.lesson_occurrence_id] = n; });
+  (artRows ?? []).forEach(a => {
+    if (a.bok_artefacts) (artsByOcc[a.occurrence_id] ??= []).push(a.bok_artefacts);
+  });
 
-  const hasContent = !!(prevNote?.note_text || prevNote?.drive_link || artefacts.length > 0);
-  if (!hasContent) return null;   // e.g. a first lesson, or attendance was marked but nothing written
+  // Something worth showing: a note, a shared file, or materials picked
+  const withContent = candidates.filter(o => {
+    const n = noteByOcc[o.id];
+    return !!(n?.note_text?.trim() || n?.drive_link || (artsByOcc[o.id] ?? []).length);
+  });
 
-  return {
-    date: prevOcc.date,
-    noteText: prevNote?.note_text ?? '',
-    driveLink: prevNote?.drive_link ?? '',
-    artefacts,
-  };
+  // Is this student in that occurrence? Regular members are in every
+  // occurrence of their lesson; a guest only in the one they were added to.
+  const inOcc = (sid, o) => memberships.some(m =>
+    m.student_id === sid && m.lesson_id === o.lesson_id &&
+    (!m.added_for_occurrence_id || m.added_for_occurrence_id === o.id));
+
+  // Each student's own last N (candidates are already newest first), merged
+  const keep = new Map();   // occurrence id -> { occ, names }
+  roster.forEach(s => {
+    withContent.filter(o => inOcc(s.id, o)).slice(0, RECENT_LESSONS_PER_STUDENT).forEach(o => {
+      if (!keep.has(o.id)) keep.set(o.id, { occ: o, names: [] });
+      keep.get(o.id).names.push(s.name);
+    });
+  });
+
+  return [...keep.values()]
+    .sort((a, b) => b.occ.date.localeCompare(a.occ.date))
+    .map(({ occ, names }) => ({
+      occurrenceId: occ.id,
+      date: occ.date,
+      isMakeup: !!occ.is_makeup,
+      noteText: noteByOcc[occ.id]?.note_text ?? '',
+      driveLink: noteByOcc[occ.id]?.drive_link ?? '',
+      artefacts: artsByOcc[occ.id] ?? [],
+      studentNames: names,
+      everyone: names.length === roster.length,
+    }));
 }
 
 function artefactListHtml(artefacts, heading) {
@@ -1169,28 +1231,79 @@ function artefactListHtml(artefacts, heading) {
     </div>`).join('');
 }
 
-// Renders the "Last lesson" recap box. `prev` is whatever
-// fetchPreviousLessonData() returned; an empty string means "show nothing".
-function previousLessonBoxHtml(prev) {
-  if (!prev) return '';
+const escHist = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// Renders the recent-lessons recap. `entries` is whatever
+// fetchStudentHistory() returned; an empty string means "show nothing".
+// One lesson shows at a time, newest first, with ‹ › arrows to step back
+// through the older ones — five lessons stacked would bury the rest of the
+// page. `scroll` caps the height inside the note modal, where the form
+// sits underneath.
+let recentLessonsSeq = 0;
+function recentLessonsHtml(entries, rosterSize, scroll = false) {
+  if (!entries || entries.length === 0) return '';
+  const id = 'rl' + (++recentLessonsSeq);
+  const n  = entries.length;
+  const heading = rosterSize > 1
+    ? `Recent lessons — last ${RECENT_LESSONS_PER_STUDENT} per student`
+    : `Recent lessons — last ${RECENT_LESSONS_PER_STUDENT}`;
+
+  const slides = entries.map((en, i) => {
+    const d    = parseLocalDate(en.date);
+    const when = formatShortDate(d) + ' ' + d.getFullYear();
+    const tags = (en.isMakeup ? ' <span class="component-pill" style="font-size:0.6rem;margin-left:0.3rem;">Makeup</span>' : '') +
+      (rosterSize > 1 && !en.everyone
+        ? ` <span style="font-weight:400;color:var(--mid-grey);font-size:0.76rem;">· ${escHist(en.studentNames.join(', '))}</span>` : '');
+    return `
+      <div class="rl-slide" data-i="${i}" ${i === 0 ? '' : 'style="display:none;"'}>
+        <div style="font-size:0.85rem;font-weight:700;color:var(--dark-grey);">${when}${tags}</div>
+        ${en.noteText ? `<div style="margin-top:0.35rem;font-size:0.845rem;line-height:1.6;color:var(--dark-grey);white-space:pre-wrap;">${escHist(en.noteText)}</div>` : ''}
+        ${en.driveLink ? `<div style="margin-top:0.4rem;"><a href="${escHist(en.driveLink)}" target="_blank" class="text-orange" style="font-size:0.82rem;text-decoration:none;">📁 View shared file</a></div>` : ''}
+        ${artefactListHtml(en.artefacts, 'Materials covered')}
+      </div>`;
+  }).join('');
+
+  const arrow = 'background:none;border:1px solid var(--border);border-radius:var(--r-sm);width:1.9rem;height:1.6rem;cursor:pointer;font-size:1rem;line-height:1;color:var(--dark-grey);';
+  const nav = n > 1 ? `
+      <div style="display:flex;align-items:center;gap:0.4rem;">
+        <button type="button" class="rl-older" style="${arrow}" title="Older lesson" aria-label="Older lesson" onclick="recentLessonsStep('${id}', 1)">‹</button>
+        <span class="rl-count" style="font-size:0.74rem;color:var(--mid-grey);min-width:2.8rem;text-align:center;">1 of ${n}</span>
+        <button type="button" class="rl-newer" style="${arrow}" title="Newer lesson" aria-label="Newer lesson" onclick="recentLessonsStep('${id}', -1)" disabled>›</button>
+      </div>` : '';
+
   return `
-    <div style="background:var(--off-white);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.75rem 0.85rem;">
-      <div style="font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--mid-grey);">
-        Last lesson — ${formatLongDate(new Date(prev.date))}
+    <div id="${id}" data-n="${n}" data-cur="0" style="background:var(--off-white);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.75rem 0.85rem;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;margin-bottom:0.45rem;">
+        <div style="font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--mid-grey);">${heading}</div>
+        ${nav}
       </div>
-      ${prev.noteText ? `<div style="margin-top:0.35rem;font-size:0.845rem;line-height:1.6;color:var(--dark-grey);">${prev.noteText}</div>` : ''}
-      ${prev.driveLink ? `<div style="margin-top:0.4rem;"><a href="${prev.driveLink}" target="_blank" class="text-orange" style="font-size:0.82rem;text-decoration:none;">📁 View shared file</a></div>` : ''}
-      ${artefactListHtml(prev.artefacts, 'Materials covered')}
+      <div ${scroll ? 'style="max-height:240px;overflow-y:auto;"' : ''}>${slides}</div>
     </div>`;
 }
 
-async function loadPreviousLessonContext(lessonId, beforeDate) {
+// ‹ goes to an older lesson (+1), › back towards the newest (-1)
+function recentLessonsStep(id, delta) {
+  const box = document.getElementById(id);
+  if (!box) return;
+  const n   = Number(box.dataset.n);
+  const cur = Math.min(n - 1, Math.max(0, Number(box.dataset.cur) + delta));
+  box.dataset.cur = cur;
+  box.querySelectorAll('.rl-slide').forEach(s => { s.style.display = Number(s.dataset.i) === cur ? '' : 'none'; });
+  const c = box.querySelector('.rl-count');  if (c) c.textContent = `${cur + 1} of ${n}`;
+  const o = box.querySelector('.rl-older');  if (o) o.disabled = cur >= n - 1;
+  const w = box.querySelector('.rl-newer');  if (w) w.disabled = cur <= 0;
+  const sc = box.querySelector('.rl-slide')?.parentElement; if (sc) sc.scrollTop = 0;
+}
+
+async function loadPreviousLessonContext(row) {
   const group = document.getElementById('prevLessonGroup');
   const box   = document.getElementById('prevLessonBox');
   group.style.display = 'none';
-  const prev = await fetchPreviousLessonData(lessonId, beforeDate);
-  if (!prev) return;
-  box.innerHTML = previousLessonBoxHtml(prev);
+  const occId = row?.occurrence_id;
+  const entries = await fetchStudentHistory(row);
+  // The teacher may have closed this modal or opened another by now
+  if (!entries.length || activeOccurrenceId !== occId) return;
+  box.innerHTML = recentLessonsHtml(entries, row.students?.length ?? 0, true);
   group.style.display = '';
 }
 

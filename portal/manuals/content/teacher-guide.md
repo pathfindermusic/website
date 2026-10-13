@@ -75,9 +75,12 @@ the link, and it appears under that lesson on their dashboard.
 </p>
 </div>
 <p>
-Clicking anywhere else on a lesson opens a read-only view showing the
-previous lesson's note for context, plus the full details of the current
-one.
+Clicking anywhere else on a lesson opens a read-only view showing each
+student's <strong>recent lessons</strong> for context &mdash; their last five
+(including makeups), one at a time. Use the <strong>&lsaquo;</strong> and
+<strong>&rsaquo;</strong> arrows to step back to older lessons. The full details
+of the current lesson are shown below. The same recent-lessons box appears above
+the note form when you write a note.
 </p>
 <div class="callout callout-tip">
 <strong>Covering for another teacher</strong>

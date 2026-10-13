@@ -774,11 +774,12 @@
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">New date *</label>
-          <input class="form-input" type="date" id="cloneDate">
+          <input class="form-input" type="date" id="cloneDate" onchange="refreshCloneTimes()">
         </div>
         <div class="form-group">
           <label class="form-label">New time *</label>
           <select class="form-select" id="cloneTime"></select>
+          <div class="form-hint" id="cloneTimeHint"></div>
         </div>
       </div>
       <div class="form-group">
@@ -893,6 +894,29 @@ function computeTimeSlots(occurrences) {
     slots.push(`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`);
   }
   return slots.length > 0 ? slots : ALL_TIME_SLOTS;
+}
+
+// Widen a grid's rows so every teacher's working hours are clickable
+// (Oct 2026). computeTimeSlots() sizes the grid from the BOOKED lessons
+// only, plus a half-hour margin — so a teacher available 3-7pm at a studio
+// whose first lesson that day is 4pm got a grid starting at 3:30pm and no
+// row at all to click for a 3:00pm booking. `availSlots` are "HH:MM"
+// half-hour keys of the availability windows to include. Slots outside the
+// normal 8am-9pm grid hours are ignored (a stray 5am window shouldn't open
+// the grid up for the whole day — reported 10 Sep 2026), and the result is
+// filled in so the rows stay a continuous run of half-hours: the lesson
+// cells use rowspan, which assumes there are no gaps.
+function extendSlotsWithAvailability(slots, availSlots) {
+  const toMin = s => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
+  const lo = 8 * 60;        // first row 8:00am …
+  const hi = 20 * 60 + 30;  // … last row 8:30pm (the grid ends at 9pm, as in computeTimeSlots)
+  const mins = [...slots, ...availSlots].map(toMin).filter(m => m >= lo && m <= hi);
+  if (!mins.length) return slots;
+  const out = [];
+  for (let m = Math.min(...mins); m <= Math.max(...mins); m += 30) {
+    out.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`);
+  }
+  return out;
 }
 
 // ============================================================
@@ -1566,7 +1590,7 @@ async function loadDailyView() {
           <tbody>`;
 
     // Compute time slots dynamically based on lessons at this studio
-    const TIME_SLOTS  = computeTimeSlots(studioOccs);
+    const TIME_SLOTS  = computeTimeSlots(studioOccs).slice();   // a copy: computeTimeSlots can return the shared ALL_TIME_SLOTS
 
     // Each shown teacher's availability windows today, as a set of
     // "HH:MM" slot keys — used below both to extend the grid (for an
@@ -1587,25 +1611,20 @@ async function loadDailyView() {
       teacherAvailSlots[t.id] = set;
     });
 
-    // Extend time range to cover teacher availability on this day, but
-    // only when the studio has no real lessons booked at all that day —
-    // so an empty grid still shows the working hours. TIME_SLOTS is one
-    // shared row-range for every teacher column in this grid, so once
-    // any lesson exists, merging in every teacher's availability
-    // unconditionally let a single early/mis-set availability window
-    // (e.g. one teacher's Friday slot starting 05:00) blow the whole
-    // grid open with a large empty gap before the day's actual lessons
-    // — reported 10 Sep 2026, first lesson 4:30pm but grid opened 5am.
-    if (studioOccs.filter(o => o.status !== 'cancelled').length === 0) {
+    // Extend the rows to cover every shown teacher's availability today,
+    // so each working hour has a cell to click — not just the hours around
+    // the lessons already booked (a teacher free from 3pm with the first
+    // lesson at 4pm used to get a grid starting at 3:30pm: Oct 2026).
+    // TIME_SLOTS is one shared row-range for every teacher column. The
+    // earlier fix for a stray 05:00 availability window blowing the grid
+    // open (10 Sep 2026) is kept by extendSlotsWithAvailability(), which
+    // ignores anything outside the normal 8am-9pm grid hours.
+    {
       const availSlots = [];
-      teachers.forEach(t => {
-        teacherAvailSlots[t.id].forEach(slot => {
-          if (!availSlots.includes(slot)) availSlots.push(slot);
-        });
-      });
-      // Merge availability slots into TIME_SLOTS
-      availSlots.forEach(s => { if (!TIME_SLOTS.includes(s)) TIME_SLOTS.push(s); });
-      TIME_SLOTS.sort();
+      teachers.forEach(t => teacherAvailSlots[t.id].forEach(s => availSlots.push(s)));
+      const widened = extendSlotsWithAvailability(TIME_SLOTS, availSlots);
+      TIME_SLOTS.length = 0;
+      widened.forEach(s => TIME_SLOTS.push(s));
     }
 
     // Group each teacher's occurrences into overlap clusters by their
@@ -1999,15 +2018,12 @@ async function loadTeacherWeekGrid(teacherId) {
   const hasAnyAvail = availRecs.length > 0;
 
   // ---- Rows (time slots) ------------------------------------------
-  const TIME_SLOTS = computeTimeSlots(mine).slice();
-  if (mine.filter(o => o.status !== 'cancelled').length === 0) {
-    // Nothing live all week — show their working hours instead so the
-    // grid isn't empty. (Only then: one stray early availability window
-    // would otherwise stretch the whole week — see the daily grid.)
-    Object.values(availByDow).forEach(set =>
-      set.forEach(s => { if (!TIME_SLOTS.includes(s)) TIME_SLOTS.push(s); }));
-    TIME_SLOTS.sort();
-  }
+  // Sized from the lessons AND the teacher's working hours, so every
+  // available half-hour has a cell to click (see
+  // extendSlotsWithAvailability for why, and for the 8am-9pm limit).
+  const TIME_SLOTS = extendSlotsWithAvailability(
+    computeTimeSlots(mine),
+    Object.values(availByDow).flatMap(set => [...set])).slice();
 
   // ---- Overlap clusters, per day ----------------------------------
   // Same idea as the daily grid: two lessons that genuinely overlap must
@@ -3170,6 +3186,7 @@ async function saveLesson() {
 
     if (lErr) throw new Error(lErr.message);
     const lessonId = lessonData.id;
+    const notifyStudents = [...lessonStudents];   // closeLessonModal() may reset the picker
 
     // Insert lesson_students as permanent series members. A
     // non-teaching event has none — nothing to insert.
@@ -3225,6 +3242,17 @@ async function saveLesson() {
         else if (r === 'failed')
           showToast('Lesson saved, but the confirmation email failed. Check the checklist.', 'warning');
       } catch (_) { /* never block the lesson on an email */ }
+    }
+
+    // Makeups and one-off requests sit outside the regular schedule, so
+    // ask whether to tell the student. (Trials have their own email.)
+    if (isOneOff && (oneOffKind === 'makeup' || oneOffKind === 'adhoc') && notifyStudents.length) {
+      await offerNewLessonEmail({
+        kind: oneOffKind === 'makeup' ? 'makeup' : 'oneoff',
+        studentIds: notifyStudents,
+        date: plannedDates(day, startDate, recurrence, count, endDate, frequency)[0] ?? startDate,
+        startTime: time, instrument, teacherId, studioId,
+      });
     }
   } catch (err) {
     showToast(err.message, 'error');
@@ -3494,12 +3522,57 @@ async function openCloneModal() {
   // Default the picker to the source occurrence's own day/time — the
   // admin only has to change what's actually different.
   document.getElementById('cloneDate').value = (occ.date ?? '').slice(0, 10);
-  const timeSel = document.getElementById('cloneTime');
-  timeSel.innerHTML = ALL_TIME_SLOTS.map(t => `<option value="${t}">${formatTime(t + ':00')}</option>`).join('');
-  if (l.start_time) timeSel.value = l.start_time.slice(0, 5);
+  refreshCloneTimes(l.start_time ? l.start_time.slice(0, 5) : null);
 
   document.getElementById('cloneClashError').classList.remove('show');
   document.getElementById('cloneModal').classList.remove('hidden');
+}
+
+// The start times offered when cloning: only those the teacher can actually
+// take on the chosen date — from the start of an availability window to
+// (window end − the lesson's duration), so a 30-minute lesson can start at
+// the last half-hour of their day but a 60-minute one can't. Re-run
+// whenever the date changes (the weekday, and so the availability, changes).
+// A teacher with no availability on record for that weekday at this studio
+// gets the full 8am-8pm list and a hint instead — saveClone() blocks the
+// save with its own explanation, which is clearer than an empty drop-down.
+function refreshCloneTimes(preferred) {
+  const occ = allOccurrences.find(o => o.id === cloneSourceOccId);
+  const l   = occ?.lessons ?? {};
+  const timeSel = document.getElementById('cloneTime');
+  const hint    = document.getElementById('cloneTimeHint');
+  const date    = document.getElementById('cloneDate').value;
+  const keep    = preferred ?? timeSel.value;
+  const dur     = l.duration_mins ?? 30;
+  const toMin   = s => { const [h, m] = String(s).split(':').map(Number); return h * 60 + m; };
+  const key     = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+
+  let slots = ALL_TIME_SLOTS;
+  hint.textContent = '';
+  if (date) {
+    const dow  = parseLocalDate(date).getDay();
+    const teacher = allTeachers.find(t => t.id === l.teacher_id);
+    const wins = (teacher?.teacher_availability ?? [])
+      .filter(a => a.studio_id === l.studio_id && a.day_of_week === dow);
+    if (wins.length) {
+      const set = new Set();
+      wins.forEach(a => {
+        const end = toMin(a.end_time);
+        for (let m = Math.ceil(toMin(a.start_time) / 30) * 30; m + dur <= end; m += 30) set.add(key(m));
+      });
+      slots = [...set].sort();
+      hint.textContent = 'Available ' + wins
+        .slice().sort((a, b) => a.start_time.localeCompare(b.start_time))
+        .map(a => `${formatTime(a.start_time)} – ${formatTime(a.end_time)}`).join(', ') +
+        ` (${DAY_SHORT[dow]}); a ${formatDuration(dur)} lesson must finish by then.`;
+    } else {
+      hint.textContent = `No availability recorded for this teacher on ${DAY_NAMES[dow]} at this studio — the clone can't be saved on this date.`;
+    }
+  }
+  timeSel.innerHTML = slots.length
+    ? slots.map(t => `<option value="${t}">${formatTime(t + ':00')}</option>`).join('')
+    : '<option value="">No time fits this lesson\'s length</option>';
+  if (keep && slots.includes(keep)) timeSel.value = keep;
 }
 
 function closeCloneModal() {
@@ -3701,6 +3774,16 @@ async function saveClone() {
     closeCloneModal();
     closeOccModal();
     loadView();
+
+    // The clone is a one-off outside the regular schedule (a makeup when
+    // a credit was spent) — ask whether to tell the student(s).
+    await offerNewLessonEmail({
+      // 'makeup' wording only when it is one student's credit; a group clone just says one-off
+      kind: (makeupForSid && studentIds.length === 1) ? 'makeup' : 'oneoff',
+      studentIds,
+      date, startTime: time, instrument: l.instrument,
+      teacherId: l.teacher_id, studioId: l.studio_id,
+    });
   } catch (err) {
     showCloneClashError('Could not clone this lesson: ' + err.message);
   }
@@ -3726,10 +3809,25 @@ async function addStudentToOccurrence() {
 
   showToast('Student added to this lesson.', 'success');
   // Reload the occurrence modal
+  const occForEmail = allOccurrences.find(o => o.id === occId);   // read before the reload replaces it
   closeOccModal();
   await loadView();
   // Re-fetch allOccurrences and reopen
   openOccurrenceModal(occId);
+
+  // A guest for one date is outside their regular schedule — ask whether
+  // to tell them (only them, not the lesson's regular students).
+  if (occForEmail) {
+    await offerNewLessonEmail({
+      kind: occForEmail.is_makeup ? 'makeup' : 'oneoff',
+      studentIds: [sid],
+      date: (occForEmail.date ?? '').slice(0, 10),
+      startTime: occForEmail.lessons?.start_time,
+      instrument: occForEmail.lessons?.instrument,
+      teacherId: occForEmail.substitute_teacher_id ?? occForEmail.lessons?.teacher_id,
+      studioId: occForEmail.lessons?.studio_id,
+    });
+  }
 }
 
 async function removeStudentFromOccurrence(lessonId, studentId, occId) {
@@ -3880,8 +3978,120 @@ async function saveOccurrence() {
     if (notify) await sendOnlineLessonEmail(occId, occ);
   }
 
+  // Ticked "This is a makeup lesson" on an existing lesson — the student
+  // now has a lesson outside their regular schedule, so offer the same
+  // email as a newly created makeup. Goes to the student the credit was
+  // spent for (the makeup is theirs), with the covering teacher's name
+  // when someone else is taking it.
+  if (becomingMakeup && makeupCreditFor && occ?.lessons) {
+    await offerNewLessonEmail({
+      kind: 'makeup',
+      studentIds: [makeupCreditFor],
+      date: (occ.date ?? '').slice(0, 10),
+      startTime: occ.lessons.start_time,
+      instrument: occ.lessons.instrument,
+      teacherId: (subSel && subSel !== '__external') ? subSel : occ.lessons.teacher_id,
+      studioId: occ.lessons.studio_id,
+    });
+  }
+
   closeOccModal();
   loadView();
+}
+
+// ============================================================
+// "NEW NON-REGULAR LESSON" EMAIL (Oct 2026)
+//
+// Students know their regular weekly slot but tend to forget a makeup
+// or one-off, so every time one is created the admin is asked whether
+// the student should be emailed the details. The question defaults to
+// yes (OK is the default button of the confirm box).
+//
+// Covers every path that creates one: Add Lesson (Makeup lesson / One-off
+// request), Clone occurrence, and "Add a student for this lesson only" —
+// plus the two ways an EXISTING lesson becomes a makeup: ticking "This is a
+// makeup lesson" in the lesson occurrence modal, and switching a one-off to
+// "Makeup lesson" in Edit lesson. Past-dated lessons are never offered.
+// Trials are not covered here — the enrolment checklist already sends its
+// own trial email. Sent to exactly the listed students (mode 'students')
+// rather than the whole lesson, so a guest added to a group lesson tells
+// only the guest, not the regulars. The studio gets a BCC copy.
+//
+// kind: 'makeup' | 'oneoff'. Never throws — a failed email must not
+// look like a failed booking, which was already saved.
+// ============================================================
+async function offerNewLessonEmail({ kind, studentIds, date, startTime, instrument, teacherId, studioId }) {
+  try {
+    const ids = [...new Set((studentIds ?? []).filter(Boolean))];
+    if (!ids.length || !date || !startTime) return;
+    // Nothing to remind anyone about for a lesson that has already
+    // happened (back-dating a booking, or flagging an old lesson).
+    if (date < toISODate(new Date())) return;
+
+    const studio = allStudios.find(s => s.id === studioId);
+    if (!studio?.email) {
+      showToast('No email offered — the studio has no email address set.', 'warning');
+      return;
+    }
+
+    const clean   = v => String(v ?? '').replace(/\*\*/g, '').trim();
+    const teacher = allTeachers.find(t => t.id === teacherId);
+    const tName   = clean(`${teacher?.profile?.first_name ?? ''} ${teacher?.profile?.last_name ?? ''}`);
+    const when    = parseLocalDate(date).toLocaleDateString('en-AU',
+                      { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const time    = formatTime(startTime.length === 5 ? startTime + ':00' : startTime);
+    const label   = kind === 'makeup' ? 'makeup' : 'one-off';
+    const inst    = clean(instrument);
+
+    const names = ids.map(sid => {
+      const s = allStudents.find(x => x.id === sid);
+      return s ? `${s.profile?.first_name ?? ''} ${s.profile?.last_name ?? ''}`.trim() : 'the student';
+    });
+    const who = names.length <= 2 ? names.join(' and ') : `${names.length} students`;
+
+    // OK = yes (the default), Cancel = no email
+    const yes = confirm(
+      `Email ${who} the details of this ${label} lesson?\n\n` +
+      `${inst} · ${when} at ${time}\n\n` +
+      'Students often forget lessons outside their regular schedule, so a reminder helps. ' +
+      'OK = send the email · Cancel = don\'t send.'
+    );
+    if (!yes) return;
+
+    const bodyText =
+      'Dear {{student_name}},\n\n' +
+      `A ${label} ${inst} lesson has been booked for you:\n\n` +
+      `**${when} at ${time}${tName ? ' with ' + tName : ''} at ${clean(studio.name)}**\n\n` +
+      "Because it's outside your regular schedule, please add it to your calendar. " +
+      "If you can't make it, please let us know as soon as you can.\n\n" +
+      'Kind regards,\nPathfinder Music Lessons';
+
+    const res = await fetch('/.netlify/functions/send-email', {
+      method: 'POST',
+      headers: await authHeaders(),
+      body: JSON.stringify({
+        action:     'send',
+        mode:       'students',
+        studentIds: ids,
+        from:       studio.email,
+        fromName:   `Pathfinder Music Lessons (${studio.name})`,
+        bcc:        studio.email,
+        subject:    `Your ${label} ${inst} lesson on ${when}`,
+        bodyText,
+        sentBy:     currentProfile?.id ?? null,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showToast('Lesson saved, but the email failed: ' + (data.error ?? res.status), 'warning');
+    } else if (data.sent > 0) {
+      showToast(`Lesson details emailed to ${data.sent} student${data.sent !== 1 ? 's' : ''}.`, 'success');
+    } else {
+      showToast('Lesson saved — no contactable student email found, so nothing was sent.', 'warning');
+    }
+  } catch (err) {
+    showToast('Lesson saved, but the email failed: ' + err.message, 'warning');
+  }
 }
 
 // Companion to sendCancellationEmail below — same "occurrence" recipient
@@ -4198,10 +4408,12 @@ async function saveSeriesEdit(lessonId, f) {
     // saveLesson() already worked that out (f.becomingMakeup is false
     // for a lesson that was already one, so re-saving it never spends
     // a second credit).
+    let offerEmailFor = null;
     if (f.becomingMakeup && f.makeupCreditFor) {
       const { data: occRow } = await db.from('lesson_occurrences')
-        .select('id').eq('lesson_id', lessonId).single();
+        .select('id,date').eq('lesson_id', lessonId).single();
       if (occRow) {
+        offerEmailFor = { date: String(occRow.date ?? '').slice(0, 10) };
         const { error: cErr } = await db.from('lesson_credit_movements').insert({
           student_id:        f.makeupCreditFor,
           delta:             -1,
@@ -4218,6 +4430,16 @@ async function saveSeriesEdit(lessonId, f) {
     showToast('Lesson updated.', 'success');
     closeLessonModal();
     loadView();
+
+    // Switched a one-off to "Makeup lesson" — same email offer as a newly
+    // booked makeup (see offerNewLessonEmail).
+    if (offerEmailFor) {
+      await offerNewLessonEmail({
+        kind: 'makeup', studentIds: [f.makeupCreditFor],
+        date: offerEmailFor.date, startTime: f.time,
+        instrument: f.instrument, teacherId: f.teacherId, studioId: f.studioId,
+      });
+    }
     return;
   }
 

@@ -266,12 +266,10 @@ function skillBandColour(level) {
 // both, Sep 2026). Keyed by the exact instrument string used in
 // INSTRUMENTS, then indexed by bok_grade_levels.sort_order (0-8).
 //
-// Only the instruments the admins actually asked for get a theme.
-// Music Theory, Band and Other are deliberately left out — they're
-// catch-alls rather than one real instrument, so gradeAnimalName()
-// just returns '' for them and every caller falls back to the plain
-// label. The same happens for any instrument added later that hasn't
-// been given a theme yet.
+// Every instrument in INSTRUMENTS now has a theme (Band, Music Theory and
+// Other were added in Oct 2026). gradeAnimalName() still returns '' for
+// any instrument added later that hasn't been given one, and every caller
+// falls back to the plain label.
 const BOK_GRADE_ANIMAL_NAMES = {
   'Guitar': [
     'Tadpole Strummer', 'Cricket Chords', 'Sparrow Picker', 'Robin Riffer',
@@ -312,6 +310,24 @@ const BOK_GRADE_ANIMAL_NAMES = {
     'Kitten', 'Alley Cat', 'Bobcat', 'Cougar',
     'Panther', 'Jaguar', 'Lion', 'Tiger',
     'Sabertooth',
+  ],
+  // Added Oct 2026. Band is about playing together, so its animals travel
+  // in groups; Music Theory is the thinking-cap one; Other is a general
+  // "growing up" ladder for any instrument without a theme of its own.
+  'Band': [
+    'Duckling Chorus', 'Cricket Choir', 'Bee Buzz', 'Wolf Pack',
+    'Dolphin Pod', 'Elephant Herd', 'Lion Pride', 'Eagle Squadron',
+    'Thunder Dragons',
+  ],
+  'Music Theory': [
+    'Bookworm', 'Curious Mouse', 'Clever Crow', 'Sly Fox',
+    'Wise Owl', 'Octopus Brain', 'Sage Elephant', 'Dolphin Scholar',
+    'Sphinx Scholar',
+  ],
+  'Other': [
+    'Brave Hatchling', 'Bold Fledgling', 'Bouncy Joey', 'Clever Fox Cub',
+    'Proud Stag', 'Mighty Bear', 'Swift Falcon', 'Golden Eagle',
+    'Legendary Dragon',
   ],
 };
 

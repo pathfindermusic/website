@@ -1156,9 +1156,11 @@ young students respond a lot better to "you're a Hawk now!" than "you're
 Intermediate Grade 5" — the same idea as swimming badges (tadpole → shark
 → marlin). Guitar's names were the pilot; Bass, Drums, Piano / Keyboard,
 Violin, Voice / Singing, Ukulele and Saxophone followed once the theme
-was approved. Music Theory, Band and Other were deliberately left out —
-they're catch-alls rather than one real instrument, and nobody asked for
-a theme for them.
+was approved. Music Theory, Band and Other were left out at first as
+catch-alls, then themed too (Oct 2026) when the Grade Boards went up on the
+wall — every instrument in `INSTRUMENTS` now has a 9-name set (Band:
+Duckling Chorus → Thunder Dragons; Music Theory: Bookworm → Sphinx Scholar;
+Other: Brave Hatchling → Legendary Dragon).
 
 The names are **not stored in the database.** `bok_grade_levels` stays the
 single generic 9-row reference scale it always was — Foundation/Beginner/
@@ -2491,6 +2493,89 @@ and prints it from the browser. Nothing is stored except three optional text col
   iframe, email draft, draft-event defaults, event switch, phone width); PDFs produced
   from the same template, QR codes decoded from the PDFs at 400 dpi.
 
+## "Email the student?" prompt for makeup / one-off lessons (Oct 2026) — `lessons.html`
+
+Students know their regular slot but forget non-regular lessons, so every
+creation path now asks the admin whether to email the details, **defaulting to
+yes** (a `confirm()` — OK sends, Cancel doesn't). One helper,
+`offerNewLessonEmail({kind, studentIds, date, startTime, instrument, teacherId,
+studioId})`, is called from:
+
+- `saveLesson()` — a new one-off whose kind is *Makeup lesson* or *One-off
+  request* (not *Trial*: `maybeSendConfirmation()` already sends the trial
+  email). The date used is the actual first occurrence date, from
+  `plannedDates()`.
+- `saveClone()` — Clone to new timeslot; worded "makeup" only when one student's
+  credit was spent, otherwise "one-off".
+- `addStudentToOccurrence()` — "Add a student for this lesson only"; emails only
+  the guest.
+
+It sends through `send-email.js` in **`students` mode with explicit
+`studentIds`** (not `occurrence` mode, which resolves every `lesson_students`
+row of the lesson — including guests of other dates — via
+`studentsForLessons()`), with the body composed client-side and the studio BCC'd.
+Skipped, with a toast, when the studio has no email address; a failed send
+never undoes the booking. Also called when an *existing* lesson becomes a makeup
+(added later the same month): `saveOccurrence()` when "This is a makeup lesson" is
+ticked in the occurrence modal (only on the not-a-makeup → makeup change, so a
+re-save never re-prompts; sent to the student whose credit was spent, naming the
+covering teacher if there is one), and `saveSeriesEdit()` when a one-off is switched
+to *Makeup lesson* in Edit lesson. A lesson dated before today is never offered an
+email (guard inside `offerNewLessonEmail()`). Edit series on a repeating lesson is
+not covered. No SQL migration, no new function.
+
+## Lesson history on the teacher dashboard (Oct 2026) — `dashboard-teacher.html`
+
+The "Last lesson" box (lesson view and note modal) used to show only the previous
+occurrence of the *same lesson series*. It now shows each student's **last 5
+lessons** (`RECENT_LESSONS_PER_STUDENT`), one at a time with ‹ › arrows
+(newest first, "n of N"). `fetchStudentHistory(row)` follows the *student*, not the
+series: lessons they're in (permanent member, or a guest for that one occurrence),
+same instrument, earlier date, not cancelled, with something recorded (note, shared
+file or materials) — so makeups, one-offs and guest lessons count. Group lessons
+share notes, so each student's five are merged (an occurrence appears once, tagged
+with the students it applies to when that's not everyone). Notes are HTML-escaped
+and keep their line breaks. No SQL change.
+
+**Visibility is whatever RLS allows**: a teacher sees history from their own
+lessons; a cover teacher from the lessons they're covering
+(`phase5-substitute-access.sql`, lesson-scoped). A student's lessons with another
+teacher stay hidden by design, so a cover teacher won't see a makeup the usual
+teacher ran as a separate lesson. The materials list reads
+`lesson_occurrence_artefacts`, whose policy isn't in the repo's `supabase/` folder —
+if a cover teacher sees notes but no "Materials covered", check that policy.
+
+## Lessons grid: rows now cover teachers' working hours (Oct 2026) — `lessons.html`
+
+`computeTimeSlots()` sizes the daily/weekly grid from the *booked* lessons only
+(+30 min margin). Teacher availability was merged in only when the studio had no
+lessons at all that day, so a teacher free 3-7pm at a studio whose first lesson
+was 4pm got a grid starting at 3:30pm — no row to click for a 3:00pm booking
+(admins could still use *Add Lesson*). Now `extendSlotsWithAvailability()` widens
+the rows to include every shown teacher's availability (daily grid) or the
+teacher's own availability (weekly teacher grid), always as one continuous run of
+half-hours (the cells use `rowspan`). Availability outside 8:00am-9:00pm is
+ignored, which keeps the 10 Sep 2026 fix (a stray 05:00 window opening the grid at
+5am). **Consequence:** a teacher whose availability is genuinely 9am-9pm now shows
+those hours; a mis-set window inside 8am-9pm will widen the grid — fix it on the
+teacher's availability. `computeTimeSlots()` can return the shared
+`ALL_TIME_SLOTS`, so callers must copy (`.slice()`) before changing the array.
+No SQL.
+
+## Clone lesson: start times follow the teacher's availability (Oct 2026) — `lessons.html`
+
+The *New time* drop-down in **Clone to new timeslot** used to be a fixed 8:00am-8:00pm
+list (`ALL_TIME_SLOTS`). `refreshCloneTimes()` now offers only times the cloned
+lesson's teacher can take on the chosen date: from the start of an availability window
+at that studio to **window end − the lesson's duration** (a 30-min lesson may start in
+the last half-hour of their day, a 60-min one may not). Several windows in a day work
+(the gap between them is excluded); a hint under the drop-down shows the windows. It
+re-runs when the date changes and keeps the selected time if it is still valid. A teacher
+with no availability on that weekday at that studio gets the full list plus a warning
+(`saveClone()` still hard-blocks the save with its own message). Availability only —
+clashes are still checked on save. Add Lesson uses a free time box with
+`checkAvailability()`, so it needed no change. No SQL.
+
 ## Traps that have already cost time
 
 - **Check which environment you're looking at.** Local dev runs against the same
@@ -2986,3 +3071,40 @@ reminded in the last 3 days. One email per login, grouped per sending studio
 and per single/family variant (family emails open "Hello," instead of one
 child's name). No SQL migration. Sidebar link added to the 21 admin pages
 (static sidebars and the `renderSidebar()` ones).
+
+**Grade Boards (Oct 2026) — `grade-boards.html`.** Replaces hand-writing the
+wall whiteboards. Reached from **Grading** (the *🖨 Grade Boards* button on
+`grading-report.html`, with a *← Grading report* link back) — deliberately not
+a separate sidebar item, to keep the navigation short. It builds two print-ready outputs
+from live data, with a Print / Save as PDF button (sheets are real paper
+size; an injected `@page` rule switches between A4 and A3 per tab, so in the
+print dialog pick the matching paper, margins None, Background graphics on):
+
+- **Grade sheets (A4)** — one sheet per grade (`bok_grade_levels`, Grade 0-8),
+  listing every *active* student's **current** grade per instrument
+  (`student_current_grades`), **sorted alphabetically by name** (students scan
+  for their own name; the page header shows the letter range, e.g. "A–L", on
+  multi-page grades): name, instrument (+ the animal nickname from
+  `BOK_GRADE_ANIMAL_NAMES`) and studio. 22 rows per page; a bigger grade runs
+  to page 2, 3… (explicit chunking, not CSS fragmentation, so every page keeps
+  its Grade heading). Grades with nobody in them produce no sheet. A **NEW**
+  tag marks anyone who moved up in the chosen month.
+- **Congratulations board (A3)** — everyone with a `student_grade_milestones`
+  row in the chosen month (highest grade per student + instrument). Upbeat
+  look: sunburst banner with bunting and a "WELL DONE!" starburst, cream page
+  with confetti, tier-coloured cards (Foundation teal, Beginner yellow,
+  Intermediate blue, Advanced orange-red via `tierColor()`), big grade badge, name, instrument + nickname, studio and date achieved. First page has
+  the banner (12 cards); later pages 14. Order: date, highest grade, or name.
+
+The **month defaults to last month** — the "automation" is that on the 1st you
+open the page and print; nothing is stored or scheduled. Studios are combined
+by default (studio shown per student) with a filter. Names are shown as
+**first name + last initial** (a deliberate privacy choice for a public wall;
+change `students[...].name` in `loadData()` for full names). Test accounts are
+skipped: any student whose first or last name is the whole word Test, Tester or
+Testing (`isTestName()` in `loadData()`; whole-word so a real surname like
+"Testa" stays). There is no test-student flag in the database. Only `status =
+'active'` students appear. All queries page past PostgREST's 1000-row cap
+(`fetchAll`). No SQL migration; no sidebar link (the entry point is the
+Grading page). Looks up Google Fonts (Anton, Barlow) for
+the printed sheets.

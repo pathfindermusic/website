@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grade Boards — Pathfinder Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Anton&family=Barlow:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/portal.css">
+  <style>
+    .report-toolbar { display:flex; align-items:flex-end; gap:0.75rem; flex-wrap:wrap; margin-bottom:1rem; }
+    .toolbar-field { display:flex; flex-direction:column; gap:0.3rem; }
+    .toolbar-field label { font-size:0.72rem; font-weight:600; color:var(--mid-grey); text-transform:uppercase; letter-spacing:0.04em; }
+    .info-note { background:#eff6ff; border:1px solid #93c5fd; color:#1d4ed8; border-radius:var(--r-sm); padding:0.6rem 0.8rem; font-size:0.8rem; line-height:1.55; margin-bottom:1.1rem; }
+    .tabs { display:flex; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap; }
+    .tab-btn { border:1px solid var(--border); background:var(--white); color:var(--dark-grey); padding:0.55rem 1.1rem; border-radius:var(--r-sm); font-family:'Inter',sans-serif; font-size:0.85rem; font-weight:600; cursor:pointer; }
+    .tab-btn.active { background:var(--orange); border-color:var(--orange); color:var(--white); }
+    .preview-stage { background:#d9d9dc; padding:1.25rem; border-radius:var(--r); overflow-x:auto; }
+    .preview-note { font-size:0.8rem; color:var(--dark-grey); margin:0 0 0.9rem; line-height:1.55; }
+
+    /* ---------- Paper sheets (screen = preview, print = real size) ---------- */
+    .sheet { position:relative; overflow:hidden; background:#fff; margin:0 auto 1.25rem; box-shadow:0 2px 14px rgba(0,0,0,0.25);
+             font-family:'Barlow','Helvetica Neue',Arial,sans-serif; color:#1C1C1E;
+             -webkit-print-color-adjust:exact; print-color-adjust:exact; box-sizing:border-box; }
+    .sheet.a4 { width:794px; height:1123px; }
+    .sheet.a3 { width:1123px; height:1587px; background:#FFF6E5; }
+    .sheet img.logo { display:block; width:auto; }
+
+    /* ---- A4 grade sheet ---- */
+    .a4-top { height:96px; background:#1C1C1E; display:flex; align-items:center; justify-content:space-between; padding:0 40px; }
+    .a4-top img.logo { height:64px; }
+    .a4-asat { color:#fff; font-size:20px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; text-align:right; line-height:1.15; }
+    .a4-asat small { display:block; font-size:14px; font-weight:600; letter-spacing:0.12em; color:#FF8A66; }
+    .a4-hero { height:150px; background:#E8491E; padding:0 40px; display:flex; align-items:center; justify-content:space-between; }
+    .a4-grade { font-family:'Anton','Impact',sans-serif; font-size:104px; line-height:1; text-transform:uppercase; color:#fff; letter-spacing:0.01em; white-space:nowrap; flex:0 1 auto; min-width:0; }
+    .a4-tier { text-align:right; color:#1C1C1E; }
+    .a4-tier b { display:block; font-size:34px; font-weight:800; letter-spacing:0.14em; text-transform:uppercase; }
+    .a4-tier span { display:block; font-size:22px; font-weight:700; margin-top:2px; }
+    .a4-rows { padding:14px 40px 0; }
+    .a4-head, .a4-row { display:grid; grid-template-columns: 232px 1fr 118px; align-items:center; column-gap:14px; }
+    .a4-head { font-size:13px; font-weight:800; letter-spacing:0.14em; text-transform:uppercase; color:#555; border-bottom:3px solid #1C1C1E; padding:0 10px 6px; }
+    .a4-row { height:35px; padding:0 10px; border-bottom:1px solid #e6e3df; }
+    .a4-row:nth-child(even) { background:#F6F3EF; }
+    .a4-name { font-size:21px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .a4-inst { font-size:17px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .a4-inst i { font-style:normal; font-weight:600; color:#B8330F; margin-left:8px; font-size:15px; }
+    .a4-studio { font-size:15px; font-weight:600; color:#4A4A4C; text-align:right; }
+    .new-chip { display:inline-block; margin-left:8px; padding:1px 8px; border-radius:999px; background:#E8491E; color:#fff; font-size:12px; font-weight:800; letter-spacing:0.1em; vertical-align:middle; }
+    .a4-foot { position:absolute; left:0; right:0; bottom:0; height:46px; background:#E8491E; display:flex; align-items:center; justify-content:space-between; padding:0 40px; font-size:15px; font-weight:800; letter-spacing:0.05em; color:#1C1C1E; }
+
+    /* ---- A3 congratulations board ---- */
+    .a3-confetti { position:absolute; left:0; top:0; z-index:0; }
+    .a3-top { position:relative; z-index:2; height:110px; background:#1C1C1E; display:flex; align-items:center; justify-content:space-between; padding:0 64px; }
+    .a3-top img.logo { height:78px; }
+    .a3-top .tag { background:#FFC531; border-radius:999px; color:#1C1C1E; font-size:24px; font-weight:800; letter-spacing:0.18em; text-transform:uppercase; padding:9px 28px; }
+    .a3-hero { position:relative; z-index:1; background:#E8491E; padding:0 64px; overflow:hidden; }
+    .a3-hero.big { height:330px; }
+    .a3-hero.small { height:150px; }
+    .a3-hero svg.art { position:absolute; left:0; top:0; }
+    .a3-hero .inner { position:relative; height:100%; display:flex; flex-direction:column; justify-content:center; }
+    .a3-hero.big .inner { padding-top:40px; }
+    .a3-h1 { font-family:'Anton','Impact',sans-serif; text-transform:uppercase; color:#fff; line-height:1; letter-spacing:0.02em; text-shadow:0 5px 0 #B8330F, 0 9px 0 rgba(0,0,0,0.18); }
+    .a3-hero.big .a3-h1 { font-size:124px; }
+    .a3-hero.small .a3-h1 { font-size:70px; text-shadow:0 4px 0 #B8330F; }
+    .a3-sub { align-self:flex-start; margin-top:18px; background:#FFC531; color:#1C1C1E; border-radius:999px; padding:6px 28px; font-size:30px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; transform:rotate(-1.5deg); box-shadow:0 4px 0 #B8330F; }
+    .a3-hero.small .a3-sub { font-size:22px; margin-top:8px; padding:3px 20px; }
+    .a3-grid { position:relative; z-index:1; display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:16px; padding:26px 64px 0; }
+    .a3-card { position:relative; height:156px; box-sizing:border-box; background:#fff; border:4px solid var(--tc,#E8491E); border-radius:28px; display:flex; align-items:center; gap:18px; padding:0 20px 0 14px; box-shadow:0 6px 0 var(--tc,#E8491E); overflow:hidden; }
+    .a3-badge { width:112px; height:112px; flex-shrink:0; border-radius:50%; background:var(--tc,#E8491E); color:#1C1C1E; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:inset 0 0 0 5px rgba(255,255,255,0.6); }
+    .a3-badge small { font-size:15px; font-weight:800; letter-spacing:0.16em; text-transform:uppercase; line-height:1; margin-top:2px; }
+    .a3-badge b { font-family:'Anton','Impact',sans-serif; font-size:60px; line-height:1; font-weight:400; }
+    .a3-badge b.txt { font-size:24px; text-align:center; padding:0 10px; line-height:1.1; text-transform:uppercase; }
+    .a3-star { position:absolute; right:14px; top:10px; }
+    .a3-info { min-width:0; display:flex; flex-direction:column; justify-content:center; gap:2px; }
+    .a3-name { font-family:'Anton','Impact',sans-serif; font-size:40px; line-height:1.05; text-transform:uppercase; letter-spacing:0.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:26px; }
+    .a3-inst { font-size:24px; font-weight:800; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .a3-nick { font-size:21px; font-weight:700; line-height:1.15; color:#B8330F; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .a3-meta { font-size:19px; line-height:1.15; font-weight:600; color:#4A4A4C; }
+    .a3-foot { position:absolute; z-index:2; left:0; right:0; bottom:0; height:64px; background:#FFC531; display:flex; align-items:center; justify-content:space-between; padding:0 64px; color:#1C1C1E; font-size:26px; font-weight:800; letter-spacing:0.03em; }
+
+    /* ---------- Print: only the sheets, at true paper size ---------- */
+    @media print {
+      body { background:#fff !important; }
+      .topnav, .sidebar, .page-header, .info-note, .report-toolbar, .tabs, .preview-note, #toastWrap, .no-print { display:none !important; }
+      .portal-shell, .main { display:block !important; margin:0 !important; padding:0 !important; width:auto !important; max-width:none !important; background:#fff !important; }
+      .preview-stage { background:none !important; padding:0 !important; border-radius:0 !important; overflow:visible !important; }
+      .sheet { zoom:1 !important; margin:0 !important; box-shadow:none !important; page-break-after:always; break-after:page; }
+      .sheet:last-child { page-break-after:auto; break-after:auto; }
+    }
+  </style>
+  <style id="pageStyle">@page { size: A4 portrait; margin: 0; }</style>
+</head>
+<body>
+<div class="portal-shell">
+
+  <nav class="topnav">
+    <a href="#" class="topnav-logo"><img src="../Logo_-_long.png" alt="Pathfinder Music Lessons"></a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">–</span>
+        </div>
+      </div>
+      <a href="change-password.html" class="btn-logout" style="text-decoration:none;">🔑 Password</a>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Front desk</div>
+    <a class="nav-item" href="tasks.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Tasks
+    </a>
+    <a class="nav-item" href="enquiries.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+      Enquiries
+    </a>
+    <a class="nav-item" href="notifications.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/></svg>
+      Notifications
+    </a>
+    <a class="nav-item" href="day-sheet.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
+      Day Sheet
+    </a>
+    <a class="nav-item" href="events.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      Events
+    </a>
+    <a class="nav-item" href="vouchers.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+      Vouchers
+    </a>
+    <div class="sidebar-section">Teaching</div>
+    <a class="nav-item" href="lessons.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Lessons
+    </a>
+    <a class="nav-item" href="students.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      Students
+    </a>
+    <a class="nav-item" href="teachers.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+      Teachers
+    </a>
+    <div class="sidebar-section">Curriculum</div>
+    <a class="nav-item" href="bok-artefacts.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Artefact Library
+    </a>
+    <div class="sidebar-section">Reports</div>
+    <a class="nav-item" href="attendance-report.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Attendance
+    </a>
+    <a class="nav-item active" href="grading-report.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+      Grading
+    </a>
+    <a class="nav-item" href="credits.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/></svg>
+      Credits
+    </a>
+    <a class="nav-item" href="distribution-lists.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      Distribution Lists
+    </a>
+    <a class="nav-item" href="portal-logins.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+      Portal Logins
+    </a>
+    <div class="sidebar-section hidden" id="superuserSection">Super User</div>
+    <a class="nav-item hidden" href="studios.html" id="studiosLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Studios
+    </a>
+    <a class="nav-item hidden" href="admins.html" id="adminsLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Admins
+    </a>
+    <a class="nav-item hidden" href="teacher-utilisation.html" id="utilLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Teachers utilisation
+    </a>
+    <div class="sidebar-section">Manuals</div>
+    <a class="nav-item" href="manuals/index.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      How-To Guide
+    </a>
+  </aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Grade Boards</div>
+        <div class="page-sub" id="pageSub">Loading…</div>
+      </div>
+      <div class="flex gap-1" style="flex-wrap:wrap;">
+        <a class="btn btn-secondary btn-sm" href="grading-report.html" style="text-decoration:none;">← Grading report</a>
+        <button class="btn btn-primary btn-sm" onclick="printBoards()">🖨 Print / Save as PDF</button>
+      </div>
+    </div>
+
+    <div class="info-note">
+      Print-ready wall boards built from the Portal's grading records. <b>Grade sheets (A4)</b> show where every active
+      student is today — one sheet per grade, with a <b>NEW</b> tag on anyone who moved up in the chosen month.
+      The <b>Congratulations board (A3)</b> lists everyone who achieved a new grade in the chosen month; it opens on
+      <b>last month</b>, so on the 1st just open this page and print. In the print dialog choose paper size
+      <b>A4</b> or <b>A3</b> to match the tab, set margins to <b>None</b> and tick <b>Background graphics</b>.
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" id="tabSheets" onclick="setTab('sheets')">Grade sheets (A4)</button>
+      <button class="tab-btn" id="tabBoard" onclick="setTab('board')">Congratulations board (A3)</button>
+    </div>
+
+    <div class="report-toolbar">
+      <div class="toolbar-field">
+        <label for="filterMonth">Month</label>
+        <select class="filter-select" id="filterMonth" onchange="render()"></select>
+      </div>
+      <div class="toolbar-field">
+        <label for="filterStudio">Studio</label>
+        <select class="filter-select" id="filterStudio" onchange="render()">
+          <option value="">All Studios</option>
+        </select>
+      </div>
+      <div class="toolbar-field" id="sortField" style="display:none;">
+        <label for="sortBy">Order</label>
+        <select class="filter-select" id="sortBy" onchange="render()">
+          <option value="date">Date achieved</option>
+          <option value="grade">Highest grade first</option>
+          <option value="name">Name</option>
+        </select>
+      </div>
+    </div>
+
+    <p class="preview-note" id="previewNote"></p>
+    <div class="preview-stage" id="stage"><div class="loading"><div class="spinner"></div> Loading…</div></div>
+  </main>
+</div>
+
+<div id="toastWrap" class="toast-wrap"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script>
+let currentProfile = null;
+let tab        = 'sheets';
+let studios    = [];
+let gradeLevels = [];     // bok_grade_levels, by sort_order
+let students   = {};      // id -> { name, studioId, studioName }
+let currentGrades = [];   // student_current_grades rows for active students
+let milestones = [];      // grade milestones in the chosen month (active students)
+let loadedMonth = null;
+
+const A4_ROWS_PER_PAGE = 22;
+const A3_CARDS_FIRST   = 12;   // first page has the big banner
+const A3_CARDS_NEXT    = 14;
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// ---- Init ----
+(async () => {
+  currentProfile = await requireAuth(['superuser','admin']);
+  if (!currentProfile) return;
+  renderTopNavUser(currentProfile);
+  if (currentProfile.role === 'superuser') {
+    document.getElementById('superuserSection').classList.remove('hidden');
+    document.getElementById('studiosLink').classList.remove('hidden');
+    document.getElementById('adminsLink').classList.remove('hidden');
+    document.getElementById('utilLink').classList.remove('hidden');
+  }
+  if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
+
+  fillMonths();
+  await loadStudios();
+  await loadGradeLevels();
+  await render();
+  window.addEventListener('resize', fitPreview);
+})();
+
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+// ---- Month list: last 13 months, defaulting to LAST month ----
+function monthKey(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
+function monthLabel(key) {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
+}
+function fillMonths() {
+  const sel = document.getElementById('filterMonth');
+  const now = new Date();
+  const keys = [];
+  for (let i = 1; i <= 13; i++) keys.push(monthKey(new Date(now.getFullYear(), now.getMonth() - i, 1)));
+  // "This month so far" sits on top for a mid-month look, but last month is selected
+  const thisKey = monthKey(now);
+  sel.innerHTML = `<option value="${thisKey}">${monthLabel(thisKey)} (so far)</option>` +
+    keys.map(k => `<option value="${k}">${monthLabel(k)}</option>`).join('');
+  sel.value = keys[0];
+}
+
+async function loadStudios() {
+  const { data } = await db.from('studios').select('id, name, status').order('name');
+  studios = data ?? [];
+  const sel = document.getElementById('filterStudio');
+  studios.filter(s => s.status === 'active').forEach(s => {
+    sel.innerHTML += `<option value="${s.id}">${esc(s.name)}</option>`;
+  });
+  // Both studios by default — one combined set of boards
+}
+
+async function loadGradeLevels() {
+  const { data } = await db.from('bok_grade_levels').select('*').order('sort_order');
+  gradeLevels = data ?? [];
+}
+
+// ---- Fetch every row, past PostgREST's 1000-row cap ----
+async function fetchAll(makeQuery) {
+  const PAGE = 1000, out = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await makeQuery().range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    out.push(...(data ?? []));
+    if ((data ?? []).length < PAGE) break;
+  }
+  return out;
+}
+
+async function loadData(month) {
+  const [y, m] = month.split('-').map(Number);
+  const from = toISODate(new Date(y, m - 1, 1));
+  const to   = toISODate(new Date(y, m, 0));
+
+  const studentRows = await fetchAll(() => db.from('students')
+    .select('id, studio_id, first_name, last_name, profiles(first_name, last_name)')
+    .eq('status', 'active').order('id'));
+
+  const studioName = {};
+  studios.forEach(s => { studioName[s.id] = s.name; });
+  students = {};
+  // Test accounts (a first or last name that is the whole word Test / Tester / Testing)
+  // never belong on a wall board. Whole-word match, so real names like "Testa" stay.
+  const isTestName = n => /\btest(?:er|ing)?\b/i.test(n || '');
+  studentRows.forEach(s => {
+    const first = (s.first_name ?? s.profiles?.first_name ?? '').trim();
+    const last  = (s.last_name  ?? s.profiles?.last_name  ?? '').trim();
+    if (isTestName(first) || isTestName(last)) return;
+    students[s.id] = {
+      name: last ? `${first} ${last[0].toUpperCase()}.` : (first || '(no name)'),   // first name + last initial
+      studioId: s.studio_id, studioName: studioName[s.studio_id] ?? '',
+    };
+  });
+
+  const cg = await fetchAll(() => db.from('student_current_grades')
+    .select('student_id,instrument,grade_level_id,tier,label,sort_order').order('student_id'));
+  currentGrades = cg.filter(r => students[r.student_id]);
+
+  const ms = await fetchAll(() => db.from('student_grade_milestones')
+    .select('id,student_id,instrument,achieved_on,grade_level_id,bok_grade_levels(tier,label,sort_order)')
+    .gte('achieved_on', from).lte('achieved_on', to).order('achieved_on'));
+  milestones = ms.filter(r => students[r.student_id]);
+  loadedMonth = month;
+}
+
+// ---- Tabs / print ----
+function setTab(t) {
+  tab = t;
+  document.getElementById('tabSheets').classList.toggle('active', t === 'sheets');
+  document.getElementById('tabBoard').classList.toggle('active', t === 'board');
+  document.getElementById('sortField').style.display = t === 'board' ? '' : 'none';
+  document.getElementById('pageStyle').textContent =
+    `@page { size: ${t === 'board' ? 'A3' : 'A4'} portrait; margin: 0; }`;
+  render();
+}
+function printBoards() {
+  if (!document.querySelector('.sheet')) { showToast('Nothing to print yet.', 'warning'); return; }
+  window.print();
+}
+
+function fitPreview() {
+  const stage = document.getElementById('stage');
+  const sheet = stage.querySelector('.sheet');
+  if (!sheet) return;
+  const w = sheet.classList.contains('a3') ? 1123 : 794;
+  const avail = stage.clientWidth - 40;
+  const z = Math.min(1, avail / w);
+  stage.querySelectorAll('.sheet').forEach(s => { s.style.zoom = z; });
+}
+
+// ---- Rendering ----
+function gradeNumber(levelLabel) {
+  const m = String(levelLabel ?? '').match(/(\d+)/);
+  return m ? m[1] : null;
+}
+// Long grade names (e.g. "Pre-Grade 1") must stay on ONE line in the
+// hero, so the headline shrinks with its length: full size up to 8
+// characters ("GRADE 8"), then proportionally smaller, never below 56px.
+function a4GradeFontSize(label) {
+  const n = String(label ?? '').length;
+  return n <= 8 ? 104 : Math.max(56, Math.floor(104 * 8 / n));
+}
+function dateLabel(iso) {
+  return parseLocalDate(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+function chunk(list, firstSize, nextSize) {
+  const pages = [];
+  let i = 0;
+  pages.push(list.slice(0, firstSize)); i = firstSize;
+  while (i < list.length) { pages.push(list.slice(i, i + nextSize)); i += nextSize; }
+  return pages;
+}
+
+async function render() {
+  const month  = document.getElementById('filterMonth').value;
+  const studio = document.getElementById('filterStudio').value;
+  const stage  = document.getElementById('stage');
+
+  if (loadedMonth !== month) {
+    stage.innerHTML = '<div class="loading"><div class="spinner"></div> Loading…</div>';
+    try { await loadData(month); }
+    catch (err) {
+      stage.innerHTML = `<div class="empty-state"><p style="color:#dc2626;">${esc(err.message)}</p></div>`;
+      return;
+    }
+  }
+
+  const inScope = id => !studio || students[id]?.studioId === studio;
+  const html = tab === 'sheets' ? renderSheets(month, inScope) : renderBoard(month, inScope);
+  stage.innerHTML = html.html || `<div class="empty-state"><h3>${esc(html.empty)}</h3></div>`;
+  document.getElementById('pageSub').textContent = html.sub;
+  document.getElementById('previewNote').textContent = html.note;
+  fitPreview();
+}
+
+// ---------- A4 grade sheets ----------
+function renderSheets(month, inScope) {
+  const newKey = new Set(milestones.filter(m => inScope(m.student_id))
+    .map(m => `${m.student_id}|${m.instrument}|${m.grade_level_id}`));
+
+  const byLevel = {};
+  currentGrades.filter(r => inScope(r.student_id)).forEach(r => {
+    (byLevel[r.sort_order] ??= []).push(r);
+  });
+
+  const today = new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  const sheets = [];
+  let studentCount = 0, emptyGrades = [];
+
+  gradeLevels.forEach(level => {
+    // Alphabetical by name, so students can find themselves quickly
+    const list = (byLevel[level.sort_order] ?? []).slice().sort((a, b) =>
+      students[a.student_id].name.localeCompare(students[b.student_id].name, 'en', { sensitivity: 'base' }) ||
+      a.instrument.localeCompare(b.instrument));
+    if (!list.length) { emptyGrades.push(level.label); return; }
+    studentCount += list.length;
+
+    const pages = chunk(list, A4_ROWS_PER_PAGE, A4_ROWS_PER_PAGE);
+    pages.forEach((rows, pi) => {
+      const gnum = gradeNumber(level.label);
+      sheets.push(`
+      <section class="sheet a4">
+        <div class="a4-top">
+          <img class="logo" src="../Logo_-_long.png" alt="Pathfinder Music Lessons">
+          <div class="a4-asat">Student grades<small>As at ${esc(today)}</small></div>
+        </div>
+        <div class="a4-hero">
+          <div class="a4-grade" style="font-size:${a4GradeFontSize(level.label)}px;">${esc(level.label)}</div>
+          <div class="a4-tier"><b>${esc(level.tier)}</b><span>${list.length} student${list.length !== 1 ? 's' : ''}</span>${pages.length > 1 ? `<span style="font-size:18px;">Page ${pi + 1} of ${pages.length} · ${letterRange(rows)}</span>` : ''}</div>
+        </div>
+        <div class="a4-rows">
+          <div class="a4-head"><div>Student</div><div>Instrument</div><div style="text-align:right;">Studio</div></div>
+          ${rows.map(r => {
+            const animal = gradeAnimalName(r.instrument, r.sort_order);
+            const isNew  = newKey.has(`${r.student_id}|${r.instrument}|${r.grade_level_id}`);
+            const s = students[r.student_id];
+            return `<div class="a4-row">
+              <div class="a4-name">${esc(s.name)}${isNew ? '<span class="new-chip">NEW</span>' : ''}</div>
+              <div class="a4-inst">${esc(r.instrument)}${animal ? `<i>${esc(animal)}</i>` : ''}</div>
+              <div class="a4-studio">${esc(s.studioName)}</div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div class="a4-foot"><span>Keep practising — you're doing great!</span><span>${isNewLegend(month)}</span></div>
+      </section>`);
+    });
+  });
+
+  if (!sheets.length) return { empty: 'No graded students found for this filter.', sub: '', note: '' };
+  return {
+    html: sheets.join(''),
+    sub: `${studentCount} grade${studentCount !== 1 ? 's' : ''} across ${gradeLevels.length - emptyGrades.length} grade sheet${gradeLevels.length - emptyGrades.length !== 1 ? 's' : ''} · ${sheets.length} A4 page${sheets.length !== 1 ? 's' : ''}`,
+    note: `Active students' current grade per instrument, as of today. NEW tags mark anyone who moved up in ${monthLabel(month)}.` +
+      (emptyGrades.length ? ` No sheet for ${emptyGrades.join(', ')} — nobody is at that grade yet.` : ''),
+  };
+}
+function letterRange(rows) {
+  const first = students[rows[0].student_id].name[0].toUpperCase();
+  const last  = students[rows[rows.length - 1].student_id].name[0].toUpperCase();
+  return first === last ? first : `${first}–${last}`;
+}
+function isNewLegend(month) { return `NEW = new grade in ${monthLabel(month)}`; }
+
+// ---------- A3 decoration helpers ----------
+function tierColor(tier) {
+  return ({ Foundation: '#19B5A5', Beginner: '#FFC531', Intermediate: '#4DA3FF', Advanced: '#FF5C8A' })[tier] || '#E8491E';
+}
+const CONFETTI_COLORS = ['#FFC531', '#19B5A5', '#4DA3FF', '#FF5C8A', '#E8491E'];
+
+// Sunburst rays, bunting along the top and (first page) a "WELL DONE!"
+// starburst. Plain vector shapes, so it prints crisply.
+function heroArt(h, big) {
+  const W = 1123, cx = W / 2, cy = big ? 190 : h / 2, R = 1500, N = 28;
+  let rays = '';
+  for (let i = 0; i < N; i += 2) {
+    const a1 = (i / N) * 2 * Math.PI, a2 = ((i + 1) / N) * 2 * Math.PI;
+    rays += `<polygon points="${cx},${cy} ${(cx + R * Math.cos(a1)).toFixed(1)},${(cy + R * Math.sin(a1)).toFixed(1)} ${(cx + R * Math.cos(a2)).toFixed(1)},${(cy + R * Math.sin(a2)).toFixed(1)}" fill="#F2602F"/>`;
+  }
+  let bunting = '', starburst = '', dots = '';
+  if (big) {
+    bunting = `<path d="M-10,4 Q${cx},112 ${W + 10},4" fill="none" stroke="#B8330F" stroke-width="3"/>`;
+    for (let i = 0; i < 17; i++) {
+      const t = (i + 0.5) / 17, x = -10 + (W + 20) * t;
+      // quadratic bezier with control point y=112: y = (1-t)^2*4 + 2t(1-t)*112 + t^2*4
+      const yy = (1 - t) * (1 - t) * 4 + 2 * t * (1 - t) * 112 + t * t * 4;
+      bunting += `<polygon points="${(x - 20).toFixed(1)},${(yy - 1).toFixed(1)} ${(x + 20).toFixed(1)},${(yy - 1).toFixed(1)} ${x.toFixed(1)},${(yy + 40).toFixed(1)}" fill="${CONFETTI_COLORS[i % 5]}"/>`;
+    }
+    let pts = '';
+    for (let i = 0; i < 40; i++) {
+      const ang = (i / 40) * 2 * Math.PI, rad = i % 2 ? 84 : 102;
+      pts += `${(1000 + rad * Math.cos(ang)).toFixed(1)},${(212 + rad * Math.sin(ang)).toFixed(1)} `;
+    }
+    starburst = `<g transform="rotate(12 1000 212)"><polygon points="${pts}" fill="#FFC531" stroke="#B8330F" stroke-width="4" stroke-linejoin="round"/>
+      <text x="1000" y="210" text-anchor="middle" font-family="Anton,Impact,sans-serif" font-size="40" fill="#1C1C1E">WELL</text>
+      <text x="1000" y="252" text-anchor="middle" font-family="Anton,Impact,sans-serif" font-size="40" fill="#1C1C1E">DONE!</text></g>`;
+    dots = `<g fill="#FFFFFF" fill-opacity="0.5"><circle cx="1105" cy="150" r="9"/><circle cx="1075" cy="318" r="7"/><circle cx="60" cy="318" r="7"/></g>`;
+  } else {
+    dots = `<g fill="#FFFFFF" fill-opacity="0.45"><circle cx="1010" cy="40" r="8"/><circle cx="1080" cy="108" r="6"/><circle cx="900" cy="124" r="5"/></g>
+      <g fill="#FFC531"><circle cx="1050" cy="70" r="9"/><circle cx="960" cy="30" r="6"/></g>`;
+  }
+  return `<svg class="art" width="${W}" height="${h}" viewBox="0 0 ${W} ${h}" aria-hidden="true">${rays}${dots}${bunting}${starburst}</svg>`;
+}
+
+// Scattered confetti behind the cards, the same every time (seeded)
+function confettiLayer(seed) {
+  let x = 1234567 + seed * 7919;
+  const rnd = () => (x = (x * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  let out = '';
+  for (let i = 0; i < 70; i++) {
+    const cx = rnd() * 1123, cy = 440 + rnd() * 1080, c = CONFETTI_COLORS[Math.floor(rnd() * 5)], k = Math.floor(rnd() * 3), sz = 8 + rnd() * 12, rot = Math.floor(rnd() * 360);
+    out += k === 0 ? `<circle cx="${cx.toFixed(0)}" cy="${cy.toFixed(0)}" r="${(sz / 2).toFixed(1)}" fill="${c}"/>`
+         : k === 1 ? `<rect x="${cx.toFixed(0)}" y="${cy.toFixed(0)}" width="${sz.toFixed(0)}" height="${(sz * 0.55).toFixed(0)}" rx="2" fill="${c}" transform="rotate(${rot} ${cx.toFixed(0)} ${cy.toFixed(0)})"/>`
+         : `<polygon points="${cx.toFixed(0)},${cy.toFixed(0)} ${(cx + sz).toFixed(0)},${cy.toFixed(0)} ${(cx + sz / 2).toFixed(0)},${(cy - sz).toFixed(0)}" fill="${c}" transform="rotate(${rot} ${cx.toFixed(0)} ${cy.toFixed(0)})"/>`;
+  }
+  return `<svg class="a3-confetti" width="1123" height="1587" viewBox="0 0 1123 1587" aria-hidden="true" style="opacity:0.55;">${out}</svg>`;
+}
+
+// ---------- A3 congratulations board ----------
+function renderBoard(month, inScope) {
+  // Highest grade per student+instrument in the month
+  const best = {};
+  milestones.filter(m => inScope(m.student_id) && m.bok_grade_levels).forEach(m => {
+    const k = `${m.student_id}|${m.instrument}`;
+    if (!best[k] || m.bok_grade_levels.sort_order > best[k].bok_grade_levels.sort_order) best[k] = m;
+  });
+  let list = Object.values(best);
+
+  const sortBy = document.getElementById('sortBy').value;
+  list.sort((a, b) => {
+    const byDate  = a.achieved_on.localeCompare(b.achieved_on);
+    const byGrade = b.bok_grade_levels.sort_order - a.bok_grade_levels.sort_order;
+    const byName  = students[a.student_id].name.localeCompare(students[b.student_id].name);
+    if (sortBy === 'grade') return byGrade || byDate || byName;
+    if (sortBy === 'name')  return byName || byDate;
+    return byDate || byGrade || byName;
+  });
+
+  if (!list.length) {
+    return { empty: `No new grades were recorded in ${monthLabel(month)}.`, sub: monthLabel(month), note: '' };
+  }
+
+  const pages = chunk(list, A3_CARDS_FIRST, A3_CARDS_NEXT);
+  const total = pages.length;
+  const sheets = pages.map((cards, pi) => `
+    <section class="sheet a3">
+      ${confettiLayer(pi)}
+      <div class="a3-top"><img class="logo" src="../Logo_-_long.png" alt="Pathfinder Music Lessons"><div class="tag">Grade achievements</div></div>
+      ${pi === 0 ? `
+      <div class="a3-hero big">${heroArt(330, true)}<div class="inner">
+        <div class="a3-h1">Congratulations!</div>
+        <div class="a3-sub">New grades achieved in ${esc(monthLabel(month))}</div>
+      </div></div>` : `
+      <div class="a3-hero small">${heroArt(150, false)}<div class="inner">
+        <div class="a3-h1">Congratulations!</div>
+        <div class="a3-sub">${esc(monthLabel(month))} · continued</div>
+      </div></div>`}
+      <div class="a3-grid">
+        ${cards.map(m => {
+          const lvl = m.bok_grade_levels, s = students[m.student_id];
+          const animal = gradeAnimalName(m.instrument, lvl.sort_order);
+          const num = gradeNumber(lvl.label);
+          return `<div class="a3-card" style="--tc:${tierColor(lvl.tier)};">
+            <div class="a3-badge">${num !== null ? `<b>${esc(num)}</b><small>Grade</small>` : `<b class="txt">${esc(lvl.label)}</b>`}</div>
+            <svg class="a3-star" width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.1 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z" fill="#FFC531" stroke="#1C1C1E" stroke-width="1.6" stroke-linejoin="round"/></svg>
+            <div class="a3-info">
+              <div class="a3-name">${esc(s.name)}</div>
+              <div class="a3-inst">${esc(m.instrument)}</div>
+              ${animal ? `<div class="a3-nick">${esc(animal)}</div>` : ''}
+              <div class="a3-meta">${esc(s.studioName)} · ${esc(dateLabel(m.achieved_on))}</div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="a3-foot"><span>Could you be next? Ask your teacher about your next grade!</span><span>${total > 1 ? `Page ${pi + 1} of ${total}` : ''}</span></div>
+    </section>`).join('');
+
+  return {
+    html: sheets,
+    sub: `${list.length} new grade${list.length !== 1 ? 's' : ''} in ${monthLabel(month)} · ${pages.length} A3 page${pages.length !== 1 ? 's' : ''}`,
+    note: `Everyone who achieved a new grade in ${monthLabel(month)} (their highest grade per instrument). Active students only.`,
+  };
+}
+</script>
+</body>
+</html>

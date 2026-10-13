@@ -547,6 +547,23 @@ this rebuilds future, unmarked occurrences only; anything already marked
 or in the past is left untouched.</li>
 </ul>
 <div class="callout callout-tip">
+<strong>Emailing the student about a makeup or one-off lesson</strong>
+<p>
+Students know their regular weekly slot but tend to forget lessons outside it.
+So whenever you create a <strong>makeup lesson</strong> or <strong>one-off
+request</strong> (Add Lesson), <strong>clone</strong> a lesson to a new
+timeslot, add a student to <strong>one lesson only</strong>, or
+<strong>turn an existing lesson into a makeup</strong> (tick <em>This is a makeup
+lesson</em> on the lesson, or switch a one-off to <em>Makeup lesson</em> in Edit
+lesson), the portal asks whether to email that student the details (instrument, date, time, teacher and
+studio). The answer defaults to <strong>yes</strong> &mdash; just press
+<strong>OK</strong>; choose <strong>Cancel</strong> to skip it. Only the student
+being added is emailed, not the rest of a group lesson, and the studio gets a
+copy. Lessons dated in the past aren't offered an email, and trial lessons
+aren't covered: their own trial email is sent from the enrolment checklist.
+</p>
+</div>
+<div class="callout callout-tip">
 <strong>Trial and makeup lessons are "one-off," not a mini-series</strong>
 <p>
 A trial, makeup, or one-off request lesson is stored as a single-occurrence
@@ -791,6 +808,45 @@ The <em>Last reminded</em> column shows when a login was last sent this
 reminder. <strong>Select all shown</strong> skips anyone reminded in the last
 3 days; you can still tick them by hand. <strong>Export CSV</strong>
 downloads the list currently on screen.
+</p>
+</div>
+
+<h3 id="grade-boards">Grade Boards</h3>
+<p>
+Prints the wall boards for you, so there is no more hand-writing. Open
+the <strong>Grading</strong> page and click the <strong>Grade Boards</strong>
+button at the top right, choose a tab, and click
+<strong>Print / Save as PDF</strong>.
+</p>
+<ul>
+<li><strong>Grade sheets (A4)</strong> — one sheet per grade, listing every
+active student at that grade with their instrument (and its animal nickname)
+and studio, with names in alphabetical order so students can find themselves
+quickly. This is a snapshot of where students are <em>today</em>. Anyone who
+moved up in the chosen month gets a <strong>NEW</strong> tag. A busy grade
+carries on to a second page.</li>
+<li><strong>Congratulations board (A3)</strong> — everyone who achieved a new
+grade in the chosen month: name, instrument, new grade, studio and the date
+they achieved it, on a bright, cheerful board to inspire other students.</li>
+</ul>
+<p>
+The month opens on <strong>last month</strong>, so on the 1st of each month
+just open the page and print the new Congratulations board and refreshed grade
+sheets. Choose another month from the drop-down if you need to. Both studios
+are shown together; use the Studio filter for one studio only. Students appear
+as first name and last initial (for example "Mia T."). Test students (any whose
+first or last name is "Test") are left off the boards automatically. The grades come from
+what teachers and admins record on each student, so a new grade only shows up
+once it has been entered.
+</p>
+<div class="callout callout-tip">
+<strong>Printing</strong>
+<p>
+In the print dialog choose paper size <strong>A4</strong> for the grade sheets
+or <strong>A3</strong> for the Congratulations board, set margins to
+<strong>None</strong>, and tick <strong>Background graphics</strong> so the
+colours print. Choose <strong>Save as PDF</strong> if you'd rather send the
+file to a print shop.
 </p>
 </div>
 
