@@ -428,8 +428,11 @@ async function loadEvents() {
     const { data, error } = await db.rpc('list_events_for_me');
     if (error) return;
     const today = toISODate(new Date());
-    const rows = (data ?? []).filter(e => e.status === 'open' && e.event_date >= today
-      && !(e.booking_deadline && e.booking_deadline < today));
+    // Still bookable, OR the family already has a performance there — those
+    // stay on the dashboard until the day (a band performance the studio
+    // booked for them must be visible, even after the booking deadline).
+    const bookable = e => e.status === 'open' && !(e.booking_deadline && e.booking_deadline < today);
+    const rows = (data ?? []).filter(e => e.event_date >= today && (bookable(e) || e.my_count > 0));
     const card = document.getElementById('eventsCard');
     if (!rows.length) { card.classList.add('hidden'); return; }
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -440,12 +443,41 @@ async function loadEvents() {
           <b>${esc(e.name)}</b> — ${d.toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long' })}, ${esc(PFEvents.timeRange(e))}
           ${e.venue_name ? '<br><span style="color:var(--dark-grey)">📍 ' + esc(e.venue_name) + '</span>' : ''}
           ${e.my_count ? '<br><span style="color:var(--orange-dark);font-weight:600">You have ' + e.my_count + ' performance' + (e.my_count === 1 ? '' : 's') + ' booked</span>' : ''}
+          <div id="evMine-${e.id}"></div>
         </div>
-        <a class="btn ${e.my_count ? 'btn-secondary' : 'btn-primary'} btn-sm" href="event-book.html?event=${e.id}">${e.my_count ? 'View / change' : 'Book now'}</a>
+        <a class="btn ${e.my_count && bookable(e) ? 'btn-secondary' : (bookable(e) ? 'btn-primary' : 'btn-secondary')} btn-sm" href="event-book.html?event=${e.id}">${!bookable(e) ? 'View' : (e.my_count ? 'View / change' : 'Book now')}</a>
       </div>`;
     }).join('');
     card.classList.remove('hidden');
+    rows.filter(e => e.my_count > 0).forEach(e => showMyPerformances(e, esc));
   } catch (_) { /* events not set up yet */ }
+}
+
+// Under an event on the dashboard: each performance this family is in — a
+// solo one or a band (with its other members) — with its block and time, so
+// a band booked by the studio is visible to every member without opening
+// the event. Quiet on failure: the card still works without it.
+async function showMyPerformances(e, esc) {
+  try {
+    const { data, error } = await db.rpc('get_event_grid', { p_event: e.id });
+    const el = document.getElementById('evMine-' + e.id);
+    if (error || !data || !el) return;
+    const ev = data.event;
+    const many = (typeof myStudents !== 'undefined' ? myStudents : []).length > 1;
+    const mine = (data.bookings ?? []).filter(b => b.own);
+    el.innerHTML = mine.map(b => {
+      const band = !!b.band_name;
+      const names = band ? (b.members ?? []).map(m => m.name).filter(Boolean) : [];
+      const title = band
+        ? '🎸 <b>' + esc(b.band_name) + '</b> — ' + esc(b.piece)
+        : (many ? esc(b.student_name) + ' — ' : '') + '<b>' + esc(b.instrument) + '</b>: ' + esc(b.piece);
+      return '<div style="margin-top:.35rem;padding:.4rem .6rem;background:var(--off-white);border:1px solid var(--border);border-radius:var(--r-sm);font-size:.84rem;line-height:1.5;">'
+        + title
+        + (names.length ? '<br><span style="color:var(--dark-grey)">Band: ' + names.map(esc).join(', ') + '</span>' : '')
+        + '<br><span style="color:var(--dark-grey)">Block ' + b.block + ' · ' + PFEvents.blockTimes(ev, b.block)
+        + ' · about ' + PFEvents.clock(PFEvents.slotMinute(ev, b.block, b.position)) + '</span></div>';
+    }).join('');
+  } catch (_) { /* optional detail */ }
 }
 
 // Only shown where there is more than one — a single child needs no

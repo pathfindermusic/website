@@ -28,6 +28,8 @@
 //   teacher_date  { teacherId, date }
 //   students      { studentIds: [] }
 //   occurrence    { occurrenceId }   (used by automatic emails)
+//   Any student mode may also carry { notBookedEventId } — students with a
+//   booked performance at that event are left out (concert reminders).
 //   teachers      { studioIds? }     (active teachers; no studioIds = all of them.
 //                                     Placeholders: {{first_name}} / {{student_name}} are
 //                                     the TEACHER's name; {{portal_link}} is not offered.)
@@ -249,8 +251,47 @@ exports.handler = async (event) => {
     }
 
     studentIds = [...new Set(studentIds.filter(Boolean))];
+
+    // Optional narrowing for any student audience: leave out everyone who
+    // already has a booked performance at the named event, so a reminder
+    // reaches only those who still have to book. A cancelled booking does
+    // not count — that student has not got a spot, so they are reminded.
+    let alreadyBooked = 0;
+    if (body.notBookedEventId && mode !== 'teachers') {
+      const evId = String(body.notBookedEventId);
+      if (!/^[0-9a-f-]{36}$/i.test(evId)) return json(400, { error: 'Invalid event.' });
+      const evRows = await get(`events?id=eq.${evId}&select=name`);
+      if (!evRows?.[0]) return json(400, { error: 'That event was not found.' });
+      const booked = new Set();
+      for (let from = 0; ; from += 1000) {
+        const page = await get(
+          `event_bookings?event_id=eq.${evId}&status=eq.booked&select=student_id&order=id&limit=1000&offset=${from}`);
+        page.forEach(r => booked.add(r.student_id));
+        if (page.length < 1000) break;
+      }
+      // Members of a band performance count as booked too (events-bands.sql).
+      // Tolerant: before that script is run the table does not exist.
+      try {
+        for (let from = 0; ; from += 1000) {
+          const page = await get(
+            `event_booking_members?select=student_id,event_bookings!inner(id)` +
+            `&event_bookings.event_id=eq.${evId}&event_bookings.status=eq.booked&order=student_id&limit=1000&offset=${from}`);
+          page.forEach(r => booked.add(r.student_id));
+          if (page.length < 1000) break;
+        }
+      } catch (_) { /* no band table yet */ }
+      const before = studentIds.length;
+      studentIds = studentIds.filter(id => !booked.has(id));
+      alreadyBooked = before - studentIds.length;
+      audienceLabel = `${audienceLabel ?? 'Students'} — not yet booked for ${evRows[0].name}`;
+    }
+
     if (mode === 'teachers' ? teacherRows.length === 0 : studentIds.length === 0) {
-      return json(200, { count: 0, recipients: [], message: mode === 'teachers' ? 'No matching teachers found.' : 'No matching students found.' });
+      return json(200, {
+        count: 0, recipients: [], alreadyBooked,
+        message: mode === 'teachers' ? 'No matching teachers found.'
+               : (alreadyBooked > 0 ? `Everyone in this audience (${alreadyBooked}) has already booked a performance.` : 'No matching students found.'),
+      });
     }
 
     // ============================================================
@@ -390,6 +431,7 @@ exports.handler = async (event) => {
         invalidNames: body.full ? invalidAddresses : invalidAddresses.slice(0, SAMPLE),
         audienceLabel,
         audience: mode === 'teachers' ? 'teachers' : 'students',
+        alreadyBooked,
         bcc,
       });
     }

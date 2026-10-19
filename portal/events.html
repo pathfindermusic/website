@@ -157,7 +157,9 @@
     <div class="modal-body">
       <div style="font-size:.86rem;color:var(--dark-grey);margin-bottom:.7rem">Who should be invited? Each audience gets its own wording, which you can review and edit before anything is sent.</div>
       <label class="ev-inv-opt"><input type="radio" name="invWho" value="students" checked>
-        <div><b>Students</b><span>Asks them to book a performance.</span></div></label>
+        <div><b>Students — everyone</b><span>Asks every student to book a performance.</span></div></label>
+      <label class="ev-inv-opt"><input type="radio" name="invWho" value="unbooked">
+        <div><b>Students — only those who have not booked yet</b><span>A reminder. Leaves out anyone who already has a performance booked at this event; the list is checked when you send, so you can use it every week until bookings close.</span></div></label>
       <label class="ev-inv-opt"><input type="radio" name="invWho" value="teachers">
         <div><b>Teachers</b><span>Tells them their students are invited, and that they will see their students' performances, who wants them to accompany, and any backing-track tasks.</span></div></label>
       <label class="ev-inv-opt"><input type="radio" name="invWho" value="both">
@@ -288,6 +290,37 @@
       </div>
     </div>
     <div class="modal-footer" id="detailFooter"></div>
+  </div>
+</div>
+
+<!-- ============ MODAL: band performance (admin) ============ -->
+<div class="modal-overlay hidden" id="bandModal">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <div class="modal-title" id="bandModalTitle">Band performance</div>
+      <button class="modal-close" onclick="closeModal('bandModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-hint" id="bandSlotNote" style="margin-bottom:.8rem"></div>
+      <div class="form-row" style="margin-bottom:.8rem">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Band name *</label>
+          <input class="form-input" id="bandName" maxlength="80" placeholder="e.g. The Rockers">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Piece</label>
+          <input class="form-input" id="bandPiece" maxlength="120">
+        </div>
+      </div>
+      <label class="form-label">Band members</label>
+      <div id="bandMembers" style="border:1px solid var(--border);border-radius:var(--r-sm);padding:.3rem .6rem;max-height:260px;overflow:auto"></div>
+      <div style="display:flex;gap:.5rem;margin-top:.6rem;align-items:center">
+        <select class="form-select" id="bandAddSel" style="flex:1"></select>
+        <button class="btn btn-secondary btn-sm" type="button" onclick="bandAddStudent()">＋ Add student</button>
+      </div>
+      <div class="form-hint" id="bandSummary" style="margin-top:.7rem"></div>
+    </div>
+    <div class="modal-footer" id="bandFooter"></div>
   </div>
 </div>
 
@@ -649,7 +682,7 @@ function renderRunOrder() {
     rows.push(`<tr class="${b.accompany ? 'acc' : b.own ? 'own' : ''}">
       <td>~${PF.clock(PF.slotMinute(ev, b.block, b.position))}</td>
       <td>#${b.position}</td>
-      <td><b>${PF.esc(b.student_name)}</b></td>
+      <td><b>${PF.esc(b.student_name)}</b>${b.band_name ? `<div style="color:var(--mid-grey);font-size:.74rem">${PF.esc(PF.bandLine(b))}</div>` : ''}</td>
       <td>${PF.esc(b.instrument)}</td>
       <td>${PF.esc(b.piece)}</td>
       <td>${PF.esc(acc)}</td>
@@ -719,7 +752,32 @@ If a student chooses a backing track with you as their teacher, a task is added 
 
 Thank you for supporting your students!`,
   };
-  return { students, teachers };
+  // Reminder: only students with no booked performance. The Notifications
+  // page applies the filter (notBookedEventId) and shows the head-count.
+  const closes = ev.booking_deadline ? PF.fmtDate(ev.booking_deadline) : null;
+  const unbooked = {
+    audience: 'students',
+    notBookedEventId: ev.id,
+    subject: `Reminder: book your performance for ${ev.name}`,
+    studioId: ev.studio_id ?? null,
+    body:
+`Hi {{first_name}},
+
+A friendly reminder that **${ev.name}** is on ${when}${where ? ' at ' + where : ''}, and we have not yet seen a performance booked for you.${closes ? `\n\nBookings close on **${closes}**.` : ''}
+
+Would you like to perform? Book your spot here — sign in with your usual Portal login:
+
+[Book your performance](${url})
+
+If you have forgotten your password, choose **Forgot password?** on the sign-in page and we will email you a link to set a new one. If you still cannot get in, just reply to this email and we will sort it out.
+
+Choose up to three time blocks you would like, and the Portal will place you in the first one that still has room. You can change or cancel your booking at any time while bookings are open.
+
+If you have already decided not to perform this time, there is nothing you need to do — thank you for letting us know.
+
+We look forward to hearing you play!`,
+  };
+  return { students, unbooked, teachers };
 }
 
 function startInvitation() {
@@ -962,6 +1020,7 @@ function openDetailModal(b) {
   document.getElementById('detailBody').innerHTML = `
     <dt>Slot</dt><dd>Block ${b.block} · ${PF.blockTimes(ev, b.block)} · slot #${b.position} (about ${PF.clock(PF.slotMinute(ev, b.block, b.position))})</dd>
     <dt>Instrument</dt><dd>${PF.esc(b.instrument)}</dd>
+    ${b.band_name ? `<dt>Band members</dt><dd>${(b.members ?? []).length ? (b.members.map(m => PF.esc(m.name)).join(', ')) : PF.esc((b.member_count ?? 0) + ' members')}</dd>` : ''}
     <dt>Piece</dt><dd>${PF.esc(b.piece)}</dd>
     <dt>Teacher</dt><dd>${PF.esc(b.teacher_name ?? '—')}</dd>
     <dt>Accompaniment</dt><dd>${PF.esc(acc)}</dd>
@@ -971,6 +1030,7 @@ function openDetailModal(b) {
   document.getElementById('movePanel').classList.add('hidden');
   document.getElementById('detailFooter').innerHTML = isAdmin
     ? `<button class="btn btn-danger" onclick="cancelBooking()">Cancel this booking</button>
+       <button class="btn btn-secondary" onclick="openBandModal()">${b.band_name ? '🎸 Band members…' : '🎸 Make it a band…'}</button>
        <button class="btn btn-secondary" onclick="showMove()">Move…</button>
        <button class="btn btn-primary" onclick="editBooking()">Edit</button>`
     : `<button class="btn btn-ghost" onclick="closeModal('detailModal')">Close</button>`;
@@ -1012,6 +1072,152 @@ async function cancelBooking() {
   if (error) { showToast(PF.errorText(error), 'error'); return; }
   closeModal('detailModal');
   showToast('Booking cancelled.');
+  await loadGrid();
+}
+
+// ============================================================
+// BAND PERFORMANCES (admin)
+// One booking = one slot, with several member students. Opened from a
+// booking's details: THAT booking's slot is the one the band keeps. The
+// other members' individual "Band" bookings for this event are cancelled
+// when you save (their slots become free).
+// ============================================================
+let bandCtx = null;   // { booking, rows: Map(studentId -> {id,name,tags,solo,checked,lead}) }
+
+const isBandInstrument = x => String(x ?? '').trim().toLowerCase() === 'band';
+
+// Students enrolled in an active Band group lesson with this student
+async function bandLessonMates(studentId) {
+  try {
+    const { data: mine } = await db.from('lesson_students').select('lesson_id')
+      .eq('student_id', studentId).is('added_for_occurrence_id', null);
+    const ids = [...new Set((mine ?? []).map(r => r.lesson_id))];
+    if (!ids.length) return [];
+    const { data: ls } = await db.from('lessons').select('id').in('id', ids).eq('status', 'active').eq('instrument', 'Band');
+    const bandIds = (ls ?? []).map(l => l.id);
+    if (!bandIds.length) return [];
+    const { data: all } = await db.from('lesson_students').select('student_id')
+      .in('lesson_id', bandIds).is('added_for_occurrence_id', null);
+    return [...new Set((all ?? []).map(r => r.student_id))].filter(x => x !== studentId);
+  } catch (_) { return []; }
+}
+
+async function openBandModal() {
+  const b = activeBooking;
+  if (!b) return;
+  const ev = grid.event;
+  closeModal('detailModal');
+  const choices = await loadStudentChoices();
+  const nameOf = new Map(choices.map(s => [s.id, s.name]));
+  const soloBand = new Map(grid.bookings
+    .filter(x => x.id !== b.id && !x.band_name && isBandInstrument(x.instrument))
+    .map(x => [x.student_id, x]));
+  const mates = await bandLessonMates(b.student_id);
+  const current = new Map((b.members ?? []).map(m => [m.student_id, m.name]));
+
+  // Someone already in a DIFFERENT band at this event cannot be offered here
+  const inOtherBand = new Set(grid.bookings.filter(x => x.id !== b.id && x.band_name)
+    .flatMap(x => (x.members ?? []).map(m => m.student_id)));
+
+  const rows = new Map();
+  const add = (id, name, tag, checked) => {
+    if (!id || rows.has(id) || inOtherBand.has(id)) return;
+    const solo = soloBand.get(id);
+    rows.set(id, { id, name: name || nameOf.get(id) || 'Student', tags: [tag].filter(Boolean),
+      solo: solo ?? null, checked, lead: id === b.student_id });
+  };
+  add(b.student_id, nameOf.get(b.student_id) ?? (b.band_name ? (b.members ?? [])[0]?.name : b.student_name), 'keeps this slot', true);
+  current.forEach((n, id) => add(id, n, 'current member', true));
+  // A lesson mate who already booked Band solo is almost certainly in the band
+  mates.forEach(id => add(id, nameOf.get(id), 'same Band lesson', !!soloBand.get(id)));
+  soloBand.forEach((x, id) => add(id, nameOf.get(id) ?? x.student_name, 'individual Band booking', false));
+  rows.forEach(r => { if (r.solo && !r.lead) r.tags.push('Block ' + r.solo.block + ' #' + r.solo.position); });
+
+  bandCtx = { booking: b, rows, nameOf, choices };
+  document.getElementById('bandModalTitle').textContent = b.band_name ? 'Band members' : 'Make it a band performance';
+  document.getElementById('bandSlotNote').textContent =
+    `The band keeps this slot: Block ${b.block} · ${PF.blockTimes(ev, b.block)} · slot #${b.position}. To keep a different member's slot, open that member's booking instead.`;
+  document.getElementById('bandName').value = b.band_name ?? '';
+  document.getElementById('bandPiece').value = b.piece ?? '';
+  document.getElementById('bandFooter').innerHTML =
+    `${b.band_name ? '<button class="btn btn-danger" onclick="dissolveBand()">Split back to solo</button>' : ''}
+     <button class="btn btn-ghost" onclick="closeModal(\'bandModal\')">Cancel</button>
+     <button class="btn btn-primary" id="bandSaveBtn" onclick="saveBand()">Save band</button>`;
+  renderBandMembers();
+  openModal('bandModal');
+}
+
+function renderBandMembers() {
+  const { rows, nameOf, choices, booking } = bandCtx;
+  const ev = grid.event;
+  document.getElementById('bandMembers').innerHTML = [...rows.values()].map(r => `
+    <label style="display:flex;gap:.5rem;align-items:flex-start;padding:.35rem 0;border-bottom:1px solid var(--border);cursor:${r.lead ? 'default' : 'pointer'}">
+      <input type="checkbox" data-id="${PF.esc(r.id)}" ${r.checked ? 'checked' : ''} ${r.lead ? 'disabled' : ''} onchange="bandToggle(this)" style="accent-color:var(--orange);margin-top:.2rem">
+      <span><b>${PF.esc(r.name)}</b>${r.tags.length ? ` <span style="color:var(--mid-grey);font-size:.76rem">· ${r.tags.map(PF.esc).join(' · ')}</span>` : ''}</span>
+    </label>`).join('');
+  const taken = new Set(rows.keys());
+  const memberOfOther = new Set(grid.bookings.filter(x => x.id !== booking.id && x.band_name)
+    .flatMap(x => (x.members ?? []).map(m => m.student_id)));
+  document.getElementById('bandAddSel').innerHTML = '<option value="">— Add another student —</option>' +
+    choices.filter(s => !taken.has(s.id) && !memberOfOther.has(s.id))
+      .map(s => `<option value="${PF.esc(s.id)}">${PF.esc(s.name)}</option>`).join('');
+  updateBandSummary();
+}
+
+function bandToggle(box) {
+  const r = bandCtx.rows.get(box.dataset.id);
+  if (r) r.checked = box.checked;
+  updateBandSummary();
+}
+
+function bandAddStudent() {
+  const sel = document.getElementById('bandAddSel');
+  const id = sel.value;
+  if (!id) return;
+  const solo = grid.bookings.find(x => x.student_id === id && !x.band_name && isBandInstrument(x.instrument) && x.id !== bandCtx.booking.id);
+  bandCtx.rows.set(id, { id, name: bandCtx.nameOf.get(id) ?? 'Student', tags: ['added'], solo: solo ?? null, checked: true, lead: false });
+  renderBandMembers();
+}
+
+function bandChosen() { return [...bandCtx.rows.values()].filter(r => r.checked); }
+
+function updateBandSummary() {
+  const chosen = bandChosen();
+  const gone = chosen.filter(r => r.solo && !r.lead);
+  document.getElementById('bandSummary').innerHTML =
+    `<b>${chosen.length}</b> member${chosen.length === 1 ? '' : 's'} selected.` +
+    (gone.length ? ` Saving cancels ${gone.length} individual Band booking${gone.length === 1 ? '' : 's'} (${gone.map(r => PF.esc(r.name)).join(', ')}) and frees ${gone.length === 1 ? 'that slot' : 'those slots'}.` : '') +
+    ` Every member sees the band performance on their own Portal dashboard; other students see only the band name.`;
+}
+
+async function saveBand() {
+  const name = document.getElementById('bandName').value.trim();
+  const piece = document.getElementById('bandPiece').value.trim();
+  const chosen = bandChosen();
+  if (!name) { showToast('Please enter the band name.', 'warning'); return; }
+  if (chosen.length < 2) { showToast('Tick at least one other band member.', 'warning'); return; }
+  const gone = chosen.filter(r => r.solo && !r.lead);
+  if (gone.length && !confirm(`This cancels ${gone.length} individual Band booking${gone.length === 1 ? '' : 's'} (${gone.map(r => r.name).join(', ')}). Continue?`)) return;
+  const btn = document.getElementById('bandSaveBtn');
+  btn.disabled = true;
+  const { data, error } = await db.rpc('combine_event_bookings', {
+    p_booking: bandCtx.booking.id,
+    p_members: chosen.filter(r => !r.lead).map(r => r.id),
+    p_band_name: name, p_piece: piece || null,
+  });
+  btn.disabled = false;
+  if (error) { showToast(PF.errorText(error), 'error'); return; }
+  closeModal('bandModal');
+  showToast(`Band saved — ${data?.members ?? chosen.length} members` + (data?.cancelled ? `, ${data.cancelled} individual booking${data.cancelled === 1 ? '' : 's'} cancelled.` : '.'));
+  await loadGrid();
+}
+
+async function dissolveBand() {
+  if (!confirm('Turn this back into a solo performance for the lead student? The other members\' individual bookings are not brought back — they can book again themselves.')) return;
+  const { error } = await db.rpc('dissolve_event_band', { p_booking: bandCtx.booking.id });
+  if (error) { showToast(PF.errorText(error), 'error'); return; }
+  closeModal('bandModal');
+  showToast('Band split back to a solo performance.');
   await loadGrid();
 }
 

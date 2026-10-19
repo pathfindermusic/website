@@ -328,13 +328,18 @@ function render() {
         const acc = b.accompaniment === 'peer' ? 'with ' + PF.esc(b.accompanist_name ?? 'a peer')
           : b.accompaniment === 'teacher' ? 'with ' + (b.teacher_name ? PF.esc(b.teacher_name) : 'my teacher')
           : b.accompaniment === 'backing_track' ? 'with a backing track' : 'unaccompanied';
+        const band = !!b.band_name;
+        const bandNames = band ? (b.members ?? []).map(m => m.name).filter(Boolean) : [];
         return `<div class="eb-mine">
           <div class="eb-mine-main">
             <div class="eb-mine-slot">Block ${b.block} · ${PF.blockTimes(ev, b.block)} · slot #${b.position} (about ${PF.clock(PF.slotMinute(ev, b.block, b.position))})</div>
-            <b>${multi ? PF.esc(b.student_name) + ' — ' : ''}${PF.esc(b.instrument)}: ${PF.esc(b.piece)}</b>
+            <b>${band ? '🎸 ' + PF.esc(b.band_name) + ': ' + PF.esc(b.piece)
+                      : (multi ? PF.esc(b.student_name) + ' — ' : '') + PF.esc(b.instrument) + ': ' + PF.esc(b.piece)}</b>
+            ${band && bandNames.length ? `<div style="color:var(--dark-grey)">Band: ${bandNames.map(PF.esc).join(', ')}</div>` : ''}
             <div style="color:var(--dark-grey)">${acc}${b.teacher_name && b.accompaniment !== 'teacher' ? ' · teacher ' + PF.esc(b.teacher_name) : ''}</div>
+            ${band ? '<div class="form-hint" style="margin-top:.25rem">The studio booked this band performance for all band members. To change or cancel it, please contact the studio.</div>' : ''}
           </div>
-          ${open ? `<button class="btn btn-secondary btn-sm" onclick="openForm('${b.id}')">Edit</button>
+          ${open && !band ? `<button class="btn btn-secondary btn-sm" onclick="openForm('${b.id}')">Edit</button>
                     <button class="btn btn-danger btn-sm" onclick="cancelMine('${b.id}')">Cancel booking</button>` : ''}
         </div>`;
       }).join('')
@@ -354,8 +359,8 @@ function render() {
   }
 
   PF.renderGrid(document.getElementById('eGrid'), grid, {
-    onFilled: b => { if (open && b.own) openForm(b.id); },
-    canClick: b => open && b.own,
+    onFilled: b => { if (open && b.own && !b.band_name) openForm(b.id); },
+    canClick: b => open && b.own && !b.band_name,
     mineLabel: 'You',
   });
 }

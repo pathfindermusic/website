@@ -864,7 +864,13 @@ function computeTimeSlots(occurrences) {
   // allowed to stretch the visible range for the whole day — that's
   // what was pulling the grid open to 5am on 10 Sep 2026 for a studio
   // whose only lesson that day was at 4:30pm.
-  const activeOccs = (occurrences ?? []).filter(o => o.status !== 'cancelled');
+  // …but when EVERY lesson that day is cancelled (a public holiday, a
+  // studio closure) there is nothing else to centre the grid on, so size it
+  // from the cancelled lessons instead of falling back to 8am-9pm and
+  // leaving them scattered down the afternoon (reported Oct 2026).
+  const all = (occurrences ?? []).filter(o => o.lessons?.start_time);
+  const live = all.filter(o => o.status !== 'cancelled');
+  const activeOccs = live.length ? live : all;
   if (activeOccs.length === 0) return ALL_TIME_SLOTS;
 
   // Find earliest start and latest end across all lessons
@@ -1897,15 +1903,19 @@ async function loadDailyView() {
 
           if (live.length === 0) {
             // Nothing live sits here — just a history of one or more
-            // cancellations at this slot. There's no real duration being
-            // misrepresented, so keep the simple compact stacked list.
+            // cancellations at this slot, kept as a compact stacked list.
+            // Each block shares out the cell's height in proportion to its
+            // lesson length, so a single cancelled 1-hour lesson fills its
+            // whole hour instead of shrinking to a 30-minute-looking strip
+            // (reported Oct 2026); several stacked ones still never get
+            // less than their own text needs.
             cellBody = `<div style="height:100%;display:flex;flex-direction:column;gap:2px;
                         padding:2px 0;overflow:hidden;box-sizing:border-box;">
               ${cancelled.map(o =>
                 `<div class="lesson-block cancelled"
                    onclick="event.stopPropagation();openOccurrenceModal('${o.id}')"
                    title="Cancelled — click to view"
-                   style="cursor:pointer;padding:0 4px;flex:0 0 auto;
+                   style="cursor:pointer;padding:0 4px;flex:${o.lessons?.duration_mins ?? 30} 0 auto;
                           min-height:0;line-height:1.35;overflow:hidden;">
                    <div style="display:flex;align-items:center;gap:3px;overflow:hidden;">
                      <span style="font-size:0.62rem;">✕</span>

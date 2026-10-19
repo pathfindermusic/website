@@ -111,7 +111,10 @@
   /** Database error codes -> sentences a parent can act on */
   PF.errorText = raw => {
     const code = String(raw?.message ?? raw ?? '').split(':')[0].trim();
+    const detail = String(raw?.message ?? raw ?? '').split(':').slice(1).join(':').trim();   // e.g. a student's name
     return ({
+      member_inactive:  `${detail || 'A band member'} is not an Active or Trial student, so cannot be added to a band performance. Untick them (or fix their status on the Students page) and save again.`,
+      member_studio:    `${detail || 'A band member'} belongs to a different studio from this event (or one outside your studios), so cannot be added. Untick them and save again.`,
       none_available:   'Sorry — every block you chose has just filled up. Please choose different blocks (the list has been refreshed).',
       event_closed:     'Bookings for this event are closed. Please contact the studio.',
       deadline_passed:  'The booking deadline has passed. Please contact the studio.',
@@ -123,6 +126,9 @@
       not_found:        'That booking no longer exists.',
       slot_taken:       'That slot is already taken.',
       bad_slot:         'That slot does not exist in this event.',
+      band_locked:      'This is a band performance, so only the studio can change or cancel it. Please contact the studio.',
+      band_members:     'A band needs at least two members.',
+      already_in_band:  `${detail || 'One of those students'} is already in a different band performance for this event.`,
       layout_conflict:  'Some performances are already booked outside the new blocks or slots. Move or cancel them first, then change the layout.',
     })[code] ?? (String(raw?.message ?? raw ?? 'Something went wrong.'));
   };
@@ -225,6 +231,13 @@
     d.head.appendChild(st);
   };
 
+  /** "🎸 Una, Dee, Tre" for a band the viewer may see in full, "🎸 4 members" otherwise; '' for a solo performance */
+  PF.bandLine = b => {
+    if (!b || !b.band_name) return '';
+    const names = (b.members ?? []).map(m => String(m.name || '').split(' ')[0]).filter(Boolean);
+    return '🎸 ' + (names.length ? names.join(', ') : (b.member_count ?? 0) + ' members');
+  };
+
   // ---------- the grid ----------
   /**
    * Draws the blocks and slots.
@@ -237,7 +250,7 @@
     opts = opts || {};
     const ev = data.event;
     const sig = JSON.stringify([ev.id, ev.status, ev.block_minutes, ev.slots_per_block, ev.start_time, ev.end_time, !!opts.clickEmpty, !!opts.teacherView,
-      (data.bookings ?? []).map(b => [b.id, b.block, b.position, b.student_name, b.instrument, b.piece, b.accompaniment, b.own, b.detail, b.accompanist_name, b.teacher_name, b.notes, b.accompany])]);
+      (data.bookings ?? []).map(b => [b.id, b.block, b.position, b.student_name, b.instrument, b.piece, b.accompaniment, b.own, b.detail, b.accompanist_name, b.teacher_name, b.notes, b.accompany, b.band_name, b.member_count, (b.members ?? []).map(m => m.name)])]);
     if (container._evSig === sig) return false;
     container._evSig = sig;
 
@@ -273,6 +286,7 @@
             <span class="ev-slot-no">#${b.position} · ~${t}</span>
             <span class="ev-slot-name">${PF.esc(b.student_name)}</span>
             <span class="ev-slot-what">${PF.esc(b.instrument)} — ${PF.esc(b.piece)}</span>
+            ${b.band_name ? `<span class="ev-slot-acc">${PF.esc(PF.bandLine(b))}</span>` : ''}
             ${accTxt ? `<span class="ev-slot-acc">${accTxt}</span>` : ''}
             ${b.accompany ? '<span class="ev-slot-tag">♪ You accompany</span>' : ''}
           </${end}>`;
@@ -321,6 +335,7 @@
             ${b.own && !opts.hideMine ? '<span class="ev-slot-me">' + (opts.mineLabel ?? 'You') + '</span>' : ''}
             <span class="ev-slot-name">${PF.esc(b.student_name)}</span>
             <span class="ev-slot-what">${PF.esc(b.instrument)} — ${PF.esc(b.piece)}</span>
+            ${b.band_name ? `<span class="ev-slot-acc">${PF.esc(PF.bandLine(b))}</span>` : ''}
             ${acc ? `<span class="ev-slot-acc">${acc}</span>` : ''}
           </${end}>`;
         } else if (opts.clickEmpty && opts.onEmpty) {
@@ -472,7 +487,7 @@
     const norm = x => String(x ?? '').trim().toLowerCase();
     const takenInstruments = () => {
       const sid = $('student').value;
-      return new Set(bookings.filter(b => b.student_id === sid && (!ex || b.id !== ex.id)).map(b => norm(b.instrument)));
+      return new Set(bookings.filter(b => (b.student_id === sid || (b.members ?? []).some(m => m.student_id === sid)) && (!ex || b.id !== ex.id)).map(b => norm(b.instrument)));
     };
     const withBand = list => list.some(i => norm(i) === 'band') ? list : list.concat(['Band']);
     const markTaken = () => {

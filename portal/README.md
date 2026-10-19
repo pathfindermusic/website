@@ -529,6 +529,16 @@ option until this was added. Active only, not trial, matching what
 - **Clearing the student filter returns to the view you came from (16 Oct 2026).** Picking a student jumps to Monthly; clearing them used to leave you on Monthly for everyone, the slowest view. `onStudentFilter()` now remembers the view in use (`viewBeforeStudent`) and `switchView(view, auto)` returns to it when the student is cleared — normally Daily, which loads one day rather than a month. Clicking a Daily/Weekly/Monthly button yourself forgets the way back, so choosing Monthly deliberately keeps you on Monthly. The "show everyone" link uses the same path.
 - **"Still to mark" ignores lessons before 1 Oct 2026 (18 Oct 2026).** The portal went live later than planned, so lessons from September were never marked here and showed as a standing backlog in the Sunday email (`netlify/functions/attendance-marking-report.js`, `MARKING_START`) and in the Unmarked counts on the admin dashboard, teacher dashboard and teacher page (`ATTENDANCE_MARKING_START` in `js/supabase-client.js`). Nothing was hard-coded before — the queries simply counted every ended, unmarked lesson up to today. To move the date, change both constants. The Attendance Report page is unaffected (it has its own date range).
 - **Tasks show whether "About" is a Student, Teacher or Enquiry (19 Oct 2026).** Reported: overdue "Record a lesson for…" tasks were visible to admins but not to the teacher they were meant for. The person is both a student and a teacher, and the tasks had been created about her *student* record; a teacher's My Tasks only lists tasks whose About is their own *teacher* record (`tasks_teacher_read`: `subject_type = 'teacher' AND subject_id = get_my_teacher_id()`), and the list showed the same name for both. Fixed the data by hand (tasks re-pointed with SQL; no recurring rule was involved). `tasks.html` now adds a small Student / Teacher / Enquiry tag beside the About name in the admin list, and the About dropdown options read `Name (student)`, `Name (teacher)` or `Name (enquiry)` so the closed dropdown is unambiguous. Teachers' own view is unchanged. Remember: an assignee is always an admin; a task only reaches a teacher through its About.
+- **A cancelled 1-hour lesson fills its hour on the daily grid (20 Oct 2026).** When every lesson in a slot was cancelled, `loadDailyView()` drew the cancelled blocks at their text height (about 30 minutes) inside a 2-row cell. They now share the cell's height in proportion to their lesson length (`flex: <duration_mins> 0 auto`), so a lone cancelled 60-minute lesson fills the full hour and a lone 30-minute one fills its half hour; several stacked cancellations still never get less than their text needs. The weekly teacher grid and any slot containing a live lesson already placed cancelled blocks at their true length.
+- **A day where every lesson is cancelled still centres the grid on those
+  lessons (Oct 2026).** `computeTimeSlots()` deliberately ignores cancelled
+  lessons when sizing the rows (a stray cancelled one-off once pulled the grid
+  open to 5am), but with nothing left it fell back to the full 8am-9pm range,
+  so a public holiday showed an empty morning and the cancelled lessons far
+  down the page. When no live lesson remains it now sizes from the cancelled
+  ones; any live lesson still takes priority. Applies to the daily grid
+  (per studio) and the teacher/weekly grid. Teacher availability still widens
+  the rows as before, within 8am-9pm.
 - **Online lessons get a violet camera badge, not a colour change (Sep
   2026).** `is_online` used to be invisible on the Daily grid and Monthly
   view entirely — the only place it showed at all was a small "Online" text
@@ -2103,6 +2113,53 @@ shared code in `js/events-common.js`; database in `supabase/events.sql`.
   have no caller check at all.
   **Deploy order:** run `events-teachers.sql`, then `events-teachers-fix1.sql`
   (each one statement at a time in the Supabase SQL editor), then `git push`.
+- **Reminder to students who have not booked yet (Oct 2026).** The Send
+  invitation chooser now has **Students — only those who have not booked yet**
+  next to **Students — everyone** (the old behaviour, unchanged). It drafts a
+  reminder (`invitationDrafts().unbooked` in `events.html`; mentions the booking
+  deadline when one is set) and hands Notifications `notBookedEventId`.
+  Notifications ticks a new filter, **Only students who have not yet booked a
+  performance** + an event picker (upcoming, not-closed events), available under
+  *All active students* and *All students at one or more studios*; it can also
+  be ticked by hand for any message. `send-email.js` accepts
+  `notBookedEventId` on any student mode and drops every student with a
+  `status = 'booked'` row in `event_bookings` for that event — cancelled
+  bookings do not count, so those students are reminded. The check runs at
+  preview/send time, so the same drafted reminder can be re-sent each week and
+  always reaches only the people still outstanding. The preview says how many
+  were left out ("— 12 already booked, left out") and the studio summary
+  email's audience line reads "… — not yet booked for <event>". Bookings are
+  per student (not per login), so siblings sharing a login are judged
+  individually. Sending is still manual — there is no scheduled weekly job.
+  No SQL; deploy is just `git push`.
+- **Band (group) performances (Oct 2026).** A band used to be several students
+  each booking "Band" on their own — separate slots, nothing linking them.
+  `events-bands.sql` (migration #46, run each STEP one statement at a time, then
+  `git push`) adds `event_bookings.band_name` and `event_booking_members`: ONE
+  booking, one slot, a list of member students (the booking's `student_id` is
+  the lead and is also a member). **Admin tool:** open a booking's details on
+  `events.html` → **🎸 Make it a band…** (or **Band members…** on an existing
+  band). Name, piece and members are chosen in a dialog; members are suggested
+  from the lead's active **Band** group lesson (`lesson_students`), pre-ticked
+  when they already booked "Band" solo; any student can be added. Saving calls
+  `combine_event_bookings()`: the band **keeps the opened booking's slot** and
+  every other member's individual *Band* booking for that event is **cancelled**
+  (slots freed). Re-open to change the members. **Split back to solo** calls
+  `dissolve_event_band()` (the cancelled bookings are not restored). A member
+  already in a different band at the event is refused (`already_in_band`).
+  **Visibility:** `get_event_grid()` marks a band `own`/`detail` for EVERY
+  member's family and for every member's teacher; `student_name` is the band
+  name for everyone, but `members` (full names) only goes to those with `detail`
+  — other students see "🎸 N members". The booking page (`event-book.html`)
+  lists the band under "My performances" with its members and no Edit/Cancel
+  (a trigger, `_event_band_guard`, also refuses `band_locked` for families; a
+  member cannot book a second solo "Band" either). The **student dashboard**
+  event card now lists each of the family's performances (solo or band) with
+  block and approximate time, and stays visible after the booking deadline
+  while the family has a performance there ("View" instead of "Book now").
+  `list_events_for_me().my_count`, the teacher summary and the "not booked yet"
+  reminder filter in `send-email.js` all count band membership. Not built: members
+  self-organising a band, or editing a band themselves — the studio does it.
 - **Not built (ideas):** automatic emailing of a confirmation when a booking is
   made; waiting list when a block is full; per-event "accompanist/venue
   equipment" fields; exporting the running order to PDF/CSV (use Print for now).

@@ -394,6 +394,7 @@ const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','
 let currentProfile = null;
 let allStudios     = [];
 let allTeachers    = [];
+let allEvents      = [];   // upcoming events, for the "not yet booked" filter
 let lastPreview    = null;
 
 (async () => {
@@ -408,7 +409,7 @@ let lastPreview    = null;
   }
   if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
 
-  await Promise.all([loadStudios(), loadTeachers()]);
+  await Promise.all([loadStudios(), loadTeachers(), loadEvents()]);
   onModeChange();
   applyPrefill();
 })();
@@ -433,7 +434,9 @@ function applyPrefill() {
     ? 'Student invitation drafted — send it, and the teacher version will follow.'
     : (first.audience === 'teachers'
         ? 'Teacher invitation drafted — check the recipients, then send.'
-        : 'Invitation drafted — check the recipients, then send.'));
+        : (first.notBookedEventId
+            ? 'Reminder drafted for students who have not booked yet — check the recipients, then send.'
+            : 'Invitation drafted — check the recipients, then send.')));
 }
 
 function applyDraft(p, message) {
@@ -447,6 +450,13 @@ function applyDraft(p, message) {
   } else {
     // students: every studio; teachers: none ticked = every active teacher
     document.querySelectorAll('.studio-check').forEach(c => { c.checked = !teachers; });
+  }
+  // A reminder to students who have not booked yet: tick the filter for that event.
+  const nb = document.getElementById('onlyNotBooked');
+  if (nb && p.notBookedEventId && allEvents.some(e => e.id === p.notBookedEventId)) {
+    nb.checked = true;
+    document.getElementById('notBookedEvent').value = p.notBookedEventId;
+    document.getElementById('notBookedEvent').disabled = false;
   }
   document.getElementById('subject').value  = p.subject ?? '';
   document.getElementById('bodyText').value = p.body ?? '';
@@ -468,6 +478,40 @@ async function loadStudios() {
   if (!allStudios.some(s => s.email)) {
     showToast('No studio has an email address set. Add one on the Studios page first.', 'warning');
   }
+}
+
+// Upcoming events, so a message to students can leave out those who have
+// already booked a performance (a reminder for the year-end concert).
+async function loadEvents() {
+  const { data } = await db.from('events')
+    .select('id,name,event_date,status')
+    .gte('event_date', toISODate(new Date()))
+    .neq('status', 'closed')
+    .order('event_date');
+  allEvents = data ?? [];
+}
+
+function notBookedBlock() {
+  if (!allEvents.length) return '';
+  const opts = allEvents.map(e => `<option value="${e.id}">${e.name} — ${fmtEventDate(e.event_date)}</option>`).join('');
+  return `<div id="notBookedBox" style="margin-top:0.9rem;padding-top:0.8rem;border-top:1px dashed var(--border);">
+      <label style="display:flex;align-items:flex-start;gap:0.45rem;font-size:0.84rem;cursor:pointer;">
+        <input type="checkbox" id="onlyNotBooked" onchange="onNotBookedToggle()" style="accent-color:var(--orange);margin-top:0.2rem;">
+        <span><b>Only students who have not yet booked a performance</b><br>
+          <span class="text-muted" style="font-size:0.78rem;">Leaves out anyone with a booked spot at the event below — for reminders. Untick to send to everyone selected above.</span></span>
+      </label>
+      <select class="form-select" id="notBookedEvent" onchange="refreshPreview()" disabled style="margin-top:0.5rem;max-width:420px;">${opts}</select>
+    </div>`;
+}
+
+function onNotBookedToggle() {
+  document.getElementById('notBookedEvent').disabled = !document.getElementById('onlyNotBooked').checked;
+  refreshPreview();
+}
+
+function fmtEventDate(d) {
+  const [y, m, dd] = String(d).split('-').map(Number);
+  return new Date(y, m - 1, dd).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 async function loadTeachers() {
@@ -511,11 +555,11 @@ function onModeChange() {
     box.innerHTML = `<div class="text-sm text-muted" style="line-height:1.6;">
       Every student whose status is Active, across every studio — no further selection needed.
       Click "Refresh recipients" to see the count.
-    </div>`;
+    </div>` + notBookedBlock();
 
   } else if (mode === 'studios') {
     box.innerHTML = `<div class="form-label" style="margin-bottom:0.5rem;">Select studios</div>
-      <div style="display:flex;flex-wrap:wrap;gap:0.85rem;">${studioChecks}</div>`;
+      <div style="display:flex;flex-wrap:wrap;gap:0.85rem;">${studioChecks}</div>` + notBookedBlock();
 
   } else if (mode === 'teachers') {
     box.innerHTML = `<div class="form-label" style="margin-bottom:0.5rem;">Limit to teachers at these studios (optional — leave all unticked for every active teacher)</div>
@@ -574,6 +618,11 @@ function buildSpec() {
   const spec = { mode };
   const checked = [...document.querySelectorAll('.studio-check:checked')].map(c => c.value);
 
+  if ((mode === 'all' || mode === 'studios') && document.getElementById('onlyNotBooked')?.checked) {
+    spec.notBookedEventId = document.getElementById('notBookedEvent')?.value;
+    if (!spec.notBookedEventId) return { error: 'Choose the event to check bookings for.' };
+  }
+
   if (mode === 'studios') {
     spec.studioIds = checked;
     if (checked.length === 0) return { error: 'Select at least one studio.' };
@@ -625,8 +674,11 @@ async function refreshPreview() {
 
     lastPreview = data;
     document.getElementById('recipientCount').textContent = data.count;
-    document.getElementById('recipientHint').textContent  =
-      (data.audience === 'teachers' ? 'teacher' : 'student') + (data.count === 1 ? ' will receive this' : 's will receive this');
+    document.getElementById('recipientHint').textContent =
+      (data.count === 0 && data.message)
+        ? data.message
+        : (data.audience === 'teachers' ? 'teacher' : 'student') + (data.count === 1 ? ' will receive this' : 's will receive this') +
+          (data.alreadyBooked > 0 ? ` — ${data.alreadyBooked} already booked, left out` : '');
 
     let listHtml = (data.recipients ?? [])
       .map(r => `<div class="recipient-row">
