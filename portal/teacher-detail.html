@@ -444,6 +444,7 @@ async function countUnmarked(teacherIdValue) {
   const { data } = await db.from('schedule_view')
     .select('date,start_time,duration_mins')
     .eq('teacher_id', teacherIdValue)
+    .gte('date', ATTENDANCE_MARKING_START)   // see supabase-client.js
     .lte('date', today)
     .neq('occurrence_status', 'cancelled')
     .eq('fully_marked', false);

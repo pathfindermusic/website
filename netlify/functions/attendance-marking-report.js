@@ -24,6 +24,11 @@ const SITE                 = 'https://www.pathfindermusiclessons.com.au';
 // Anything older than this is a backlog worth naming separately
 const STALE_DAYS = 14;
 
+// Lessons before this date are ignored: the portal went live late, so
+// earlier lessons were never marked here. Keep in step with
+// ATTENDANCE_MARKING_START in portal/js/supabase-client.js.
+const MARKING_START = '2026-10-01';
+
 exports.handler = async () => {
   const now = new Date();
   const today = fmtISO(now);
@@ -44,7 +49,7 @@ exports.handler = async () => {
     // filter is deliberately loose — whether a lesson has ENDED depends
     // on its start time and duration, which is worked out below.
     const rows = await get(
-      `schedule_view?date=lte.${today}` +
+      `schedule_view?date=gte.${MARKING_START}&date=lte.${today}` +
       `&occurrence_status=neq.cancelled` +
       `&fully_marked=is.false` +
       `&select=occurrence_id,date,start_time,duration_mins,instrument,` +

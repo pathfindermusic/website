@@ -1147,7 +1147,12 @@ function onInstrumentChange() {
 // ============================================================
 // VIEW SWITCHING
 // ============================================================
-function switchView(view) {
+// `auto` is true when the page switches view by itself (picking a student
+// jumps to Monthly, clearing them jumps back); a click on the Daily /
+// Weekly / Monthly buttons is a deliberate choice and forgets the way back.
+let viewBeforeStudent = null;
+function switchView(view, auto = false) {
+  if (!auto) viewBeforeStudent = null;
   currentView = view;
   document.getElementById('btnDaily').classList.toggle('active',   view === 'daily');
   document.getElementById('btnWeekly').classList.toggle('active',  view === 'weekly');
@@ -1233,7 +1238,20 @@ function onStudentFilter() {
   // A student and a teacher are two different lenses on the schedule —
   // picking one clears the other rather than combining them.
   if (sid) document.getElementById('filterTeacher').value = '';
-  if (sid && currentView !== 'monthly') { switchView('monthly'); return; }
+  if (sid && currentView !== 'monthly') {
+    viewBeforeStudent = currentView;        // remember where they were
+    switchView('monthly', true);
+    return;
+  }
+  // Student cleared: go back to the view they started from (usually Daily,
+  // which loads one day instead of a whole month) — unless they have
+  // chosen another view since.
+  if (!sid && viewBeforeStudent && currentView === 'monthly') {
+    const back = viewBeforeStudent;
+    viewBeforeStudent = null;
+    switchView(back, true);
+    return;
+  }
   loadView();
 }
 
@@ -1247,12 +1265,144 @@ function onTeacherFilter() {
 }
 
 // ============================================================
+// MONTHLY VIEW — loading without schedule_view
+//
+// schedule_view works out the roster, attendance and teacher for every
+// row it returns, which is fine for a handful of rows but is what timed
+// out ("canceling statement due to statement timeout") when the month
+// view asked it for EVERYONE for a whole month — reproducible by picking
+// a student, then going back to All students. The weekly view never
+// had the problem because it reads lesson_occurrences directly and
+// fills in the rest from small separate lookups. This does the same for
+// a month: week-sized slices of lesson_occurrences (in parallel), then
+// the rosters and attendance in id chunks (also in parallel), assembled
+// into the same row shape schedule_view returns so the renderer is
+// unchanged.
+//
+// Every lookup goes through lmPaged()/lmByIds(): Supabase silently stops
+// at 1000 rows per request and a very long .in() list can overflow the
+// URL, so lists are split into chunks of 80 and each chunk is paged.
+// ============================================================
+async function lmPaged(build) {
+  const rows = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await build().range(from, from + 999);
+    if (error) throw error;
+    rows.push(...(data ?? []));
+    if ((data ?? []).length < 1000) break;
+  }
+  return rows;
+}
+async function lmByIds(ids, build) {
+  const list = [...new Set((ids ?? []).filter(x => x != null))];
+  const chunks = [];
+  for (let i = 0; i < list.length; i += 80) chunks.push(list.slice(i, i + 80));
+  return (await Promise.all(chunks.map(c => lmPaged(() => build(c))))).flat();
+}
+
+async function monthRowsLight(first, last, { studioId, statusF, teacherId }) {
+  // Week-sized slices: each is the same size of query the weekly view runs.
+  const slices = [];
+  for (let s = new Date(first); s <= last; ) {
+    const e = new Date(s.getFullYear(), s.getMonth(), s.getDate() + 6);
+    const to = e > last ? last : e;
+    slices.push([toISODate(s), toISODate(to)]);
+    s = new Date(to.getFullYear(), to.getMonth(), to.getDate() + 1);
+  }
+
+  const occParts = await Promise.all(slices.map(([a, b]) => lmPaged(() => {
+    let q = db.from('lesson_occurrences')
+      .select(`id,date,status,is_online,is_makeup,substitute_teacher_id,substitute_name,
+               lessons(id,teacher_id,studio_id,instrument,start_time,lesson_type,status)`)
+      .gte('date', a).lte('date', b).order('date').order('id');
+    if (studioId) q = q.eq('lessons.studio_id', studioId);
+    if (teacherId) q = q.eq('lessons.teacher_id', teacherId);
+    if (statusF)  q = q.eq('status', statusF);
+    return q;
+  })));
+  // Filtering on a joined column gives a LEFT join — occurrences from
+  // other studios/teachers come back with lessons = null. Drop those.
+  const occs = occParts.flat().filter(o => o.lessons);
+  if (!occs.length) return [];
+
+  const lessonIds = occs.map(o => o.lessons.id);
+  const occIds    = occs.map(o => o.id);
+
+  const [lsRows, attRows] = await Promise.all([
+    lmByIds(lessonIds, c => db.from('lesson_students')
+      .select('id,lesson_id,student_id,added_for_occurrence_id').in('lesson_id', c).order('id')),
+    lmByIds(occIds, c => db.from('attendance')
+      .select('lesson_occurrence_id,student_id,status').in('lesson_occurrence_id', c)
+      .order('lesson_occurrence_id').order('student_id')),
+  ]);
+  const rosterMaps = splitRosterRows(lsRows);
+
+  // Names: the students already loaded for the filter list, plus a lookup
+  // for anyone not in it (e.g. an inactive student on an old lesson).
+  const nameById = {};
+  allStudents.forEach(s => {
+    const n = `${s.profile?.first_name ?? ''} ${s.profile?.last_name ?? ''}`.trim();
+    if (n) nameById[s.id] = n;
+  });
+  const missing = [...new Set(lsRows.map(r => r.student_id))].filter(id => !nameById[id]);
+  if (missing.length) {
+    const sRows = await lmByIds(missing, c => db.from('students')
+      .select('id,user_id,first_name,last_name').in('id', c).order('id'));
+    const noName = sRows.filter(s => !(s.first_name || s.last_name));
+    const pRows = noName.length
+      ? await lmByIds(noName.map(s => s.user_id), c => db.from('profiles')
+          .select('id,first_name,last_name').in('id', c).order('id'))
+      : [];
+    sRows.forEach(s => {
+      let n = `${s.first_name ?? ''} ${s.last_name ?? ''}`.trim();
+      if (!n) {
+        const p = pRows.find(p => p.id === s.user_id);
+        n = p ? `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() : '';
+      }
+      if (n) nameById[s.id] = n;
+    });
+  }
+
+  const attByOcc = {};
+  attRows.forEach(a => { (attByOcc[a.lesson_occurrence_id] ??= []).push(a); });
+
+  const teacherName = id => {
+    const t = allTeachers.find(t => t.id === id);
+    return t ? `${t.profile?.first_name ?? ''} ${t.profile?.last_name ?? ''}`.trim() : '';
+  };
+
+  const rows = occs.map(o => {
+    const l = o.lessons;
+    const ids = rosterFor(l.id, o.id, rosterMaps);
+    const names = ids.map(id => nameById[id]).filter(Boolean).sort((a, b) => a.localeCompare(b));
+    const marks = attByOcc[o.id] ?? [];
+    return {
+      occurrence_id: o.id, date: o.date, occurrence_status: o.status,
+      is_online: o.is_online, is_makeup: o.is_makeup,
+      lesson_id: l.id, studio_id: l.studio_id, instrument: l.instrument,
+      start_time: l.start_time, lesson_type: l.lesson_type, lesson_status: l.status,
+      student_count: ids.length,
+      student_name: names[0] ?? null,
+      attendance_marked_count: marks.length,
+      attendance_status: ids.length === 1 ? (marks[0]?.status ?? null) : null,
+      teacher_name: (o.substitute_name || '').trim()
+        || teacherName(o.substitute_teacher_id ?? l.teacher_id),
+    };
+  });
+  rows.sort((a, b) => String(a.date).localeCompare(String(b.date))
+                   || String(a.start_time).localeCompare(String(b.start_time)));
+  return rows;
+}
+
+// ============================================================
 // MONTHLY VIEW
 //
 // Most students have one lesson a week, so a month is the span that
 // shows the pattern — and whether any of it has been cancelled.
 // ============================================================
+let monthReq = 0;   // so a slow earlier load can't overwrite a newer one
 async function loadMonthlyView() {
+  const myReq = ++monthReq;
   const el = document.getElementById('viewContent');
   el.innerHTML = '<div class="loading"><div class="spinner"></div> Loading…</div>';
 
@@ -1279,7 +1429,7 @@ async function loadMonthlyView() {
   // Teacher filter: the view doesn't expose a teacher id, but it does
   // carry lesson_id, so match on that.
   let teacherLessons = null;
-  if (teacherId) {
+  if (teacherId && studentId) {
     const { data: tl, error: tErr } = await db.from('lessons').select('id').eq('teacher_id', teacherId);
     if (tErr) return fail(tErr.message);
     teacherLessons = new Set((tl ?? []).map(l => l.id));
@@ -1309,8 +1459,14 @@ async function loadMonthlyView() {
   }
 
   let data = [];
-  const nothingToShow = (studentId || teacherId) && !wantLessons.length && !wantOccurrences.length;
-  if (!nothingToShow) {
+  if (!studentId) {
+    // Everyone (optionally one studio / teacher / status): the light path
+    // — see monthRowsLight() for why schedule_view is avoided here.
+    try { data = await monthRowsLight(first, last, { studioId, statusF, teacherId }); }
+    catch (err) { if (myReq === monthReq) fail(err.message ?? String(err)); return; }
+  }
+  const nothingToShow = studentId && !wantLessons.length && !wantOccurrences.length;
+  if (studentId && !nothingToShow) {
     let q = db.from('schedule_view').select('*')   // includes is_makeup via the view
       .gte('date', toISODate(first)).lte('date', toISODate(last))
       .order('date').order('start_time');
@@ -1323,9 +1479,10 @@ async function loadMonthlyView() {
       q = q.or(parts.join(','));
     }
     const res = await q;
-    if (res.error) return fail(res.error.message);
+    if (res.error) { if (myReq === monthReq) fail(res.error.message); return; }
     data = res.data ?? [];
   }
+  if (myReq !== monthReq) return;   // a newer load has taken over
 
   let rows = data.filter(o =>
     o.lesson_status !== 'active' ? o.occurrence_status !== 'cancelled' : true);
@@ -4750,8 +4907,29 @@ async function editSeriesInner() {
 // lesson) and doubles as the note field — clear the text and
 // press Cancel to skip logging anything.
 // ============================================================
+// The note offered with a lesson credit now carries the date of the lesson
+// it is for ("Teacher unavailable on 14 Oct 2026") so the admin can just
+// press OK — the credit ledger is read months later, when "Teacher
+// unavailable" on its own says nothing about which lesson it was.
+// 'Sep' not 'Sept': toLocaleDateString('en-AU') gives "Sept".
+function creditNoteWithDate(defaultNote, reason, isoDate) {
+  const base = defaultNote ?? '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(isoDate ?? ''));
+  if (!m || !base) return base;
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const when = `${Number(m[3])} ${MON[Number(m[2]) - 1]} ${m[1]}`;
+  // Teacher unavailable ON the day; a student gave notice FOR the day
+  return `${base} ${reason === 'student_notice' ? 'for' : 'on'} ${when}`;
+}
+
 async function offerCreditMovements(occId, studentIds, reason, defaultNote) {
   if (!studentIds || !studentIds.length) return;
+
+  let lessonDate = allOccurrences.find(o => o.id === occId)?.date;
+  if (!lessonDate) {   // not on the current grid — ask the database
+    const { data: oRow } = await db.from('lesson_occurrences').select('date').eq('id', occId).maybeSingle();
+    lessonDate = oRow?.date;
+  }
 
   const names = studentIds.map(sid => {
     const s = allStudents.find(s => s.id === sid);
@@ -4760,7 +4938,7 @@ async function offerCreditMovements(occId, studentIds, reason, defaultNote) {
 
   const note = prompt(
     `Record a lesson credit for ${names}?\n\nAdd a note below, or clear the text and press Cancel to skip.`,
-    defaultNote ?? ''
+    creditNoteWithDate(defaultNote, reason, lessonDate)
   );
   if (note === null) return; // Cancel — no credit logged
 

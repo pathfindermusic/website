@@ -808,9 +808,12 @@ async function loadOptions() {
     `<option value="">Unassigned — studio queue</option>` +
     admins.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
 
-  const optGroup = (label, items, prefix) =>
+  // The closed dropdown shows only the selected option's text, not its
+  // group — so a student and a teacher with the same name (someone can
+  // be both) looked identical. Each option therefore carries its kind.
+  const optGroup = (label, items, prefix, kind) =>
     `<optgroup label="${label}">` + (items.length
-      ? items.map(x => `<option value="${prefix}:${x.id}">${x.name}</option>`).join('')
+      ? items.map(x => `<option value="${prefix}:${x.id}">${x.name} (${kind})</option>`).join('')
       : `<option value="" disabled>None available</option>`) + `</optgroup>`;
 
   const enrolled  = studentOpts.filter(s => ['active','trial','inactive'].includes(s.status));
@@ -818,9 +821,9 @@ async function loadOptions() {
 
   document.getElementById('tmSubject').innerHTML =
     `<option value="">Nothing in particular</option>` +
-    optGroup('Students', enrolled, 'student') +
-    (enquiries.length ? optGroup('Enquiries', enquiries, 'student') : '') +
-    optGroup('Teachers', teacherOpts, 'teacher');
+    optGroup('Students', enrolled, 'student', 'student') +
+    (enquiries.length ? optGroup('Enquiries', enquiries, 'student', 'enquiry') : '') +
+    optGroup('Teachers', teacherOpts, 'teacher', 'teacher');
 }
 
 // ============================================================
@@ -1083,7 +1086,15 @@ function render() {
     }
 
     const bits = [];
-    if (t.subjectName) bits.push(`<span>${t.subjectName}</span>`);
+    // Say what kind of person the task is about: the same name can be
+    // both a student and a teacher, and only the teacher's own record
+    // puts a task in that teacher's My Tasks.
+    if (t.subjectName) {
+      const kind = isTeacher || !t.subject_type ? ''
+        : t.subject_type === 'teacher' ? 'Teacher'
+        : (studentOpts.find(x => x.id === t.subject_id)?.status === 'prospective' ? 'Enquiry' : 'Student');
+      bits.push(`<span>${t.subjectName}${kind ? ` <span class="tag" style="margin-left:0.2rem;">${kind}</span>` : ''}</span>`);
+    }
     if (studioName(t.studio_id)) {
       bits.push(`<span class="tag">${studioName(t.studio_id)}</span>`);
     } else if (!t.assigned_to) {

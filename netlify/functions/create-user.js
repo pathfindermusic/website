@@ -56,21 +56,30 @@ exports.handler = async (event) => {
   // login exists — a website enquiry (receive-enquiry.js) fills that
   // column in at intake, long before anyone creates a portal account —
   // so the row-level decision has to be checked against auth.users
-  // directly. Same single-page (per_page=1000) ceiling as the existing
-  // duplicate-check below; fine while the studio has well under 1000
-  // accounts, worth paginating if that ever changes.
+  // directly. Pages through the whole list (the duplicate-check below
+  // still reads a single page of 1000).
   if (action === 'list-user-ids') {
     try {
-      const res  = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=1000`, { headers });
-      const data = await res.json();
-      if (!res.ok) {
-        return { statusCode: 400, headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ error: data?.message ?? 'Could not list users' }) };
+      // One page holds at most 1000 users, so keep asking until a page
+      // comes back empty — otherwise anyone beyond the first 1000 would
+      // look as if they had no login.
+      const ids = new Set();
+      for (let page = 1; page <= 50; page++) {
+        const res  = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?page=${page}&per_page=1000`, { headers });
+        const data = await res.json();
+        if (!res.ok) {
+          return { statusCode: 400, headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: data?.message ?? 'Could not list users' }) };
+        }
+        const users = data?.users ?? [];
+        const before = ids.size;
+        users.forEach(u => ids.add(u.id));
+        if (users.length === 0 || ids.size === before) break;   // end of list
       }
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: (data?.users ?? []).map(u => u.id) }),
+        body: JSON.stringify({ ids: [...ids] }),
       };
     } catch (err) {
       return { statusCode: 500, body: JSON.stringify({ error: err.message }) };

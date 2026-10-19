@@ -285,7 +285,7 @@
     <div class="toolbar">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
-        <input type="text" id="searchInput" placeholder="Search by name, email, phone or instrument…" oninput="filterStudents()">
+        <input type="text" id="searchInput" placeholder="Search by name, parent, email, phone or instrument…" oninput="filterStudents()">
       </div>
       <div class="flex gap-1">
         <select class="filter-select" id="filterStudio" onchange="filterStudents()">
@@ -582,15 +582,23 @@ let bokGradeLevels = [];   // [{id, code, tier, label, sort_order}]
     document.getElementById('utilLink').classList.remove('hidden');
   }
   if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
-  const { data: gl } = await db.from('bok_grade_levels').select('*').order('sort_order');
-  bokGradeLevels = gl ?? [];
-  await loadStudios();
-  await loadStudents();
+  // Grade levels and studios are independent of the student fetch, so
+  // they load alongside it instead of in front of it. loadStudents()
+  // waits for them just before it first draws the list.
+  const gradesP = db.from('bok_grade_levels').select('*').order('sort_order')
+    .then(({ data }) => { bokGradeLevels = data ?? []; });
+  await loadStudents(Promise.all([gradesP, loadStudios()]));
 })();
 
 // ---- Load studios ----
 async function loadStudios() {
-  const { data } = await db.from('studios').select('id, name').eq('status','active').order('name');
+  // The admins lookup doesn't depend on the studios list, so both go at once.
+  const [{ data }, meRes] = await Promise.all([
+    db.from('studios').select('id, name').eq('status','active').order('name'),
+    currentProfile.role === 'superuser'
+      ? Promise.resolve({ data: null })
+      : db.from('admins').select('studio_ids').eq('user_id', currentProfile.id).maybeSingle(),
+  ]);
   (data ?? []).forEach(s => { allStudiosMap[s.id] = s.name; });
 
   // Which studios may this admin create students in? An insert elsewhere
@@ -598,8 +606,7 @@ async function loadStudios() {
   if (currentProfile.role === 'superuser') {
     myStudioIds = (data ?? []).map(s => s.id);
   } else {
-    const { data: me } = await db.from('admins')
-      .select('studio_ids').eq('user_id', currentProfile.id).maybeSingle();
+    const me = meRes.data;
     myStudioIds = me?.studio_ids?.length ? me.studio_ids : (data ?? []).map(s => s.id);
   }
 
@@ -619,61 +626,86 @@ async function loadStudios() {
 }
 
 // ---- Load students ----
-async function loadStudents() {
+// How this stays quick: every query that doesn't depend on another one
+// is sent at the same moment, so the page waits for the slowest chain
+// rather than the sum of every query. The chains are: the student list →
+// (profiles, instruments, grades, teacher assignments → lessons) and,
+// from the moment the student list arrives, the enrolment checklists
+// (loadProcesses) alongside it. The auth-user list (a Netlify function,
+// the slowest single call) and the teacher list start immediately and are
+// only waited for when the table is drawn. Big lookups go through
+// dbFetchByIds(), which splits long id lists and pages past Supabase's
+// silent 1000-row response cap.
+// `prereq` (optional) is page-start work — studios, grade levels — that
+// must have finished before the list is first drawn.
+let listReady = false;   // filterStudents() draws nothing until the first full load
+async function loadStudents(prereq = null) {
+  // Every real auth.users id, for Add login/Reset PW — see authUserIds'
+  // own comment for why students.email can't answer that.
+  const authIdsP = fetch('/.netlify/functions/create-user', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'list-user-ids' }),
+  }).then(r => r.json()).catch(() => ({ ids: [] }));
+
+  // Teachers and their names: independent of the students, so fetched now.
+  const teachersP = (async () => {
+    const { data: teacherData } = await db.from('teachers').select('id, user_id');
+    const uids = (teacherData ?? []).map(t => t.user_id).filter(Boolean);
+    const { data: tp } = uids.length
+      ? await db.from('profiles').select('id, first_name, last_name').in('id', uids)
+      : { data: [] };
+    const byId = {};
+    (teacherData ?? []).forEach(t => {
+      const p = (tp ?? []).find(p => p.id === t.user_id);
+      if (p) byId[t.id] = p;
+    });
+    return byId;
+  })();
+
   // Fetch students base records only
   // Prospective and lapsed are enquiries, not students — they live on
   // the Enquiries page and would otherwise clutter this list.
-  const { data: studentData, error } = await db
-    .from('students')
-    .select('id, status, user_id, studio_id, email, parent_name, parent_phone, ' +
-            'parent_email, enquiry_notes, enquiry_date, enquiry_source, lesson_reminders, ' +
-            'first_name, last_name, additional_notes')
-    .in('status', ['trial','active','inactive'])
-    .order('id');
+  let studentData;
+  try {
+    studentData = await dbFetchPaged(() => db
+      .from('students')
+      .select('id, status, user_id, studio_id, email, parent_name, parent_phone, ' +
+              'parent_email, enquiry_notes, enquiry_date, enquiry_source, lesson_reminders, ' +
+              'first_name, last_name, additional_notes')
+      .in('status', ['trial','active','inactive'])
+      .order('id'));
+  } catch (error) {
+    showToast('Error loading students: ' + error.message, 'error'); return;
+  }
 
-  if (error) { showToast('Error loading students: ' + error.message, 'error'); return; }
+  const studentIds = studentData.map(s => s.id);
+  const userIds    = studentData.map(s => s.user_id);
 
-  const studentIds = (studentData ?? []).map(s => s.id);
+  // The checklists only need the student ids, so they load alongside
+  // everything below rather than after it.
+  const processesP = loadProcesses(studentData);
 
-  // Fetch profiles, instruments and teacher assignments separately
-  const userIds = (studentData ?? []).map(s => s.user_id);
-
-  // Current grade (all graded instruments, per GRADED_INSTRUMENTS) rides
-  // along in this same parallel batch — it doesn't depend on anything
-  // else fetched here, so it used to sit after the lessons/teachers
-  // chain below for no reason, adding a whole extra sequential round
-  // trip to every load (reported as page lag, Sep 2026).
-  const [profileRes, instrRes, assignRes, cgRes, authIdsRes] = await Promise.all([
-    userIds.length > 0
-      ? db.from('profiles').select('*').in('id', userIds)
-      : Promise.resolve({ data: [] }),
-    studentIds.length > 0
-      ? db.from('student_instruments').select('student_id, instrument, skill_level').in('student_id', studentIds)
-      : Promise.resolve({ data: [] }),
+  const [profileRows, instrRows, assignRows, gradeRows] = await Promise.all([
+    dbFetchByIds(userIds, c => db.from('profiles').select('*').in('id', c).order('id')),
+    dbFetchByIds(studentIds, c => db.from('student_instruments')
+      .select('student_id, instrument, skill_level').in('student_id', c)
+      .order('student_id').order('instrument')),
     // Permanent assignment only — a one-off guest on someone else's
     // lesson isn't a regular teacher assignment for this student.
-    studentIds.length > 0
-      ? db.from('lesson_students').select('student_id, lesson_id')
-          .in('student_id', studentIds).is('added_for_occurrence_id', null)
-      : Promise.resolve({ data: [] }),
-    studentIds.length > 0
-      ? db.from('student_current_grades')
-          .select('student_id,instrument,grade_level_id,tier,label,sort_order').in('student_id', studentIds)
-      : Promise.resolve({ data: [] }),
-    // Every real auth.users id, for Add login/Reset PW below — see
-    // authUserIds' own comment for why students.email can't answer that.
-    fetch('/.netlify/functions/create-user', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'list-user-ids' }),
-    }).then(r => r.json()).catch(() => ({ ids: [] })),
+    dbFetchByIds(studentIds, c => db.from('lesson_students')
+      .select('id, student_id, lesson_id').in('student_id', c)
+      .is('added_for_occurrence_id', null).order('id')),
+    // Current grade (all graded instruments, per GRADED_INSTRUMENTS)
+    dbFetchByIds(studentIds, c => db.from('student_current_grades')
+      .select('student_id,instrument,grade_level_id,tier,label,sort_order').in('student_id', c)
+      .order('student_id').order('instrument')),
   ]);
-  authUserIds = new Set(authIdsRes?.ids ?? []);
 
   const profileMap = {};
-  (profileRes.data ?? []).forEach(p => { profileMap[p.id] = p; });
+  profileRows.forEach(p => { profileMap[p.id] = p; });
 
   const instrMap = {};
-  (instrRes.data ?? []).forEach(i => {
+  instrRows.forEach(i => {
     if (!instrMap[i.student_id]) instrMap[i.student_id] = [];
     instrMap[i.student_id].push(i);
   });
@@ -681,16 +713,15 @@ async function loadStudents() {
   // Which lessons is each student in, and who teaches them? Only
   // active lessons count — a teacher from a series that ended last
   // year is not their teacher now.
-  const lessonIds = [...new Set((assignRes.data ?? []).map(r => r.lesson_id))];
-  const { data: lessonRows } = lessonIds.length > 0
-    ? await db.from('lessons').select('id, teacher_id, instrument, status').in('id', lessonIds)
-    : { data: [] };
+  const lessonIds = [...new Set(assignRows.map(r => r.lesson_id))];
+  const lessonRows = await dbFetchByIds(lessonIds, c =>
+    db.from('lessons').select('id, teacher_id, instrument, status').in('id', c).order('id'));
 
   const lessonById = {};
-  (lessonRows ?? []).forEach(l => { if (l.status === 'active') lessonById[l.id] = l; });
+  lessonRows.forEach(l => { if (l.status === 'active') lessonById[l.id] = l; });
 
   const assignMap = {};
-  (assignRes.data ?? []).forEach(r => {
+  assignRows.forEach(r => {
     const l = lessonById[r.lesson_id];
     if (!l) return;
     if (!assignMap[r.student_id]) assignMap[r.student_id] = [];
@@ -699,29 +730,15 @@ async function loadStudents() {
     });
   });
 
-  // Fetch teacher profiles for display
-  const teacherIds = [...new Set(Object.values(assignMap).flat().map(a => a.teacher_id))];
-  const { data: teacherData } = teacherIds.length > 0
-    ? await db.from('teachers').select('id, user_id').in('id', teacherIds)
-    : { data: [] };
-  const teacherUserIds = (teacherData ?? []).map(t => t.user_id);
-  const { data: teacherProfileData } = teacherUserIds.length > 0
-    ? await db.from('profiles').select('id, first_name, last_name').in('id', teacherUserIds)
-    : { data: [] };
-  const teacherProfileMap = {};
-  (teacherData ?? []).forEach(t => {
-    const p = (teacherProfileData ?? []).find(p => p.id === t.user_id);
-    if (p) teacherProfileMap[t.id] = p;
-  });
+  const teacherProfileMap = await teachersP;
 
   // Current grade for every graded instrument (GRADED_INSTRUMENTS) —
-  // used by the edit modal to show/prefill grade. Fetched above,
-  // alongside profiles/instruments/assignments.
+  // used by the edit modal to show/prefill grade.
   const gradeMap = {};
-  (cgRes.data ?? []).forEach(r => { (gradeMap[r.student_id] ??= {})[r.instrument] = r; });
+  gradeRows.forEach(r => { (gradeMap[r.student_id] ??= {})[r.instrument] = r; });
 
   // Merge everything
-  allStudents = (studentData ?? []).map(s => ({
+  const merged = studentData.map(s => ({
     ...s,
     profiles:            profileMap[s.user_id] ?? null,
     student_instruments: instrMap[s.id] ?? [],
@@ -732,7 +749,13 @@ async function loadStudents() {
     }))
   }));
 
-  await loadProcesses();
+  // Wait for the rest: checklists, the auth-user list, studios/grade names.
+  await processesP;
+  authUserIds = new Set((await authIdsP)?.ids ?? []);
+  if (prereq) await prereq;
+
+  allStudents = merged;
+  listReady = true;
   filterStudents();   // keep the active filter — never render the raw list
 
   // Arrived here straight after converting someone — open their checklist
@@ -824,70 +847,90 @@ let endRunning    = {};   // studentId -> an end-enrolment already under way
 let endDone       = {};   // studentId -> a finished ending, lessons still to run
 let lastLessonBy  = {};   // studentId -> their final lesson date
 
-async function loadProcesses() {
-  procByStudent = {};
-  endPending    = {};
-  endRunning    = {};
-  endDone       = {};
-  lastLessonBy  = {};
-  const ids = allStudents.map(s => s.id);
-  if (!ids.length) return;
+// `students` is the freshly fetched student list (loadStudents passes it
+// in, because allStudents isn't replaced until the whole load is done).
+async function loadProcesses(students = allStudents) {
+  const nextProcByStudent = {};
+  const nextEndPending    = {};
+  const nextEndRunning    = {};
+  const nextEndDone       = {};
+  const nextLastLessonBy  = {};
+  // This function now runs alongside the rest of the load, and awaits
+  // all the way through — so it builds into fresh objects and swaps them
+  // in only when finished, never leaving a half-filled set on show.
+  const swapIn = () => {
+    procByStudent = nextProcByStudent; endPending = nextEndPending;
+    endRunning = nextEndRunning; endDone = nextEndDone; lastLessonBy = nextLastLessonBy;
+  };
+  const ids = students.map(s => s.id);
+  if (!ids.length) { swapIn(); return; }
+  const studentById = {};
+  students.forEach(s => { studentById[s.id] = s; });
 
   // An ending already planned. Two end-enrolment tasks for one student
   // is never deliberate, and would mean two farewell emails.
-  const { data: openTasks } = await db.from('tasks')
-    .select('id,title,due_date,subject_id')
-    .eq('subject_type','student').in('subject_id', ids).eq('status','open');
-  (openTasks ?? []).forEach(t => {
+  // Tasks and processes don't depend on each other, so both go at once.
+  const [openTasks, procs] = await Promise.all([
+    dbFetchByIds(ids, c => db.from('tasks')
+      .select('id,title,due_date,subject_id')
+      .eq('subject_type','student').in('subject_id', c).eq('status','open').order('id')),
+    dbFetchByIds(ids, c => db.from('student_processes')
+      .select('*').in('student_id', c).order('started_at', { ascending: false }).order('id')),
+  ]);
+  openTasks.forEach(t => {
     if (String(t.title ?? '').toLowerCase().startsWith('end enrolment')) {
-      endPending[t.subject_id] = t;
+      nextEndPending[t.subject_id] = t;
     }
   });
 
-  const { data: procs } = await db.from('student_processes')
-    .select('*').in('student_id', ids).order('started_at', { ascending: false });
-  if (!procs?.length) return;
+  if (!procs.length) { swapIn(); return; }
+  // Chunks come back one after another, so put the newest first again.
+  procs.sort((x, y) => String(y.started_at).localeCompare(String(x.started_at)));
 
-  const { data: items } = await db.from('process_items')
-    .select('*').in('process_id', procs.map(p => p.id)).order('item_order');
+  // Newest process per student drives the auto checks. Those need only
+  // the processes, not the items, so the two run together.
+  const newest = {};
+  procs.forEach(p => { if (!newest[p.student_id]) newest[p.student_id] = p; });
+
+  // Every item of every process — easily past 1000 rows once the studio
+  // has a few hundred checklists, which Supabase would cut off silently
+  // (leaving checklists with items missing), hence the paging.
+  const [items, checksFor] = await Promise.all([
+    dbFetchByIds(procs.map(p => p.id), c => db.from('process_items')
+      .select('*').in('process_id', c).order('process_id').order('item_order')),
+    evaluateAutoChecksBulk(
+      Object.values(newest).map(p => ({ studentId: p.student_id, since: p.started_at }))),
+  ]);
 
   const byProc = {};
-  (items ?? []).forEach(i => { (byProc[i.process_id] ??= []).push(i); });
+  items.forEach(i => { (byProc[i.process_id] ??= []).push(i); });
 
   // Auto items are evaluated live — they become true after the process
   // starts, so a stored value would go stale immediately.
   // Measured from each process's own start, so a student's existing
   // lessons don't satisfy a checklist begun today.
   //
-  // Batched across every student in one pass (evaluateAutoChecksBulk)
-  // rather than one evaluateAutoChecks() call per student — see that
-  // function's comment for why: it's the same exact result, just
-  // without a per-student chain of DB round trips multiplying out to
-  // hundreds of requests on a studio with real process history.
-  const newest = {};
-  procs.forEach(p => { if (!newest[p.student_id]) newest[p.student_id] = p; });
-
-  const checksFor = await evaluateAutoChecksBulk(
-    Object.values(newest).map(p => ({ studentId: p.student_id, since: p.started_at }))
-  );
+  // Batched across every student in one pass (evaluateAutoChecksBulk,
+  // fetched above) rather than one evaluateAutoChecks() call per student
+  // — see that function's comment for why.
 
   // An item deferred to a task clears when that task is done — without
   // this it stays blocked for ever and the checklist can never finish.
-  const blockedDone = await blockedTaskStatuses(items ?? []);
+  const blockedDone = await blockedTaskStatuses(items);
   Object.values(checksFor).forEach(ch => { ch._blockedDone = blockedDone; });
 
   // An ending under way blocks another being started. Populated before
   // the reconciliation below, which clears any that have finished.
   procs.forEach(p => {
     if (p.process_type === 'end_enrolment' && p.status === 'in_progress') {
-      endRunning[p.student_id] = p;
+      nextEndRunning[p.student_id] = p;
     }
   });
 
   // Most recent process per student wins the badge
   procs.forEach(p => {
-    if (procByStudent[p.student_id]) return;
-    procByStudent[p.student_id] = {
+    if (nextProcByStudent[p.student_id]) return;
+    nextProcByStudent[p.student_id] = {
       proc: p, items: byProc[p.id] ?? [], checks: checksFor[p.student_id] ?? {},
     };
   });
@@ -921,7 +964,7 @@ async function loadProcesses() {
       .in('id', toComplete.map(p => p.id));
     toComplete.forEach(p => {
       p.status = 'complete';
-      delete endRunning[p.student_id];
+      delete nextEndRunning[p.student_id];
     });
   }
 
@@ -930,8 +973,8 @@ async function loadProcesses() {
   // second one — but "in progress" is no longer true either.
   procs.forEach(p => {
     if (p.process_type === 'end_enrolment' && p.status === 'complete') {
-      const stu = allStudents.find(s => s.id === p.student_id);
-      if (stu && stu.status !== 'inactive') endDone[p.student_id] = p;
+      const stu = studentById[p.student_id];
+      if (stu && stu.status !== 'inactive') nextEndDone[p.student_id] = p;
     }
   });
 
@@ -939,30 +982,30 @@ async function loadProcesses() {
   // a one-off guest appearance elsewhere isn't part of their own ending
   // series. Batched the same way as above: one pair of queries covering
   // every student in endDone, instead of two round trips per student.
-  const endDoneIds = Object.keys(endDone);
+  const endDoneIds = Object.keys(nextEndDone);
   if (endDoneIds.length) {
-    const { data: lsRows } = await db.from('lesson_students')
-      .select('student_id,lesson_id').in('student_id', endDoneIds).is('added_for_occurrence_id', null);
+    const lsRows = await dbFetchByIds(endDoneIds, c => db.from('lesson_students')
+      .select('id,student_id,lesson_id').in('student_id', c)
+      .is('added_for_occurrence_id', null).order('id'));
 
     const lessonIdsBySid = {};
     const allLids = new Set();
-    (lsRows ?? []).forEach(r => {
+    lsRows.forEach(r => {
       (lessonIdsBySid[r.student_id] ??= []).push(r.lesson_id);
       allLids.add(r.lesson_id);
     });
-    const lidList = [...allLids];
 
-    const { data: occRows } = lidList.length
-      ? await db.from('lesson_occurrences')
-          .select('lesson_id,date').in('lesson_id', lidList).neq('status', 'cancelled')
-      : { data: [] };
-
+    // Only each lesson's latest non-cancelled date matters, so ask for
+    // exactly that (newest first, one row) instead of downloading every
+    // occurrence — an indefinite lesson has ~150, and Supabase would cut
+    // a big download off at 1000 and could drop the very date wanted.
     const latestDateByLesson = {};
-    (occRows ?? []).forEach(o => {
-      if (!latestDateByLesson[o.lesson_id] || o.date > latestDateByLesson[o.lesson_id]) {
-        latestDateByLesson[o.lesson_id] = o.date;
-      }
-    });
+    await Promise.all([...allLids].map(async lid => {
+      const { data } = await db.from('lesson_occurrences')
+        .select('date').eq('lesson_id', lid).neq('status', 'cancelled')
+        .order('date', { ascending: false }).limit(1);
+      if (data?.[0]?.date) latestDateByLesson[lid] = data[0].date;
+    }));
 
     endDoneIds.forEach(sid => {
       let latest = null;
@@ -970,9 +1013,10 @@ async function loadProcesses() {
         const d = latestDateByLesson[lid];
         if (d && (!latest || d > latest)) latest = d;
       });
-      if (latest) lastLessonBy[sid] = latest;
+      if (latest) nextLastLessonBy[sid] = latest;
     });
   }
+  swapIn();
 }
 
 function renderProcCell(studentId) {
@@ -1454,6 +1498,7 @@ function digitsOnly(str) {
 }
 
 function filterStudents() {
+  if (!listReady) return;   // the first full load draws the list itself
   const q       = document.getElementById('searchInput').value.toLowerCase().trim();
   const qDigits = digitsOnly(q);
   const studio  = document.getElementById('filterStudio').value;
@@ -1469,11 +1514,16 @@ function filterStudents() {
     // that doesn't exist (email lives on students, not profiles), so
     // email search silently matched nothing.
     const email = `${s.email ?? ''} ${s.parent_email ?? ''}`.toLowerCase();
+    // The parent's name too — families are often remembered by "Diana's
+    // son", and a search for a parent used to find only whoever happened
+    // to share the name.
+    const parent = String(s.parent_name ?? '').toLowerCase();
     const phone = digitsOnly(`${p.phone ?? ''} ${s.parent_phone ?? ''}`);
     const insts = (s.student_instruments ?? []).map(i => i.instrument.toLowerCase()).join(' ');
 
     const matchQ = !q
       || name.includes(q)
+      || parent.includes(q)
       || email.includes(q)
       || insts.includes(q)
       || (qDigits.length >= 4 && phone.includes(qDigits));   // avoid 1-2 digit false positives

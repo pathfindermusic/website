@@ -351,7 +351,9 @@ async function countUnmarkedAll() {
   // Only the last 30 days — an admin acts on a stale unmarked lesson well
   // within a month, and an unbounded scan here only gets slower as the
   // studio's history grows. Bump this if that backlog window ever changes.
-  const lookback = toISODate(new Date(now.getTime() - 30 * 86400000));
+  const rolling  = toISODate(new Date(now.getTime() - 30 * 86400000));
+  // ...but never before the day attendance marking started in the portal.
+  const lookback = rolling > ATTENDANCE_MARKING_START ? rolling : ATTENDANCE_MARKING_START;
 
   const { data } = await db.from('schedule_view')
     .select('date,start_time,duration_mins')

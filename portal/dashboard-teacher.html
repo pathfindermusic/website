@@ -439,6 +439,7 @@ async function countUnmarked(teacherIdValue) {
   const { data } = await db.from('schedule_view')
     .select('date,start_time,duration_mins')
     .eq('teacher_id', teacherIdValue)
+    .gte('date', ATTENDANCE_MARKING_START)   // see supabase-client.js
     .lte('date', today)
     .neq('occurrence_status', 'cancelled')
     .eq('fully_marked', false);
@@ -778,8 +779,29 @@ const CREDIT_TRIGGER_STATUSES = {
 // doubles as the note field — clear the text and press Cancel to
 // skip logging anything. `studentsForNames` is the same {id,name}
 // list `scheduleRows[].students` already carries.
+// The note offered with a lesson credit now carries the date of the lesson
+// it is for ("Teacher unavailable on 14 Oct 2026") so the admin can just
+// press OK — the credit ledger is read months later, when "Teacher
+// unavailable" on its own says nothing about which lesson it was.
+// 'Sep' not 'Sept': toLocaleDateString('en-AU') gives "Sept".
+function creditNoteWithDate(defaultNote, reason, isoDate) {
+  const base = defaultNote ?? '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(isoDate ?? ''));
+  if (!m || !base) return base;
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const when = `${Number(m[3])} ${MON[Number(m[2]) - 1]} ${m[1]}`;
+  // Teacher unavailable ON the day; a student gave notice FOR the day
+  return `${base} ${reason === 'student_notice' ? 'for' : 'on'} ${when}`;
+}
+
 async function offerCreditMovements(occId, studentIds, reason, defaultNote, studentsForNames) {
   if (!studentIds || !studentIds.length) return;
+
+  let lessonDate = scheduleRows.find(r => r.occurrence_id === occId)?.date;
+  if (!lessonDate) {   // not in the week on screen — ask the database
+    const { data: oRow } = await db.from('lesson_occurrences').select('date').eq('id', occId).maybeSingle();
+    lessonDate = oRow?.date;
+  }
 
   const names = studentIds.map(sid => {
     const s = (studentsForNames ?? []).find(x => x.id === sid);
@@ -788,7 +810,7 @@ async function offerCreditMovements(occId, studentIds, reason, defaultNote, stud
 
   const note = prompt(
     `Record a lesson credit for ${names}?\n\nAdd a note below, or clear the text and press Cancel to skip.`,
-    defaultNote ?? ''
+    creditNoteWithDate(defaultNote, reason, lessonDate)
   );
   if (note === null) return; // Cancel — no credit logged
 

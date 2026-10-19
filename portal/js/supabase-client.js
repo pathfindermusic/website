@@ -12,6 +12,14 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_ANON);
 
+// Attendance only counts as "still to mark" from this date. The portal
+// went live late, so lessons before it were never marked here and would
+// otherwise show as a permanent backlog. Used by the Unmarked counts on
+// the admin dashboard, teacher dashboard and teacher page. The weekly
+// email has its own copy in netlify/functions/attendance-marking-report.js
+// — change both together.
+const ATTENDANCE_MARKING_START = '2026-10-01';
+
 // ============================================================
 // AUTH HELPERS
 // ============================================================

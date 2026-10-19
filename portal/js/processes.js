@@ -146,6 +146,40 @@ async function evaluateAutoChecks(studentId, since = null) {
   };
 }
 
+// ------------------------------------------------------------
+// Reading lots of rows from Supabase safely.
+//
+// A request returns at most 1000 rows and silently drops the rest, and a
+// long .in() list can overflow the URL limit. These two helpers are the
+// way to read "everything for this list of ids":
+//   dbFetchPaged(build)        build() returns a fresh query (with a
+//                              stable .order()); pages with .range().
+//   dbFetchByIds(ids, build)   splits ids into chunks of 80, runs the
+//                              chunks IN PARALLEL, pages each chunk, and
+//                              returns one flat array. build(chunk) returns
+//                              the query, e.g.
+//                              c => db.from('t').select('*').in('x', c).order('id')
+// Both throw on a Supabase error rather than returning partial data.
+// ------------------------------------------------------------
+const DB_ID_CHUNK = 80, DB_PAGE = 1000;
+async function dbFetchPaged(build) {
+  const rows = [];
+  for (let from = 0; ; from += DB_PAGE) {
+    const { data, error } = await build().range(from, from + DB_PAGE - 1);
+    if (error) throw error;
+    rows.push(...(data ?? []));
+    if ((data ?? []).length < DB_PAGE) break;
+  }
+  return rows;
+}
+async function dbFetchByIds(ids, build) {
+  const list = [...new Set((ids ?? []).filter(x => x != null))];
+  const chunks = [];
+  for (let i = 0; i < list.length; i += DB_ID_CHUNK) chunks.push(list.slice(i, i + DB_ID_CHUNK));
+  const parts = await Promise.all(chunks.map(c => dbFetchPaged(() => build(c))));
+  return parts.flat();
+}
+
 // Same exact per-student result as calling evaluateAutoChecks() once for
 // every student in the list, but from a small constant number of
 // queries instead of ~4 sequential round trips PER STUDENT. That was
@@ -167,13 +201,21 @@ async function evaluateAutoChecksBulk(requests) {
   const sinceById    = {};
   requests.forEach(r => { sinceById[r.studentId] = r.since; });
 
-  const [{ data: students }, { data: lsRows }] = await Promise.all([
-    db.from('students').select('id,status').in('id', studentIds),
-    db.from('lesson_students').select('student_id,lesson_id').in('student_id', studentIds),
+  // Supabase answers at most 1000 rows per request and silently drops the
+  // rest, and a long .in() list can overflow the URL. Both used to hit
+  // this function once the studio had enough students and lessons — the
+  // newest rows were the ones lost, so a student enrolled a few weeks ago
+  // never got "Lesson series added" ticked (13 Oct 2026). So: ask in
+  // small chunks of ids, and page each chunk (dbFetchByIds, above).
+  const fetchByIds = dbFetchByIds;
+
+  const [students, lsRows] = await Promise.all([
+    fetchByIds(studentIds, c => db.from('students').select('id,status').in('id', c).order('id')),
+    fetchByIds(studentIds, c => db.from('lesson_students').select('id,student_id,lesson_id').in('student_id', c).order('id')),
   ]);
 
   const statusById = {};
-  (students ?? []).forEach(s => { statusById[s.id] = s.status; });
+  students.forEach(s => { statusById[s.id] = s.status; });
 
   // Every lesson any of these students is on, fetched once — this
   // covers both the "since" check (recently added) and the "ended"
@@ -182,30 +224,49 @@ async function evaluateAutoChecksBulk(requests) {
   // in JS below instead of in the query, which is the same result.
   const lessonIdsByStudent = {};
   const allLessonIds = new Set();
-  (lsRows ?? []).forEach(r => {
+  lsRows.forEach(r => {
     (lessonIdsByStudent[r.student_id] ??= []).push(r.lesson_id);
     allLessonIds.add(r.lesson_id);
   });
   const lessonIdList = [...allLessonIds];
 
-  const [{ data: lessonRows }, { data: occRows }] = await Promise.all([
-    lessonIdList.length
-      ? db.from('lessons').select('id,status,created_at').in('id', lessonIdList)
-      : Promise.resolve({ data: [] }),
-    // One row per occurrence, any status — matches the original's
-    // per-lesson head-count (which also counted cancelled occurrences).
-    lessonIdList.length
-      ? db.from('lesson_occurrences').select('lesson_id').in('lesson_id', lessonIdList)
-      : Promise.resolve({ data: [] }),
-  ]);
+  const lessonRows = await fetchByIds(lessonIdList, c =>
+    db.from('lessons').select('id,status,created_at,recurrence_type,recurrence_count').in('id', c).order('id'));
 
   const lessonById = {};
-  (lessonRows ?? []).forEach(l => { lessonById[l.id] = l; });
+  lessonRows.forEach(l => { lessonById[l.id] = l; });
 
-  const occCountByLesson = {};
-  (occRows ?? []).forEach(o => {
-    occCountByLesson[o.lesson_id] = (occCountByLesson[o.lesson_id] ?? 0) + 1;
+  // "Is this a series?" = more than one occurrence, any status (the
+  // original per-lesson head-count counted cancelled ones too). Rather
+  // than download every occurrence row of every lesson, use how the
+  // lesson was set up: an indefinite lesson always generates many, and
+  // an "N occurrences" lesson has exactly N. Only date-range lessons (or
+  // old rows without a type) need a real count, and that is a cheap
+  // head-count — no rows come back — remembered per lesson.
+  const countCache = {};
+  const isSeries = async (l) => {
+    if (l.recurrence_type === 'indefinite') return true;
+    if (l.recurrence_type === 'occurrences' && l.recurrence_count != null) return l.recurrence_count > 1;
+    if (!(l.id in countCache)) {
+      const { count } = await db.from('lesson_occurrences')
+        .select('id', { count: 'exact', head: true }).eq('lesson_id', l.id);
+      countCache[l.id] = count ?? 0;
+    }
+    return countCache[l.id] > 1;
+  };
+
+  // Work out which lessons actually need the answer (active and recent
+  // enough for at least one student asking), then resolve them together.
+  const seriesById = {};
+  const needed = new Map();
+  studentIds.forEach(studentId => {
+    const sinceMs = sinceById[studentId] ? new Date(sinceById[studentId]).getTime() : null;
+    (lessonIdsByStudent[studentId] ?? []).forEach(id => {
+      const l = lessonById[id];
+      if (l && l.status === 'active' && (!sinceMs || new Date(l.created_at).getTime() >= sinceMs)) needed.set(id, l);
+    });
   });
+  await Promise.all([...needed.values()].map(async l => { seriesById[l.id] = await isSeries(l); }));
 
   studentIds.forEach(studentId => {
     const since      = sinceById[studentId];
@@ -223,7 +284,7 @@ async function evaluateAutoChecksBulk(requests) {
       const active = recentLessons.filter(l => l.status === 'active');
       anyActive = active.length > 0;
       anyLesson = recentLessons.length > 0;
-      anySeries = active.some(l => (occCountByLesson[l.id] ?? 0) > 1);
+      anySeries = active.some(l => seriesById[l.id]);
 
       allEnded = allLessons.length > 0 && !allLessons.some(l => l.status === 'active');
     }
