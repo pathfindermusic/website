@@ -1243,6 +1243,25 @@ to copy into a normal Gmail compose window. The portal never sends these —
 it only resolves who should be on the list, live, at the moment someone
 asks for it.
 
+**Restructured (Oct 2026).** The page no longer has four separate cards. Admins
+asked for the same audience options as Notifications, so it is now ONE card
+with the same radio choices and parameter panel (copied from
+`notifications.html`): all active students; students at one or more studios;
+students of one teacher; students with lessons on a weekday (optional studio
+filter); students of one teacher on a date (defaults to today); teachers
+(optional studio filter, login emails). **"All students of one instrument"** was
+kept as an extra seventh option so nothing was lost. The page builds the same
+request as Notifications' `buildSpec()` (`mode`, `studioIds`, `teacherId`,
+`dayOfWeek`, `date`, `instrument`) with `action: 'preview', full: true`, so
+both pages pick exactly the same people — including the "lessons from today
+onward" rule for the weekday and teacher options. The list refreshes as soon as
+any choice changes (a sequence counter drops a slow earlier answer). Still one
+address per person, Bcc advice and the 500-recipient warning unchanged;
+unreachable/invalid wording says "teacher" for the Teachers list. The teachers
+mode needs the signed-in admin token, which `authHeaders()` already sends. No
+SQL and no change to `send-email.js`. The original four lists below are kept
+for the history of the design.
+
 Four lists, matching what was actually asked for:
 1. All active students, all studios (deliberately active-only, not trial —
    the one list where that was explicit)
@@ -2160,6 +2179,26 @@ shared code in `js/events-common.js`; database in `supabase/events.sql`.
   `list_events_for_me().my_count`, the teacher summary and the "not booked yet"
   reminder filter in `send-email.js` all count band membership. Not built: members
   self-organising a band, or editing a band themselves — the studio does it.
+- **Notifications → "All students who have lessons on a given weekday" is now
+  forward-looking (Oct 2026).** A `lessons` row stays `status = 'active'` for
+  ever (a makeup once it has happened, a series that has ended), so the old
+  query reached students whose lessons on that weekday were all in the past.
+  `send-email.js` mode `day` now keeps only (a) lesson series with
+  `day_of_week` = the chosen day that still have a non-cancelled
+  `lesson_occurrences` row dated from today (Melbourne date) — one PostgREST
+  `!inner` embed — using the *permanent* roster only (`added_for_occurrence_id
+  IS NULL`), and (b) occurrence-only guests whose single occurrence is upcoming
+  on that weekday (studio filter still applies). Both reads page past the
+  1000-row cap. The studio summary's audience line reads "<Weekday> lessons
+  from today". **"All students of one teacher" (mode `teacher`) uses the same
+  rule** — one shared helper, `upcomingStudents()` in `send-email.js`: that
+  teacher's active lessons that still have a non-cancelled occurrence from
+  today (permanent roster), plus guests of upcoming occurrences of their
+  lessons. Audience line: "<Teacher>'s students (lessons from today)". Other
+  modes (studios, all, …) are unchanged.
+- **Distribution Lists now mirror Notifications (Oct 2026).** See "Restructured"
+  under *Distribution lists* above: one radio-card picker with the six
+  Notifications audiences plus "one instrument", same server modes.
 - **Not built (ideas):** automatic emailing of a confirmation when a booking is
   made; waiting list when a block is full; per-event "accompanist/venue
   equipment" fields; exporting the running order to PDF/CSV (use Print for now).

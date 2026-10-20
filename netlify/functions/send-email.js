@@ -23,8 +23,8 @@
 //
 // Recipient modes:
 //   studios       { studioIds: [] }
-//   teacher       { teacherId }
-//   day           { dayOfWeek, studioIds? }
+//   teacher       { teacherId }   (only students with a lesson to come with that teacher, from today)
+//   day           { dayOfWeek, studioIds? }   (only students with a lesson on that weekday from today onward)
 //   teacher_date  { teacherId, date }
 //   students      { studentIds: [] }
 //   occurrence    { occurrenceId }   (used by automatic emails)
@@ -71,6 +71,17 @@ exports.handler = async (event) => {
     const r = await fetch(rest(path), { headers: sb });
     if (!r.ok) throw new Error(`DB error on ${path}: ${await r.text()}`);
     return r.json();
+  };
+
+  // Like get(), but pages through PostgREST's 1000-row cap.
+  const getAll = async (path) => {
+    const out = [];
+    for (let from = 0; ; from += 1000) {
+      const page = await get(`${path}${path.includes('?') ? '&' : '?'}limit=1000&offset=${from}`);
+      out.push(...page);
+      if (page.length < 1000) break;
+    }
+    return out;
   };
 
   try {
@@ -157,23 +168,27 @@ exports.handler = async (event) => {
 
     } else if (mode === 'teacher') {
       if (!body.teacherId) return json(400, { error: 'No teacher selected.' });
-      const lessons = await get(
-        `lessons?teacher_id=eq.${body.teacherId}&status=eq.active&select=id`
-      );
-      studentIds = await studentsForLessons(lessons.map(l => l.id));
-      audienceLabel = await teacherLabel(body.teacherId);
+      // Only students with a lesson to come with this teacher (from today
+      // onward) — a lesson row stays 'active' for ever, so a makeup that has
+      // happened, or a series that has ended, used to keep its students here.
+      studentIds = await upcomingStudents(`teacher_id=eq.${body.teacherId}`,
+        o => o.lessons?.teacher_id === body.teacherId);
+      audienceLabel = `${await teacherLabel(body.teacherId)} (lessons from today)`;
 
     } else if (mode === 'day') {
       if (body.dayOfWeek === undefined || body.dayOfWeek === null) {
         return json(400, { error: 'No day selected.' });
       }
-      let q = `lessons?day_of_week=eq.${body.dayOfWeek}&status=eq.active&select=id`;
-      if (body.studioIds?.length) {
-        q += `&studio_id=in.(${body.studioIds.map(i => `"${i}"`).join(',')})`;
-      }
-      const lessons = await get(q);
-      studentIds = await studentsForLessons(lessons.map(l => l.id));
-      audienceLabel = `${DAY_NAMES[body.dayOfWeek] ?? 'Selected day'} lessons` +
+      // Only students with a lesson on this weekday FROM TODAY ONWARD
+      // (see upcomingStudents, below, for what that means).
+      const dow = Number(body.dayOfWeek);
+      const studioList = body.studioIds?.length ? body.studioIds : null;
+      let filter = `day_of_week=eq.${dow}`;
+      if (studioList) filter += `&studio_id=in.(${studioList.map(i => `"${i}"`).join(',')})`;
+      studentIds = await upcomingStudents(filter, o =>
+        new Date(o.date + 'T00:00:00Z').getUTCDay() === dow &&
+        (!studioList || studioList.includes(o.lessons?.studio_id)));
+      audienceLabel = `${DAY_NAMES[body.dayOfWeek] ?? 'Selected day'} lessons from today` +
         (body.studioIds?.length ? ` — ${await studioNamesLabel(body.studioIds)}` : '');
 
     } else if (mode === 'teacher_date') {
@@ -644,6 +659,41 @@ exports.handler = async (event) => {
     });
 
     // ---- helpers that need `get` in scope ----
+    // Students who still have a lesson to come, from today (Melbourne date):
+    //   * a lesson series (matching lessonFilter) counts if it has a
+    //     non-cancelled occurrence dated today or later — its PERMANENT
+    //     roster is used;
+    //   * a guest added to ONE specific occurrence counts if that occurrence
+    //     is upcoming and occOk({date, lessons:{studio_id, teacher_id}}) agrees.
+    // Both reads page past PostgREST's 1000-row cap.
+    async function upcomingStudents(lessonFilter, occOk) {
+      const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Melbourne' });
+      const lessons = await getAll(
+        `lessons?${lessonFilter}&status=eq.active` +
+        `&select=id,lesson_occurrences!inner(id)` +
+        `&lesson_occurrences.date=gte.${today}&lesson_occurrences.status=neq.cancelled&lesson_occurrences.limit=1` +
+        `&order=id`);
+      const ids = [];
+      for (let i = 0; i < lessons.length; i += 80) {
+        const list = lessons.slice(i, i + 80).map(l => `"${l.id}"`).join(',');
+        const rows = await getAll(`lesson_students?lesson_id=in.(${list})&added_for_occurrence_id=is.null&select=student_id&order=id`);
+        rows.forEach(r => ids.push(r.student_id));
+      }
+      const guests = await getAll(`lesson_students?added_for_occurrence_id=not.is.null&select=student_id,added_for_occurrence_id&order=id`);
+      if (guests.length) {
+        const occIds = [...new Set(guests.map(g => g.added_for_occurrence_id))];
+        const keep = new Set();
+        for (let i = 0; i < occIds.length; i += 80) {
+          const list = occIds.slice(i, i + 80).map(x => `"${x}"`).join(',');
+          const occs = await get(
+            `lesson_occurrences?id=in.(${list})&date=gte.${today}&status=neq.cancelled&select=id,date,lessons(studio_id,teacher_id)`);
+          occs.forEach(o => { if (occOk(o)) keep.add(o.id); });
+        }
+        guests.forEach(g => { if (keep.has(g.added_for_occurrence_id)) ids.push(g.student_id); });
+      }
+      return ids;
+    }
+
     async function studentsForLessons(lessonIds) {
       if (!lessonIds || lessonIds.length === 0) return [];
       const list = lessonIds.map(i => `"${i}"`).join(',');

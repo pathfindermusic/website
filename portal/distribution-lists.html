@@ -49,6 +49,26 @@
     .dl-bcc-note strong { color: var(--charcoal); }
 
     .dl-placeholder { font-size: 0.82rem; color: var(--mid-grey); padding: 0.4rem 0; }
+
+    /* Audience picker — same radio-card look as Notifications */
+    .mode-options { display: flex; flex-direction: column; gap: 0.5rem; }
+    .mode-opt {
+      display: flex; align-items: flex-start; gap: 0.6rem;
+      padding: 0.7rem 0.85rem; border: 1px solid var(--border);
+      border-radius: var(--r-sm); cursor: pointer; transition: all 0.15s;
+      background: var(--white);
+    }
+    .mode-opt:hover { border-color: var(--orange); background: rgba(232,73,30,0.03); }
+    .mode-opt.active { border-color: var(--orange); background: rgba(232,73,30,0.06); }
+    .mode-opt input { accent-color: var(--orange); margin-top: 2px; }
+    .mode-opt-label { font-size: 0.86rem; font-weight: 600; color: var(--charcoal); }
+    .mode-opt-desc  { font-size: 0.76rem; color: var(--mid-grey); line-height: 1.5; }
+    .mode-params {
+      margin-top: 0.75rem; padding: 0.85rem;
+      background: var(--off-white); border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+    }
+    .dl-result { margin-top: 1.1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
   </style>
 </head>
 <body>
@@ -169,60 +189,72 @@
       family, and stops a "reply all" from blasting the whole list — replies land only
       with you, which is the point of using Gmail for this instead of Notifications.
       One address per student (their login email, else their own contact email, else a
-      parent's — whichever is on file first).
+      parent's — whichever is on file first). Teachers are listed by their login email.
     </div>
 
-    <!-- 1. All students -->
-    <div class="card dl-card" id="dlAll">
+    <div class="card dl-card">
       <div class="dl-card-head">
         <div>
-          <div class="dl-card-title">All active students — all studios</div>
-          <div class="dl-card-sub">Active students only (not trial or prospective)</div>
+          <div class="dl-card-title">Who should be on this list?</div>
+          <div class="dl-card-sub">Same audiences as Notifications. The list builds as soon as you choose.</div>
         </div>
       </div>
-      <div class="dl-body" id="dlAllBody"><div class="dl-placeholder">Loading…</div></div>
-    </div>
 
-    <!-- 2. By studio -->
-    <div class="card dl-card" id="dlStudio">
-      <div class="dl-card-head">
-        <div>
-          <div class="dl-card-title">By studio</div>
-          <div class="dl-card-sub">Active + trial students at the chosen studio</div>
-        </div>
-        <select class="filter-select dl-picker" id="dlStudioPicker" onchange="loadList('studio')">
-          <option value="">— Select a studio —</option>
-        </select>
+      <div class="mode-options" id="modeOptions">
+          <label class="mode-opt active" data-mode="all">
+            <input type="radio" name="mode" value="all" checked onchange="onModeChange()">
+            <div>
+              <div class="mode-opt-label">All active students — every studio</div>
+              <div class="mode-opt-desc">Active only — a trial student is not included.</div>
+            </div>
+          </label>
+          <label class="mode-opt" data-mode="studios">
+            <input type="radio" name="mode" value="studios" onchange="onModeChange()">
+            <div>
+              <div class="mode-opt-label">All students at one or more studios</div>
+              <div class="mode-opt-desc">Active and trial students at the studios you tick.</div>
+            </div>
+          </label>
+          <label class="mode-opt" data-mode="teacher">
+            <input type="radio" name="mode" value="teacher" onchange="onModeChange()">
+            <div>
+              <div class="mode-opt-label">All students of one teacher</div>
+              <div class="mode-opt-desc">Only students with a lesson to come with this teacher, from today onward — past lessons and finished makeups are not counted.</div>
+            </div>
+          </label>
+          <label class="mode-opt" data-mode="day">
+            <input type="radio" name="mode" value="day" onchange="onModeChange()">
+            <div>
+              <div class="mode-opt-label">All students who have lessons on a given weekday</div>
+              <div class="mode-opt-desc">Only students with a lesson on that weekday from today onward — past lessons and finished makeups are not counted.</div>
+            </div>
+          </label>
+          <label class="mode-opt" data-mode="teacher_date">
+            <input type="radio" name="mode" value="teacher_date" onchange="onModeChange()">
+            <div>
+              <div class="mode-opt-label">Students of one teacher on a specific date</div>
+              <div class="mode-opt-desc">Students with a lesson with that teacher on the chosen date.</div>
+            </div>
+          </label>
+          <label class="mode-opt" data-mode="teachers">
+            <input type="radio" name="mode" value="teachers" onchange="onModeChange()">
+            <div>
+              <div class="mode-opt-label">Teachers</div>
+              <div class="mode-opt-desc">All active teachers, or those at chosen studios. Teachers are listed by their login email.</div>
+            </div>
+          </label>
+          <label class="mode-opt" data-mode="instrument">
+            <input type="radio" name="mode" value="instrument" onchange="onModeChange()">
+            <div>
+              <div class="mode-opt-label">All students of one instrument</div>
+              <div class="mode-opt-desc">Extra: active and trial students currently learning the instrument.</div>
+            </div>
+          </label>
       </div>
-      <div class="dl-body" id="dlStudioBody"><div class="dl-placeholder">Choose a studio to generate its list.</div></div>
-    </div>
 
-    <!-- 3. By teacher -->
-    <div class="card dl-card" id="dlTeacher">
-      <div class="dl-card-head">
-        <div>
-          <div class="dl-card-title">By teacher</div>
-          <div class="dl-card-sub">Active + trial students currently taking lessons with them</div>
-        </div>
-        <select class="filter-select dl-picker" id="dlTeacherPicker" onchange="loadList('teacher')">
-          <option value="">— Select a teacher —</option>
-        </select>
-      </div>
-      <div class="dl-body" id="dlTeacherBody"><div class="dl-placeholder">Choose a teacher to generate their list.</div></div>
-    </div>
+      <div class="mode-params" id="modeParams"></div>
 
-    <!-- 4. By instrument -->
-    <div class="card dl-card" id="dlInstrument">
-      <div class="dl-card-head">
-        <div>
-          <div class="dl-card-title">By instrument</div>
-          <div class="dl-card-sub">Active + trial students currently learning it</div>
-        </div>
-        <select class="filter-select dl-picker" id="dlInstrumentPicker" onchange="loadList('instrument')">
-          <option value="">— Select an instrument —</option>
-        </select>
-      </div>
-      <div class="dl-body" id="dlInstrumentBody"><div class="dl-placeholder">Choose an instrument to generate its list.</div></div>
+      <div class="dl-result" id="dlResult"><div class="dl-placeholder">Loading…</div></div>
     </div>
 
   </main>
@@ -243,7 +275,12 @@ const INSTRUMENTS = ['Guitar','Bass','Drums','Piano / Keyboard','Voice / Singing
 // https://knowledge.workspace.google.com/admin/gmail/gmail-sending-limits-in-google-workspace
 const GMAIL_RECIPIENT_CAP = 500;
 
+const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
 let currentProfile = null;
+let allStudios  = [];
+let allTeachers = [];
+let lookupSeq   = 0;   // so a slow earlier lookup can't overwrite a newer one
 
 (async () => {
   currentProfile = await requireAuth(['superuser','admin']);
@@ -262,74 +299,166 @@ let currentProfile = null;
     document.getElementById('menuToggle').style.display = '';
   }
 
-  document.getElementById('dlInstrumentPicker').innerHTML =
-    '<option value="">— Select an instrument —</option>' +
-    INSTRUMENTS.map(i => `<option value="${i}">${i}</option>`).join('');
-
-  await loadPickers();
-  loadList('all');
+  await Promise.all([loadStudios(), loadTeachers()]);
+  onModeChange();
 })();
 
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
 }
 
-async function loadPickers() {
-  const { data: studios } = await db.from('studios').select('id,name').eq('status','active').order('name');
-  const studioSel = document.getElementById('dlStudioPicker');
-  (studios ?? []).forEach(s => { studioSel.innerHTML += `<option value="${s.id}">${s.name}</option>`; });
-
-  const { data: teachers } = await db.from('teachers')
-    .select('id, profiles(first_name, last_name)').order('profiles(last_name)');
-  const teacherSel = document.getElementById('dlTeacherPicker');
-  (teachers ?? []).forEach(t => {
-    const opt = document.createElement('option');
-    opt.value = t.id;
-    opt.textContent = `${t.profiles?.first_name ?? ''} ${t.profiles?.last_name ?? ''}`.trim();
-    teacherSel.appendChild(opt);
-  });
+async function loadStudios() {
+  const { data } = await db.from('studios').select('id,name').eq('status','active').order('name');
+  allStudios = data ?? [];
 }
 
-// which={ 'all' | 'studio' | 'teacher' | 'instrument' }
-async function loadList(which) {
-  const bodyId = {
-    all: 'dlAllBody', studio: 'dlStudioBody',
-    teacher: 'dlTeacherBody', instrument: 'dlInstrumentBody',
-  }[which];
-  const body = document.getElementById(bodyId);
+// Active teachers only, as on Notifications
+async function loadTeachers() {
+  const { data: tData } = await db.from('teachers').select('id,user_id');
+  const userIds = (tData ?? []).map(t => t.user_id).filter(Boolean);
+  const { data: pData } = userIds.length
+    ? await db.from('profiles').select('id,first_name,last_name,status').in('id', userIds)
+    : { data: [] };
+  const pMap = {};
+  (pData ?? []).forEach(p => { pMap[p.id] = p; });
+  allTeachers = (tData ?? [])
+    .map(t => ({ ...t, profile: pMap[t.user_id] ?? null }))
+    .filter(t => t.profile?.status === 'active')
+    .sort((a, b) => `${a.profile.last_name} ${a.profile.first_name}`.localeCompare(`${b.profile.last_name} ${b.profile.first_name}`));
+}
 
-  const spec = { action: 'preview', full: true };
-  if (which === 'all') {
-    spec.mode = 'all';
-  } else if (which === 'studio') {
-    const id = document.getElementById('dlStudioPicker').value;
-    if (!id) { body.innerHTML = `<div class="dl-placeholder">Choose a studio to generate its list.</div>`; return; }
-    spec.mode = 'studios'; spec.studioIds = [id];
-  } else if (which === 'teacher') {
-    const id = document.getElementById('dlTeacherPicker').value;
-    if (!id) { body.innerHTML = `<div class="dl-placeholder">Choose a teacher to generate their list.</div>`; return; }
-    spec.mode = 'teacher'; spec.teacherId = id;
-  } else if (which === 'instrument') {
-    const inst = document.getElementById('dlInstrumentPicker').value;
-    if (!inst) { body.innerHTML = `<div class="dl-placeholder">Choose an instrument to generate its list.</div>`; return; }
-    spec.mode = 'instrument'; spec.instrument = inst;
+function currentMode() {
+  return document.querySelector('input[name="mode"]:checked')?.value ?? 'all';
+}
+
+function onModeChange() {
+  const mode = currentMode();
+  document.querySelectorAll('.mode-opt').forEach(el => {
+    el.classList.toggle('active', el.dataset.mode === mode);
+  });
+
+  const box = document.getElementById('modeParams');
+  const teacherOpts = allTeachers.map(t =>
+    `<option value="${t.id}">${escapeHTML(t.profile?.first_name ?? '')} ${escapeHTML(t.profile?.last_name ?? '')}</option>`
+  ).join('');
+  const studioChecks = allStudios.map(s =>
+    `<label style="display:flex;align-items:center;gap:0.4rem;font-size:0.84rem;cursor:pointer;">
+      <input type="checkbox" class="studio-check" value="${s.id}" onchange="loadList()" style="accent-color:var(--orange);">
+      ${escapeHTML(s.name)}
+    </label>`
+  ).join('');
+
+  if (mode === 'all') {
+    box.innerHTML = `<div class="text-sm text-muted" style="line-height:1.6;">
+      Every student whose status is Active, across every studio — no further selection needed.
+    </div>`;
+
+  } else if (mode === 'studios') {
+    box.innerHTML = `<div class="form-label" style="margin-bottom:0.5rem;">Select studios</div>
+      <div style="display:flex;flex-wrap:wrap;gap:0.85rem;">${studioChecks}</div>`;
+
+  } else if (mode === 'teachers') {
+    box.innerHTML = `<div class="form-label" style="margin-bottom:0.5rem;">Limit to teachers at these studios (optional — leave all unticked for every active teacher)</div>
+      <div style="display:flex;flex-wrap:wrap;gap:0.85rem;">${studioChecks}</div>`;
+
+  } else if (mode === 'teacher') {
+    box.innerHTML = `<div class="form-group" style="margin-bottom:0;">
+      <label class="form-label">Teacher</label>
+      <select class="form-select" id="pTeacher" onchange="loadList()">
+        <option value="">— Select teacher —</option>${teacherOpts}
+      </select></div>`;
+
+  } else if (mode === 'day') {
+    box.innerHTML = `<div class="form-row" style="margin-bottom:0.75rem;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Weekday</label>
+          <select class="form-select" id="pDay" onchange="loadList()">
+            ${DAY_NAMES.map((d,i) => `<option value="${i}" ${i===1?'selected':''}>${d}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="form-label" style="margin-bottom:0.5rem;">Limit to studios (optional)</div>
+      <div style="display:flex;flex-wrap:wrap;gap:0.85rem;">${studioChecks}</div>`;
+
+  } else if (mode === 'teacher_date') {
+    box.innerHTML = `<div class="form-row" style="margin-bottom:0;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Teacher</label>
+          <select class="form-select" id="pTeacher" onchange="loadList()">
+            <option value="">— Select teacher —</option>${teacherOpts}
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Date</label>
+          <input class="form-input" type="date" id="pDate" value="${toISODate(new Date())}" onchange="loadList()">
+        </div>
+      </div>`;
+
+  } else if (mode === 'instrument') {
+    box.innerHTML = `<div class="form-group" style="margin-bottom:0;">
+      <label class="form-label">Instrument</label>
+      <select class="form-select" id="pInstrument" onchange="loadList()">
+        <option value="">— Select an instrument —</option>
+        ${INSTRUMENTS.map(i => `<option value="${i}">${i}</option>`).join('')}
+      </select></div>`;
   }
 
+  loadList();
+}
+
+// Same request shape as Notifications' buildSpec(), so both pages pick
+// exactly the same people.
+function buildSpec() {
+  const mode = currentMode();
+  const spec = { mode };
+  const checked = [...document.querySelectorAll('.studio-check:checked')].map(c => c.value);
+
+  if (mode === 'studios') {
+    spec.studioIds = checked;
+    if (checked.length === 0) return { error: 'Tick at least one studio to build the list.' };
+  } else if (mode === 'teacher') {
+    spec.teacherId = document.getElementById('pTeacher')?.value;
+    if (!spec.teacherId) return { error: 'Choose a teacher to build the list.' };
+  } else if (mode === 'teachers') {
+    if (checked.length) spec.studioIds = checked;
+  } else if (mode === 'day') {
+    spec.dayOfWeek = parseInt(document.getElementById('pDay')?.value ?? '1');
+    if (checked.length) spec.studioIds = checked;
+  } else if (mode === 'teacher_date') {
+    spec.teacherId = document.getElementById('pTeacher')?.value;
+    spec.date      = document.getElementById('pDate')?.value;
+    if (!spec.teacherId) return { error: 'Choose a teacher to build the list.' };
+    if (!spec.date)      return { error: 'Choose a date to build the list.' };
+  } else if (mode === 'instrument') {
+    spec.instrument = document.getElementById('pInstrument')?.value;
+    if (!spec.instrument) return { error: 'Choose an instrument to build the list.' };
+  }
+  return spec;
+}
+
+async function loadList() {
+  const body = document.getElementById('dlResult');
+  const built = buildSpec();
+  if (built.error) { body.innerHTML = `<div class="dl-placeholder">${escapeHTML(built.error)}</div>`; lookupSeq++; return; }
+
+  const seq = ++lookupSeq;
   body.innerHTML = `<div class="dl-placeholder"><div class="spinner" style="display:inline-block;width:14px;height:14px;vertical-align:-2px;margin-right:0.4rem;"></div>Looking up recipients…</div>`;
 
   try {
     const res = await fetch('/.netlify/functions/send-email', {
       method: 'POST',
       headers: await authHeaders(),
-      body: JSON.stringify(spec),
+      body: JSON.stringify({ action: 'preview', full: true, ...built }),
     });
     const data = await res.json();
+    if (seq !== lookupSeq) return;
     if (!res.ok) {
       body.innerHTML = `<div class="dl-placeholder">${escapeHTML(data.error ?? 'Could not resolve recipients.')}</div>`;
       return;
     }
     renderList(body, data);
   } catch (err) {
+    if (seq !== lookupSeq) return;
     body.innerHTML = `<div class="dl-placeholder">Error: ${escapeHTML(err.message)}</div>`;
   }
 }
@@ -344,6 +473,7 @@ function renderList(body, data) {
   const recipients = data.recipients ?? [];
   const addresses  = recipients.map(r => r.addresses?.[0]).filter(Boolean);
   const count      = addresses.length;
+  const noun       = data.audience === 'teachers' ? 'teacher' : 'student';
 
   const capWarning = count > GMAIL_RECIPIENT_CAP
     ? `<div class="dl-count-warn">⚠️ Over Gmail's ~${GMAIL_RECIPIENT_CAP}-recipient limit per email — split this into two sends.</div>`
@@ -352,19 +482,20 @@ function renderList(body, data) {
         : '');
 
   const unreachableBlock = (data.unreachable ?? 0) > 0
-    ? `<div class="dl-skip unreachable">⚠️ <strong>${data.unreachable}</strong> student${data.unreachable !== 1 ? 's have' : ' has'}
+    ? `<div class="dl-skip unreachable">⚠️ <strong>${data.unreachable}</strong> ${noun}${data.unreachable !== 1 ? 's have' : ' has'}
         no email on file and ${data.unreachable !== 1 ? "aren't" : "isn't"} included:
         ${(data.unreachableNames ?? []).map(escapeHTML).join(', ')}.
-        Add an email on their student record to include them.</div>`
+        Add an email on their record to include them.</div>`
     : '';
 
   const invalidBlock = (data.invalid ?? 0) > 0
     ? `<div class="dl-skip invalid">🚫 <strong>${data.invalid}</strong> address${data.invalid !== 1 ? 'es look' : ' looks'}
         invalid and ${data.invalid !== 1 ? "aren't" : "isn't"} included:
-        ${(data.invalidNames ?? []).map(escapeHTML).join('; ')}. Fix these on the student record.</div>`
+        ${(data.invalidNames ?? []).map(escapeHTML).join('; ')}. Fix these on the record.</div>`
     : '';
 
   body.innerHTML = `
+    ${count === 0 && data.message ? `<div class="dl-placeholder">${escapeHTML(data.message)}</div>` : ''}
     <div class="dl-count-row">
       <span class="dl-count">${count}</span>
       <span class="dl-count-label">address${count !== 1 ? 'es' : ''}${data.audienceLabel ? ' — ' + escapeHTML(data.audienceLabel) : ''}</span>
