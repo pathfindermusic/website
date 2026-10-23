@@ -2196,6 +2196,74 @@ shared code in `js/events-common.js`; database in `supabase/events.sql`.
   today (permanent roster), plus guests of upcoming occurrences of their
   lessons. Audience line: "<Teacher>'s students (lessons from today)". Other
   modes (studios, all, …) are unchanged.
+- **Fix: "Students of one teacher on a specific date" included people not in
+  that lesson (Oct 2026).** `send-email.js` modes `teacher_date` and
+  `occurrence` used the WHOLE `lesson_students` roster of each matching lesson
+  series — which also holds guests added for ONE other date of the same series
+  (a sibling sitting in once). Both now use `studentsForOccurrences()`: the
+  series' permanent roster (`added_for_occurrence_id IS NULL`) plus guests whose
+  `added_for_occurrence_id` is one of the matching occurrences. The old
+  `studentsForLessons()` helper was removed (no other callers). Reproduced with a
+  mocked Supabase (guest of another date was listed before; not now); a guest of
+  the chosen date is still included, and a series cancelled that day still is not.
+- **Fix: a lesson cancelled as a one-off vanished from the grid when its series
+  had been ended (Oct 2026).** The grids hide every cancelled occurrence whose
+  `lessons.status` is not `active` (that is how the tail of an ended series is
+  hidden). A teacher-sick "Cancel this lesson only" on the last live lesson of a
+  series that had been ended from a later date was therefore hidden too, although
+  the cancellation email, attendance and credit all worked (reported 22 Oct for a
+  Drums lesson; the SQL check found two more). The four views (daily, weekly,
+  teacher week, month) now keep such an occurrence when it has an attendance row
+  `teacher_cancelled` — only "Cancel this lesson only" writes those; ending a
+  series never does — via `oneOffCancelledIds()` (chunked, paged; if the lookup
+  fails it falls back to hiding as before). Works for existing data, no SQL.
+  Limit: a one-off cancel on a lesson with NO students writes no attendance, so
+  that case in an ended series still hides.
+- **Student flags — "Watch" / "Do not re-enrol" (Oct 2026).** Admins can flag a
+  student (mostly bad payers) so a family that comes back is spotted. **Run
+  `supabase/student-flags.sql` first, one statement at a time.** Design choices:
+  - **Own table, `student_flags`, admin/superuser-only RLS** — not a column on
+    `students`, because students read their own row through the normal API and
+    would see it. `level` is `watch` or `block`; `reason` is required (≤1000
+    chars); one ACTIVE flag per student (partial unique index); clearing sets
+    `cleared_at/cleared_by/clear_note`, so history is kept; changing level or
+    reason updates the active row (`updated_by/at`). Studio-limited admins can
+    only flag students they can already see (`student_id IN (SELECT id FROM
+    students)`). Explicit GRANTs are included (the Supabase Oct 30 2026 change).
+  - **Two SECURITY DEFINER lookups, admin/superuser only, all studios:**
+    `flag_check(email, phone, first, last, exclude)` for contact details and
+    `flag_check_students(ids[])` for list pages (includes the student's own flag
+    as why = "this record"). Match on email (student's or parent's,
+    case-insensitive), phone (last 9 digits, either side) or first + last name;
+    each row says why. They return flags and the flagged student's name/studio/
+    status only — a Ringwood admin is warned about a family flagged at Kilsyth.
+  - **UI:** `students.html` — 🚩 pill in the list (own flag, or a dashed "Possible
+    match" for a family member/same email, phone or name), a "Flagged only" filter,
+    a Flag section in the Edit Student window (level, reason, Save flag — its own
+    button, separate from Save Student; clearing asks for an optional note; history
+    list; red banner when linked to another flagged student), and a confirm
+    dialog when ADDING a student who matches a flagged one (warn only, never
+    blocks). `enquiries.html` — pill in the list and a red banner in the enquiry
+    window. `tasks.html` — the same banner in an enquiry follow-up task.
+  - **`js/person-match.js` (new)** holds the helpers (`flagCheckContact`,
+    `flagCheckStudents`, `flagPill`, `flagBanner`) **and** `findPossibleMatches()` /
+    `matchBanner()`, moved out of `tasks.html`. That move fixes a bug: the
+    Enquiries page called those two functions but they only existed in
+    `tasks.html`, so its "We may already know this person" box never appeared.
+    The flag helpers never throw: if the SQL has not been run, no warnings show
+    (the Flag section says to run it).
+  - **Not built:** an automatic task when a flagged family sends a new website
+    enquiry (the intake function is not in this repo; the enquiry list/window flag
+    it instead); blocking enrolment; showing flags to teachers (deliberately not).
+    Reasons should stay factual — a family can ask to see what is held about them.
+- **Clone to new timeslot has a Notes field (Oct 2026).** `lessons.html`'s clone
+  window now shows a Notes box pre-filled with "Makeup lesson for <Tue 3 Nov>"
+  (the cloned lesson's date, same short format as the credit note). Whatever is in
+  it when the admin clicks Clone Lesson becomes the new occurrence's
+  `occurrence_notes` (empty = none); it is filled even when "Not a makeup" is
+  chosen, so admins should clear/edit it for a plain relocation. The old hint
+  that clones start with blank notes was removed. No SQL — the note is no longer
+  used to detect makeups (that was a one-off migration; `is_makeup` is the flag).
 - **Distribution Lists now mirror Notifications (Oct 2026).** See "Restructured"
   under *Distribution lists* above: one radio-card picker with the six
   Notifications audiences plus "one instrument", same server modes.

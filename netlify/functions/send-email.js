@@ -203,9 +203,9 @@ exports.handler = async (event) => {
       else {
         const occs = await get(
           `lesson_occurrences?date=eq.${body.date}&status=eq.scheduled` +
-          `&lesson_id=in.(${lIds.map(i => `"${i}"`).join(',')})&select=lesson_id`
+          `&lesson_id=in.(${lIds.map(i => `"${i}"`).join(',')})&select=id,lesson_id`
         );
-        studentIds = await studentsForLessons([...new Set(occs.map(o => o.lesson_id))]);
+        studentIds = await studentsForOccurrences(occs);
       }
       audienceLabel = `${await teacherLabel(body.teacherId)} — ${formatDateLong(body.date)}`;
 
@@ -217,7 +217,7 @@ exports.handler = async (event) => {
       );
       const occ = occs?.[0];
       if (!occ) return json(404, { error: 'Lesson occurrence not found.' });
-      studentIds = await studentsForLessons([occ.lesson_id]);
+      studentIds = await studentsForOccurrences([{ id: occ.id, lesson_id: occ.lesson_id }]);
 
       // Build context for template placeholders
       const l = occ.lessons ?? {};
@@ -694,11 +694,25 @@ exports.handler = async (event) => {
       return ids;
     }
 
-    async function studentsForLessons(lessonIds) {
-      if (!lessonIds || lessonIds.length === 0) return [];
-      const list = lessonIds.map(i => `"${i}"`).join(',');
-      const rows = await get(`lesson_students?lesson_id=in.(${list})&select=student_id`);
-      return rows.map(r => r.student_id);
+    // Who is in THESE specific occurrences: the series' permanent roster plus
+    // guests added for these occurrences only. (A guest added to some OTHER
+    // date of the same series is not in this lesson and is left out.)
+    async function studentsForOccurrences(occs) {
+      if (!occs || occs.length === 0) return [];
+      const ids = [];
+      const lessonIds = [...new Set(occs.map(o => o.lesson_id))];
+      for (let i = 0; i < lessonIds.length; i += 80) {
+        const list = lessonIds.slice(i, i + 80).map(x => `"${x}"`).join(',');
+        const rows = await getAll(`lesson_students?lesson_id=in.(${list})&added_for_occurrence_id=is.null&select=student_id&order=id`);
+        rows.forEach(r => ids.push(r.student_id));
+      }
+      const occIds = [...new Set(occs.map(o => o.id))];
+      for (let i = 0; i < occIds.length; i += 80) {
+        const list = occIds.slice(i, i + 80).map(x => `"${x}"`).join(',');
+        const rows = await getAll(`lesson_students?added_for_occurrence_id=in.(${list})&select=student_id&order=id`);
+        rows.forEach(r => ids.push(r.student_id));
+      }
+      return ids;
     }
 
     // Human-readable "who this went to" for the studio summary email —

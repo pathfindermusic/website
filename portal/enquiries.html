@@ -219,12 +219,14 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/processes.js"></script>
+<script src="js/person-match.js"></script>
 <script>
 const INSTRUMENTS = ['Guitar','Bass','Drums','Piano / Keyboard','Voice / Singing','Violin','Ukulele','Music Theory','Saxophone','Band','Other'];
 
 let me       = null;
 let studios  = [];
 let enquiries = [];
+let enqFlags  = {};   // studentId -> flag rows (see person-match.js)
 let openEnq  = null;
 
 (async () => {
@@ -396,6 +398,10 @@ async function loadEnquiries() {
   });
 
   render();
+
+  // Flag markers for the list (own flag, or a link to a flagged family) —
+  // fetched after the first draw so a slow lookup never delays the page.
+  flagCheckStudents(enquiries.map(e => e.id)).then(m => { enqFlags = m; render(); });
 }
 
 // ============================================================
@@ -460,7 +466,7 @@ function render() {
 
     return `<tr class="${e.status !== 'prospective' ? 'lapsed' : ''}" onclick="openDetail('${e.id}')">
       <td>
-        <div class="enq-name">${escapeHtml(e.first_name)} ${escapeHtml(e.last_name)}</div>
+        <div class="enq-name">${escapeHtml(e.first_name)} ${escapeHtml(e.last_name)}${flagPill(enqFlags[e.id])}</div>
         <div class="enq-sub">${escapeHtml(e.email ?? '')}</div>
         ${e.phone ? `<div class="enq-sub">${escapeHtml(e.phone)}</div>` : ''}
       </td>
@@ -643,10 +649,14 @@ function openDetail(id) {
 
   // Look for a previous relationship — cheap, and worth knowing before
   // the first conversation
-  findPossibleMatches(e).then(m => {
+  // — and whether they match a flagged student (bad payer etc.), any studio
+  Promise.all([
+    findPossibleMatches(e).catch(() => []),
+    flagCheckContact({ email: e.email, phone: e.phone, first: e.first_name, last: e.last_name, exclude: e.id }),
+  ]).then(([m, f]) => {
     const box = document.getElementById('dMatches');
-    if (box) box.innerHTML = matchBanner(m);
-  }).catch(() => {});
+    if (box && openEnq && openEnq.id === e.id) box.innerHTML = flagBanner(f) + matchBanner(m);
+  });
 }
 
 function closeDetail() {

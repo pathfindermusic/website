@@ -565,6 +565,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/processes.js"></script>
+<script src="js/person-match.js"></script>
 <script>
 let me          = null;
 let isTeacher   = false;
@@ -1293,101 +1294,20 @@ function renderEnquiryContext(t) {
   // Same check as the Enquiries page — an admin working from Tasks
   // should not have to go looking to find out we know this person
   const parts = String(s.name ?? '').split(' ');
-  findPossibleMatches({
-    id: s.id, email: s.email,
-    first_name: parts[0] ?? '', last_name: parts.slice(1).join(' '),
-    phone: '',
-  }).then(m => {
+  const firstN = parts[0] ?? '', lastN = parts.slice(1).join(' ');
+  Promise.all([
+    findPossibleMatches({ id: s.id, email: s.email, first_name: firstN, last_name: lastN, phone: '' })
+      .catch(() => []),
+    // Flagged students (bad payers etc.) matching this enquirer, any studio
+    flagCheckContact({ email: s.email, first: firstN, last: lastN, exclude: s.id }),
+  ]).then(([m, f]) => {
     const box2 = document.getElementById('tmMatches');
-    if (box2 && m.length) box2.innerHTML = `<div style="margin-top:0.5rem;">${matchBanner(m)}</div>`;
-  }).catch(() => {});
-}
-
-
-// Does this enquiry look like someone we already know? Returning people
-// send a fresh enquiry rather than reviving an old one, and it is often a
-// past student rather than a lapsed enquiry. Matching on email, phone or
-// exact name catches most of it — the admin judges the rest.
-async function findPossibleMatches(enq) {
-  const out    = new Map();
-  const digits = s => String(s ?? '').replace(/\D/g, '');
-  const myPhone = digits(enq.phone);
-
-  const add = (row, why) => {
-    if (!row || row.id === enq.id) return;
-    if (out.has(row.id)) { out.get(row.id).why.add(why); return; }
-    out.set(row.id, { ...row, why: new Set([why]) });
-  };
-
-  // Same email address
-  if (enq.email) {
-    const { data } = await db.from('students')
-      .select('id,user_id,status,studio_id,email')
-      .ilike('email', enq.email.trim());
-    for (const r of (data ?? [])) add(r, 'same email');
-  }
-
-  // Same name, or same phone number
-  const { data: profs } = await db.from('profiles')
-    .select('id,first_name,last_name,phone')
-    .ilike('first_name', (enq.first_name ?? '').trim())
-    .ilike('last_name',  (enq.last_name  ?? '').trim());
-
-  const { data: byPhone } = myPhone
-    ? await db.from('profiles').select('id,first_name,last_name,phone')
-    : { data: [] };
-
-  const candidateIds = [
-    ...(profs ?? []).map(p => p.id),
-    ...(byPhone ?? []).filter(p => digits(p.phone) && digits(p.phone) === myPhone).map(p => p.id),
-  ];
-
-  if (candidateIds.length) {
-    const { data } = await db.from('students')
-      .select('id,user_id,status,studio_id,email,first_name,last_name')
-      .in('user_id', [...new Set(candidateIds)]);
-    for (const r of (data ?? [])) {
-      const nameHit  = (profs   ?? []).some(p => p.id === r.user_id);
-      const phoneHit = (byPhone ?? []).some(p => p.id === r.user_id && digits(p.phone) === myPhone);
-      if (nameHit)  add(r, 'same name');
-      if (phoneHit) add(r, 'same phone');
+    if (box2 && (m.length || f.length)) {
+      box2.innerHTML = `<div style="margin-top:0.5rem;">${flagBanner(f)}${matchBanner(m)}</div>`;
     }
-  }
-
-  const matches = [...out.values()];
-  if (!matches.length) return [];
-
-  // Names for display
-  const { data: mp } = await db.from('profiles')
-    .select('id,first_name,last_name')
-    .in('id', matches.map(m => m.user_id).filter(Boolean));
-  const nameOf = {};
-  (mp ?? []).forEach(p => { nameOf[p.id] = `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim(); });
-
-  // A student's own name (students.first_name/last_name) is the source of
-  // truth — siblings sharing a login would otherwise all show whichever
-  // name is on the shared profiles row (phase 10, Oct 2026).
-  return matches.map(m => ({
-    ...m,
-    name: (`${m.first_name ?? ''} ${m.last_name ?? ''}`.trim()) || nameOf[m.user_id] || '(unnamed)',
-    why:  [...m.why].join(', '),
-  }));
+  });
 }
 
-function matchBanner(matches) {
-  if (!matches.length) return '';
-  const LABEL = {
-    active:'Currently enrolled', trial:'On a trial', inactive:'Past student',
-    lapsed:'Lapsed enquiry', prospective:'Another open enquiry',
-  };
-  return `<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:var(--r-sm);
-              padding:0.7rem 0.85rem;margin-bottom:1rem;font-size:0.82rem;color:#92400e;line-height:1.6;">
-      <strong>We may already know this person.</strong>
-      ${matches.map(m =>
-        `<div style="margin-top:0.3rem;">${m.name} — ${LABEL[m.status] ?? m.status}
-         <span style="opacity:0.75;">(${m.why})</span></div>`).join('')}
-    </div>`;
-}
 
 function closeTask() {
   const draft = document.getElementById('tmNoteText').value.trim();

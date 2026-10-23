@@ -297,6 +297,10 @@
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
         </select>
+        <select class="filter-select" id="filterFlag" onchange="filterStudents()">
+          <option value="">All students</option>
+          <option value="flagged">🚩 Flagged only</option>
+        </select>
       </div>
     </div>
 
@@ -433,6 +437,34 @@
           <div class="form-hint" style="text-align:right;"><span id="sAdditionalNotesCount">0</span> / 50</div>
         </div>
       </div>
+
+      <!-- Flag — admins only. Lives in its own table (student-flags.sql), so
+           the family can never read it; saved with its own button, not
+           "Save Student". -->
+      <div id="flagSection" style="display:none;border-top:1px solid var(--border);padding-top:1rem;margin-top:1rem;">
+        <div class="form-label" style="margin-bottom:0.5rem;">🚩 Flag (admins only)</div>
+        <div id="flagLinked"></div>
+        <div class="form-group">
+          <label class="form-label" for="flagLevel">Level</label>
+          <select class="form-select" id="flagLevel" data-flagctl>
+            <option value="">No flag</option>
+            <option value="watch">Watch — e.g. ask for payment up front</option>
+            <option value="block">Do not re-enrol</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="flagReason">Reason</label>
+          <textarea class="form-textarea" id="flagReason" data-flagctl maxlength="1000"
+                    placeholder="e.g. Unpaid $480 for Term 3; three reminders ignored" style="min-height:60px;"></textarea>
+          <div class="form-hint">Never shown to the family or to teachers. Keep it factual — a family can ask what we hold about them.</div>
+        </div>
+        <div class="form-hint" id="flagMeta"></div>
+        <button class="btn btn-secondary btn-sm" type="button" id="flagSaveBtn" onclick="saveFlag()" style="margin-top:0.4rem;">Save flag</button>
+        <details id="flagHistory" style="margin-top:0.6rem;display:none;">
+          <summary class="form-hint" style="cursor:pointer;">Flag history</summary>
+          <div id="flagHistoryBody" class="form-hint" style="line-height:1.6;"></div>
+        </details>
+      </div>
     </div>
     <div class="modal-footer" style="justify-content:space-between;">
       <button class="btn btn-secondary" type="button" id="viewTasksBtn" onclick="openStudentTasks()"
@@ -549,6 +581,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/processes.js"></script>
+<script src="js/person-match.js"></script>
 <script>
 
 const INSTRUMENTS = ['Guitar','Bass','Drums','Piano / Keyboard','Voice / Singing','Violin','Ukulele','Music Theory','Saxophone','Band','Other'];
@@ -563,6 +596,7 @@ let csvData      = [];
 // status both check a student's user_id against this instead.
 let authUserIds  = new Set();
 let currentProfile = null;
+let flagInfo     = {};   // studentId -> flag rows (own flag or link to a flagged family), see person-match.js
 
 // Every instrument shows a grade selector instead of the 0-8 skill slider
 // (Sep 2026 — previously Guitar only). Reuses INSTRUMENTS directly so the
@@ -758,12 +792,20 @@ async function loadStudents(prereq = null) {
   listReady = true;
   filterStudents();   // keep the active filter — never render the raw list
 
+  // Flag markers arrive after the first draw so they never delay the list
+  refreshFlagInfo();
+
   // Arrived here straight after converting someone — open their checklist
   const wanted = sessionStorage.getItem('openProcessStudentId');
   if (wanted) {
     sessionStorage.removeItem('openProcessStudentId');
     if (procByStudent[wanted]) openProcess(wanted);
   }
+}
+
+async function refreshFlagInfo() {
+  flagInfo = await flagCheckStudents(allStudents.map(s => s.id));
+  filterStudents();
 }
 
 // ---- Render students ----
@@ -789,7 +831,7 @@ function renderStudents(students) {
     return `<tr>
       <td>
         <div class="student-name"><a href="#" class="student-link" title="Open this student"
-             onclick="event.preventDefault();openStudentByIndex(${allStudents.indexOf(s)})">${studentName}</a></div>
+             onclick="event.preventDefault();openStudentByIndex(${allStudents.indexOf(s)})">${studentName}</a>${flagPill(flagInfo[s.id])}</div>
         <div class="student-email">${p.email ?? ''}</div>
       </td>
       <td class="text-sm">${allStudiosMap[s.studio_id] ?? '–'}</td>
@@ -1503,6 +1545,7 @@ function filterStudents() {
   const qDigits = digitsOnly(q);
   const studio  = document.getElementById('filterStudio').value;
   const status  = document.getElementById('filterStatus').value;
+  const flagged = document.getElementById('filterFlag').value === 'flagged';
 
   const filtered = allStudents.filter(s => {
     const p    = s.profiles ?? {};
@@ -1529,7 +1572,8 @@ function filterStudents() {
       || (qDigits.length >= 4 && phone.includes(qDigits));   // avoid 1-2 digit false positives
     const matchStudio = !studio || s.studio_id === studio;
     const matchStatus = !status || s.status === status;
-    return matchQ && matchStudio && matchStatus;
+    const matchFlag   = !flagged || (flagInfo[s.id] ?? []).some(r => r.why === 'this record');
+    return matchQ && matchStudio && matchStatus && matchFlag;
   });
   renderStudents(filtered);
   updateStudentCount(studio);
@@ -1811,6 +1855,127 @@ function openStudentModal(student = null) {
   document.getElementById('studentModal').classList.remove('hidden');
   studentFormBaseline = studentFormSnapshot();
   refreshViewTasksButton(student ? student.id : null);
+  loadFlagSection(student);
+}
+
+// ============================================================
+// FLAGS (see student-flags.sql / js/person-match.js)
+// ============================================================
+let flagState = { studentId: null, active: null };
+
+// Flagged people matching a student's contact details — their own and their
+// parent's — merged, one row per flagged student.
+async function flaggedMatchesFor(c) {
+  const calls = [flagCheckContact({ email: c.email, phone: c.phone, first: c.first, last: c.last, exclude: c.exclude })];
+  if (c.parentEmail || c.parentPhone) {
+    calls.push(flagCheckContact({ email: c.parentEmail, phone: c.parentPhone, exclude: c.exclude }));
+  }
+  const merged = new Map();
+  (await Promise.all(calls)).flat().forEach(r => {
+    const cur = merged.get(r.student_id);
+    if (!cur) { merged.set(r.student_id, { ...r }); return; }
+    cur.why = [...new Set(`${cur.why}, ${r.why}`.split(', '))].join(', ');
+  });
+  return [...merged.values()];
+}
+
+async function loadFlagSection(student) {
+  const sec = document.getElementById('flagSection');
+  flagState = { studentId: student?.id ?? null, active: null };
+  if (!student) { sec.style.display = 'none'; return; }   // nothing to flag until saved
+
+  sec.style.display = '';
+  document.getElementById('flagLevel').value = '';
+  document.getElementById('flagReason').value = '';
+  document.getElementById('flagMeta').textContent = 'Loading…';
+  document.getElementById('flagLinked').innerHTML = '';
+  document.getElementById('flagHistory').style.display = 'none';
+
+  const myId = student.id;
+  const [flagRes, linked] = await Promise.all([
+    db.from('student_flags').select('*').eq('student_id', myId).order('created_at', { ascending: false }),
+    flaggedMatchesFor({
+      email: student.email, phone: student.profiles?.phone,
+      first: student.first_name ?? student.profiles?.first_name, last: student.last_name ?? student.profiles?.last_name,
+      parentEmail: student.parent_email, parentPhone: student.parent_phone, exclude: myId,
+    }),
+  ]);
+  if (flagState.studentId !== myId) return;   // modal moved on
+
+  document.getElementById('flagLinked').innerHTML =
+    flagBanner(linked, 'Linked to a flagged student (same email, phone or name):');
+
+  if (flagRes.error) {
+    document.getElementById('flagMeta').textContent =
+      'Flags are not available yet — run student-flags.sql in Supabase first.';
+    document.getElementById('flagSaveBtn').disabled = true;
+    return;
+  }
+  document.getElementById('flagSaveBtn').disabled = false;
+
+  const rows = flagRes.data ?? [];
+  const active = rows.find(r => !r.cleared_at) ?? null;
+  flagState.active = active;
+  document.getElementById('flagLevel').value  = active?.level ?? '';
+  document.getElementById('flagReason').value = active?.reason ?? '';
+  const fd = d => new Date(d).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  document.getElementById('flagMeta').textContent = active
+    ? `Flagged ${fd(active.created_at)}${active.updated_at ? ` · last changed ${fd(active.updated_at)}` : ''}.`
+    : 'Not flagged. Choose a level and give a reason to flag this student.';
+
+  const past = rows.filter(r => r.cleared_at);
+  const histEl = document.getElementById('flagHistory');
+  if (past.length) {
+    document.getElementById('flagHistoryBody').innerHTML = past.map(r =>
+      `<div>${fd(r.created_at)} – ${fd(r.cleared_at)}: <strong>${escTask(FLAG_LEVEL_LABEL[r.level])}</strong> · ${escTask(r.reason)}${
+        r.clear_note ? ` · cleared: ${escTask(r.clear_note)}` : ''}</div>`).join('');
+    histEl.style.display = '';
+  }
+}
+
+async function saveFlag() {
+  const studentId = flagState.studentId;
+  if (!studentId) return;
+  const level  = document.getElementById('flagLevel').value;
+  const reason = document.getElementById('flagReason').value.trim();
+  const active = flagState.active;
+  const btn = document.getElementById('flagSaveBtn');
+
+  try {
+    btn.disabled = true;
+    if (!level) {
+      if (!active) { showToast('This student has no flag to clear.', 'warning'); return; }
+      const note = prompt('Clear this flag?\n\nOptional note for the history (e.g. "Paid in full"):', '');
+      if (note === null) return;
+      const { error } = await db.from('student_flags').update({
+        cleared_at: new Date().toISOString(), cleared_by: currentProfile.id, clear_note: note.trim() || null,
+      }).eq('id', active.id);
+      if (error) throw error;
+      showToast('Flag cleared.', 'success');
+    } else {
+      if (!reason) { showToast('Please give a reason for the flag.', 'error'); return; }
+      if (active) {
+        if (active.level === level && active.reason === reason) { showToast('No changes to save.', 'warning'); return; }
+        const { error } = await db.from('student_flags').update({
+          level, reason, updated_by: currentProfile.id, updated_at: new Date().toISOString(),
+        }).eq('id', active.id);
+        if (error) throw error;
+      } else {
+        const { error } = await db.from('student_flags').insert({
+          student_id: studentId, level, reason, created_by: currentProfile.id,
+        });
+        if (error) throw error;
+      }
+      showToast('Flag saved.', 'success');
+    }
+    const st = allStudents.find(x => x.id === studentId);
+    await loadFlagSection(st ?? null);
+    refreshFlagInfo();
+  } catch (err) {
+    showToast('Could not save the flag: ' + (err.message ?? err), 'error');
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // Live "n / 50" under Additional Notes. The input's maxlength does the
@@ -1835,7 +2000,7 @@ let viewTasksStudentId = null;
 let studentFormBaseline = '';
 
 function studentFormSnapshot() {
-  return Array.from(document.querySelectorAll('#studentModal input, #studentModal select, #studentModal textarea'))
+  return Array.from(document.querySelectorAll('#studentModal input:not([data-flagctl]), #studentModal select:not([data-flagctl]), #studentModal textarea:not([data-flagctl])'))
     .map(el => (el.type === 'checkbox' ? el.checked : el.value)).join('\u0001');
 }
 
@@ -1971,6 +2136,19 @@ async function saveStudent() {
       instruments.push({ instrument: inst, skill_level: level });
     }
   });
+
+  // A brand-new student who matches a flagged one (same email, phone or name,
+  // any studio): warn, but let the admin carry on — it is their call.
+  if (!editId) {
+    const hits = await flaggedMatchesFor({
+      email, phone, first: firstName, last: lastName, parentEmail, parentPhone,
+    });
+    if (hits.length) {
+      const lines = hits.map(r =>
+        `• ${r.student_name} (${r.studio_name ?? 'no studio'}) — ${FLAG_LEVEL_LABEL[r.level]}: ${r.reason}  [${r.why}]`).join('\n');
+      if (!confirm(`🚩 This looks like a flagged student:\n\n${lines}\n\nAdd this student anyway?`)) return;
+    }
+  }
 
   try {
     let userId    = editUserId;

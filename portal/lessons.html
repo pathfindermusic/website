@@ -756,7 +756,7 @@
 <!-- ============================================================
      CLONE OCCURRENCE MODAL — copy this lesson to a new day/time.
      Teacher, studio, instrument, lesson type and roster all carry
-     over unchanged; only the date/time differ and notes start blank.
+     over unchanged; only the date/time differ. Notes start as "Makeup lesson for <date>" (editable).
      ============================================================ -->
 <div class="modal-overlay hidden" id="cloneModal">
   <div class="modal" style="max-width:440px;">
@@ -768,8 +768,8 @@
       <div id="cloneSummary" style="background:var(--off-white);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.85rem;margin-bottom:1rem;font-size:0.875rem;line-height:1.65;"></div>
       <div class="form-hint" style="margin-bottom:0.85rem;">
         Teacher, student(s), instrument and studio carry over unchanged — only the day and
-        time are different. The new lesson starts with blank occurrence notes and no
-        attendance marked, ready to edit as usual.
+        time are different. The new lesson starts with no attendance marked, ready to edit
+        as usual.
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -789,6 +789,11 @@
         </select>
         <div class="form-hint">Consumes one lesson credit from that student. Leave as "Not a
           makeup" to just relocate the lesson.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea class="form-textarea" id="cloneNotes" style="min-height:60px;"></textarea>
+        <div class="form-hint">Becomes the new lesson's notes. Edit or clear it if this isn't a makeup.</div>
       </div>
       <div class="clash-error" id="cloneClashError">
         <span>🚫</span><span id="cloneClashMsg"></span>
@@ -1306,6 +1311,29 @@ async function lmByIds(ids, build) {
   return (await Promise.all(chunks.map(c => lmPaged(() => build(c))))).flat();
 }
 
+// Ending a series ("Cancel this + future" / "the series") marks every later
+// occurrence cancelled and sets lessons.status to cancelled; those are hidden
+// from the grids. But a lesson that was cancelled ON PURPOSE before the series
+// ended ("Cancel this lesson only", e.g. teacher sick) lives in the same kind
+// of series and must stay visible with its red cross. The two look the same on
+// lesson_occurrences.status, so tell them apart by the attendance
+// 'teacher_cancelled' rows only the one-off cancel writes (series end never
+// does). Returns the Set of occurrence ids that were one-off cancellations.
+// If the lookup fails the old behaviour (hide) applies.
+async function oneOffCancelledIds(occIds) {
+  const ids = [...new Set((occIds ?? []).filter(Boolean))];
+  if (!ids.length) return new Set();
+  try {
+    const rows = await lmByIds(ids, c => db.from('attendance')
+      .select('lesson_occurrence_id,student_id')
+      .in('lesson_occurrence_id', c).eq('status', 'teacher_cancelled')
+      .order('lesson_occurrence_id').order('student_id'));
+    return new Set(rows.map(r => r.lesson_occurrence_id));
+  } catch (_) {
+    return new Set();
+  }
+}
+
 async function monthRowsLight(first, last, { studioId, statusF, teacherId }) {
   // Week-sized slices: each is the same size of query the weekly view runs.
   const slices = [];
@@ -1490,8 +1518,13 @@ async function loadMonthlyView() {
   }
   if (myReq !== monthReq) return;   // a newer load has taken over
 
+  const oneOffM = await oneOffCancelledIds(data
+    .filter(o => o.lesson_status !== 'active' && o.occurrence_status === 'cancelled')
+    .map(o => o.occurrence_id));
   let rows = data.filter(o =>
-    o.lesson_status !== 'active' ? o.occurrence_status !== 'cancelled' : true);
+    o.lesson_status !== 'active'
+      ? (o.occurrence_status !== 'cancelled' || oneOffM.has(o.occurrence_id))
+      : true);
 
   // The server has already narrowed the rows; these checks keep the exact
   // matching rules as a safety net.
@@ -1677,6 +1710,8 @@ async function loadDailyView() {
   // ad-hoc guest added for that specific occurrence.
   const rosterMaps = splitRosterRows(lsData);
 
+  const oneOffD = await oneOffCancelledIds((occData ?? [])
+    .filter(o => o.lessons?.status !== 'active' && o.status === 'cancelled').map(o => o.id));
   allOccurrences = (occData ?? []).map(o => ({
     ...o,
     lessonStudents: rosterFor(o.lessons?.id ?? o.lesson_id, o.id, rosterMaps),
@@ -1685,8 +1720,9 @@ async function loadDailyView() {
     // Cancelling a series marks every occurrence from the cancellation
     // point onwards as cancelled. Hide exactly those — earlier lessons
     // still happened and stay on the grid as history, whether or not
-    // their attendance was ever marked.
-    if (o.lessons?.status !== 'active') return o.status !== 'cancelled';
+    // their attendance was ever marked. A one-off cancellation inside
+    // such a series (teacher sick the week before it ended) stays.
+    if (o.lessons?.status !== 'active') return o.status !== 'cancelled' || oneOffD.has(o.id);
 
     // Active series: show everything. A cancelled occurrence here is a
     // deliberate one-off and renders with a red ✕.
@@ -2105,6 +2141,9 @@ async function loadTeacherWeekGrid(teacherId) {
   const { data, error } = await query;
   if (error) { wrap.innerHTML = `<div class="empty-state"><p style="color:#dc2626;">${error.message}</p></div>`; return; }
 
+  const oneOffT = await oneOffCancelledIds((data ?? [])
+    .filter(o => o.lessons && o.lessons.status !== 'active' && o.status === 'cancelled').map(o => o.id));
+
   // Theirs, or covered by them — at the studio shown, if one is picked.
   const mine = (data ?? []).filter(o => {
     const l = o.lessons;
@@ -2114,7 +2153,7 @@ async function loadTeacherWeekGrid(teacherId) {
     // Same rule as the other views: hide the cancelled tail of a series
     // that has been cancelled outright; a cancelled one-off in a live
     // series stays, with its red ✕.
-    if (l.status !== 'active') return o.status !== 'cancelled';
+    if (l.status !== 'active') return o.status !== 'cancelled' || oneOffT.has(o.id);
     return true;
   });
 
@@ -2469,6 +2508,9 @@ async function loadWeeklyView() {
   const { data, error } = await query;
   if (error) { wrap.innerHTML = `<div class="empty-state"><p style="color:#dc2626;">${error.message}</p></div>`; return; }
 
+  const oneOffW = await oneOffCancelledIds((data ?? [])
+    .filter(o => o.lessons && o.lessons.status !== 'active' && o.status === 'cancelled').map(o => o.id));
+
   allOccurrences = (data ?? []).filter(o => {
     // Filtering on a joined column gives a LEFT join: occurrences from
     // the other studio still come back, with lessons set to null. They
@@ -2480,7 +2522,7 @@ async function loadWeeklyView() {
     // point onwards as cancelled. Hide exactly those — earlier lessons
     // still happened and stay on the grid as history, whether or not
     // their attendance was ever marked.
-    if (o.lessons.status !== 'active') return o.status !== 'cancelled';
+    if (o.lessons.status !== 'active') return o.status !== 'cancelled' || oneOffW.has(o.id);
 
     // Active series: show everything. A cancelled occurrence here is a
     // deliberate one-off and renders with a red ✕.
@@ -3691,6 +3733,11 @@ async function openCloneModal() {
   document.getElementById('cloneDate').value = (occ.date ?? '').slice(0, 10);
   refreshCloneTimes(l.start_time ? l.start_time.slice(0, 5) : null);
 
+  // Notes for the new lesson: starts as a makeup note pointing at the lesson
+  // being cloned; the admin can overwrite or clear it.
+  document.getElementById('cloneNotes').value =
+    `Makeup lesson for ${formatShortDate(parseLocalDate((occ.date ?? '').slice(0, 10)))}`;
+
   document.getElementById('cloneClashError').classList.remove('show');
   document.getElementById('cloneModal').classList.remove('hidden');
 }
@@ -3846,6 +3893,7 @@ async function saveClone() {
 
   // ---- CREDIT CHECK: a makeup can only be booked against a balance ----
   const makeupForSid = document.getElementById('cloneMakeupFor').value;
+  const cloneNotes   = document.getElementById('cloneNotes').value.trim();
   if (makeupForSid) {
     const bal = cloneStudentBalances[makeupForSid] ?? 0;
     if (bal <= 0) {
@@ -3916,6 +3964,7 @@ async function saveClone() {
     const { data: occData, error: oErr } = await db.from('lesson_occurrences').insert({
       lesson_id: newLessonId, date, status: 'scheduled',
       is_makeup: !!makeupForSid,
+      occurrence_notes: cloneNotes || null,
     }).select('id').single();
     if (oErr) throw new Error(oErr.message);
 
