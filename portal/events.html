@@ -1102,6 +1102,20 @@ async function bandLessonMates(studentId) {
   } catch (_) { return []; }
 }
 
+// Every student in a band OTHER than `b`: Map(studentId -> [{name, block}]).
+// A student may be in any number of bands at one event (also in the same
+// block — performances are often wanted back to back); this only feeds the
+// "also in …" notes.
+function bandsOfOthers(b) {
+  const m = new Map();
+  grid.bookings.filter(x => x.id !== b.id && x.band_name).forEach(x =>
+    (x.members ?? []).forEach(mem => {
+      if (!m.has(mem.student_id)) m.set(mem.student_id, []);
+      m.get(mem.student_id).push({ name: x.band_name, block: x.block });
+    }));
+  return m;
+}
+
 async function openBandModal() {
   const b = activeBooking;
   if (!b) return;
@@ -1115,16 +1129,19 @@ async function openBandModal() {
   const mates = await bandLessonMates(b.student_id);
   const current = new Map((b.members ?? []).map(m => [m.student_id, m.name]));
 
-  // Someone already in a DIFFERENT band at this event cannot be offered here
-  const inOtherBand = new Set(grid.bookings.filter(x => x.id !== b.id && x.band_name)
-    .flatMap(x => (x.members ?? []).map(m => m.student_id)));
+  // Someone already in ANOTHER band is still offered (a student can play in
+  // several bands); a note says which.
+  const otherBands = bandsOfOthers(b);
 
   const rows = new Map();
   const add = (id, name, tag, checked) => {
-    if (!id || rows.has(id) || inOtherBand.has(id)) return;
+    if (!id || rows.has(id)) return;
     const solo = soloBand.get(id);
-    rows.set(id, { id, name: name || nameOf.get(id) || 'Student', tags: [tag].filter(Boolean),
-      solo: solo ?? null, checked, lead: id === b.student_id });
+    const lead = id === b.student_id;
+    const also = (lead ? [] : (otherBands.get(id) ?? [])).map(x => `also in "${x.name}" (Block ${x.block})`);
+    rows.set(id, { id, name: name || nameOf.get(id) || 'Student',
+      tags: [tag, ...also].filter(Boolean),
+      solo: solo ?? null, checked, lead });
   };
   add(b.student_id, nameOf.get(b.student_id) ?? (b.band_name ? (b.members ?? [])[0]?.name : b.student_name), 'keeps this slot', true);
   current.forEach((n, id) => add(id, n, 'current member', true));
@@ -1156,11 +1173,12 @@ function renderBandMembers() {
       <span><b>${PF.esc(r.name)}</b>${r.tags.length ? ` <span style="color:var(--mid-grey);font-size:.76rem">· ${r.tags.map(PF.esc).join(' · ')}</span>` : ''}</span>
     </label>`).join('');
   const taken = new Set(rows.keys());
-  const memberOfOther = new Set(grid.bookings.filter(x => x.id !== booking.id && x.band_name)
-    .flatMap(x => (x.members ?? []).map(m => m.student_id)));
+  // Students already in another band are offered too, with a note.
+  const others = bandsOfOthers(booking);
   document.getElementById('bandAddSel').innerHTML = '<option value="">— Add another student —</option>' +
-    choices.filter(s => !taken.has(s.id) && !memberOfOther.has(s.id))
-      .map(s => `<option value="${PF.esc(s.id)}">${PF.esc(s.name)}</option>`).join('');
+    choices.filter(s => !taken.has(s.id))
+      .map(s => `<option value="${PF.esc(s.id)}">${PF.esc(s.name)}${others.has(s.id)
+        ? ' — also in ' + PF.esc(others.get(s.id).map(x => '"' + x.name + '"').join(', ')) : ''}</option>`).join('');
   updateBandSummary();
 }
 

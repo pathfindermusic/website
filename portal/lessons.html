@@ -432,6 +432,12 @@
               title="Pick a teacher to see their week as a grid">
         <option value="">All teachers</option>
       </select>
+      <!-- Daily view only: leave out teachers who are available but have no lesson that day -->
+      <label id="busyOnlyWrap" style="display:flex;align-items:center;gap:0.4rem;font-size:0.84rem;cursor:pointer;white-space:nowrap;"
+             title="Daily view: hide teachers who have no lessons on this day">
+        <input type="checkbox" id="busyOnly" onchange="onBusyOnlyChange()" style="accent-color:var(--orange);">
+        Only teachers with lessons
+      </label>
     </div>
 
     <!-- Content area -->
@@ -967,6 +973,7 @@ function adhocFor(occurrenceId, maps) {
 // ============================================================
 let currentProfile  = null;
 let currentView     = 'daily';
+try { document.getElementById('busyOnly').checked = localStorage.getItem('pfLessonsBusyOnly') === '1'; } catch (_) {}
 let monthAnchor     = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let currentDate     = new Date();
 let weekStart       = getWeekStart(new Date());
@@ -1223,7 +1230,16 @@ function syncDatePicker(date) {
   if (el) el.value = toISODate(date);
 }
 
+// "Only teachers with lessons" — remembered in this browser (a convenience:
+// the page works the same if storage is unavailable).
+function onBusyOnlyChange() {
+  try { localStorage.setItem('pfLessonsBusyOnly', document.getElementById('busyOnly').checked ? '1' : '0'); } catch (_) {}
+  loadView();
+}
+
 async function loadView() {
+  // Only the daily view has teacher columns to leave out
+  document.getElementById('busyOnlyWrap').style.display = currentView === 'daily' ? 'flex' : 'none';
   try {
     if (currentView === 'daily')        await loadDailyView();
     else if (currentView === 'monthly') await loadMonthlyView();
@@ -1749,11 +1765,15 @@ async function loadDailyView() {
     // (so a real booked lesson never silently disappears because of
     // missing/stale availability data).
     const dailyTeacherFilter = document.getElementById('filterTeacher').value;
+    const busyOnly = document.getElementById('busyOnly').checked;
     const teachers = studioTeachersAll.filter(t => {
       if (dailyTeacherFilter && t.id !== dailyTeacherFilter) return false;
       const hasAvailToday = (t.teacher_availability ?? [])
         .some(a => a.studio_id === studio.id && a.day_of_week === dayOfWeek);
       const hasLessonToday = studioOccs.some(o => o.lessons?.teacher_id === t.id);
+      // "Only teachers with lessons": a day's lessons include cancelled ones,
+      // so a cancellation is still visible in its teacher's column.
+      if (busyOnly) return hasLessonToday;
       return hasAvailToday || hasLessonToday;
     });
 
@@ -1771,7 +1791,7 @@ async function loadDailyView() {
     if (teachers.length === 0) {
       html += `<div class="studio-grid-section">
         <div class="studio-grid-title">${studio.name}</div>
-        <div class="empty-state" style="padding:1.5rem;"><p>No teachers available at this studio today.</p></div>
+        <div class="empty-state" style="padding:1.5rem;"><p>${busyOnly ? 'No teachers have lessons at this studio today.' : 'No teachers available at this studio today.'}</p></div>
       </div>`;
       return;
     }

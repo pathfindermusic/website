@@ -43,6 +43,49 @@
     .bucket-value { font-size: 1.7rem; font-weight: 800; line-height: 1; color: var(--charcoal); }
     .bucket-value.urgent { color: #dc2626; }
 
+    /* Search + pager (Oct 2026) */
+    .task-search-wrap { position: relative; flex: 1 1 260px; max-width: 360px; }
+    .task-search-wrap input {
+      width: 100%; padding: 0.48rem 2rem 0.48rem 2.1rem;
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      font-size: 0.82rem; font-family: 'Inter', sans-serif;
+      background: var(--white); color: var(--charcoal);
+    }
+    .task-search-wrap input:focus { outline: none; border-color: var(--orange); }
+    .task-search-icon {
+      position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%);
+      color: var(--mid-grey); font-size: 0.85rem; pointer-events: none;
+    }
+    .task-search-clear {
+      position: absolute; right: 0.35rem; top: 50%; transform: translateY(-50%);
+      border: none; background: none; cursor: pointer; color: var(--mid-grey);
+      font-size: 1.05rem; line-height: 1; padding: 0.2rem 0.4rem;
+    }
+    .task-search-clear:hover { color: var(--charcoal); }
+    .search-hint {
+      font-size: 0.8rem; color: var(--dark-grey); background: var(--off-white);
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      padding: 0.5rem 0.8rem; margin: -0.5rem 0 1rem;
+    }
+    .search-hint a { color: var(--orange); cursor: pointer; text-decoration: underline; }
+    .task-pager {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 0.75rem; flex-wrap: wrap; padding: 0.75rem 1rem;
+      border-top: 1px solid var(--border);
+    }
+    .task-pager-info { font-size: 0.8rem; color: var(--dark-grey); }
+    .task-pager-btns { display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
+    .pg-btn {
+      min-width: 2rem; padding: 0.35rem 0.6rem; font-size: 0.8rem;
+      font-family: 'Inter', sans-serif; cursor: pointer;
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      background: var(--white); color: var(--charcoal);
+    }
+    .pg-btn:hover:not(:disabled) { background: var(--off-white); }
+    .pg-btn.active { background: var(--orange); border-color: var(--orange); color: #fff; font-weight: 600; cursor: default; }
+    .pg-btn:disabled { opacity: 0.4; cursor: default; }
+    .pg-gap { color: var(--mid-grey); padding: 0 0.15rem; font-size: 0.8rem; }
+
     /* Task rows */
     .task-row {
       display: grid; grid-template-columns: 26px 1fr auto;
@@ -190,10 +233,18 @@
 
     <!-- Filters -->
     <div class="filters-bar" id="filterBar">
+      <div class="task-search-wrap">
+        <span class="task-search-icon">🔍</span>
+        <input type="text" id="taskSearch" autocomplete="off"
+               placeholder="Search tasks — student, parent, phone, email…"
+               oninput="onTaskSearchInput()">
+        <button type="button" class="task-search-clear hidden" id="taskSearchClear"
+                title="Clear search" onclick="clearTaskSearch()">×</button>
+      </div>
       <select class="filter-select" id="filterStudio" onchange="onStudioFilterChange()">
         <option value="">All studios</option>
       </select>
-      <select class="filter-select" id="filterAssignee" onchange="render()">
+      <select class="filter-select" id="filterAssignee" onchange="renderFromStart()">
         <option value="">Anyone</option>
         <option value="__me">Assigned to me</option>
         <option value="__none">Unassigned</option>
@@ -205,9 +256,11 @@
       </select>
     </div>
 
+    <div class="search-hint hidden" id="searchHint"></div>
+
     <div class="card"><div id="taskList">
       <div class="loading"><div class="spinner"></div> Loading tasks…</div>
-    </div></div>
+    </div><div id="taskPager"></div></div>
   </main>
 </div>
 
@@ -711,7 +764,7 @@ async function loadOptions() {
   const [stRes, adRes, studRes, teachRes] = await Promise.all([
     db.from('studios').select('id,name').eq('status','active').order('name'),
     db.from('admins').select('id,user_id,studio_ids'),
-    db.from('students').select('id,user_id,status,enquiry_notes,enquiry_date,email,first_name,last_name')
+    db.from('students').select('id,user_id,status,enquiry_notes,enquiry_date,email,first_name,last_name,parent_name,parent_email,parent_phone')
       .in('status',['active','trial','prospective','lapsed','inactive']),
     db.from('teachers').select('id,user_id,studio_ids'),
   ]);
@@ -734,7 +787,7 @@ async function loadOptions() {
   ].filter(Boolean);
 
   const { data: profs } = ids.length
-    ? await db.from('profiles').select('id,first_name,last_name,role,status').in('id', ids)
+    ? await db.from('profiles').select('id,first_name,last_name,role,status,phone').in('id', ids)
     : { data: [] };
   const pMap = {};
   (profs ?? []).forEach(p => { pMap[p.id] = p; });
@@ -766,6 +819,9 @@ async function loadOptions() {
       name: `${s.first_name ?? ''} ${s.last_name ?? ''}`.trim() || nameOf(s.user_id),
       status: s.status,
       enquiry_notes: s.enquiry_notes, enquiry_date: s.enquiry_date, email: s.email,
+      // Only used by the search box
+      parent_name: s.parent_name, parent_email: s.parent_email, parent_phone: s.parent_phone,
+      phone: pMap[s.user_id]?.phone ?? null,
     }))
     .filter(s => s.name).sort((a,b) => a.name.localeCompare(b.name));
 
@@ -774,6 +830,7 @@ async function loadOptions() {
       id:     t.id,
       name:   nameOf(t.user_id) || '(name unavailable)',
       status: pMap[t.user_id]?.status ?? null,
+      phone:  pMap[t.user_id]?.phone ?? null,   // search only
     }))
     .filter(t => t.status !== 'inactive')
     .sort((a,b) => a.name.localeCompare(b.name));
@@ -914,7 +971,7 @@ function onStudioFilterChange() {
   // but only when they're recomputed — switching studios has to trigger
   // that recompute explicitly, same as changing the status filter does.
   renderBuckets();
-  render();
+  renderFromStart();
 }
 
 function onStatusFilterChange() {
@@ -924,7 +981,7 @@ function onStatusFilterChange() {
     bucket = 'open';
     renderBuckets();
   }
-  render();
+  renderFromStart();
 }
 
 function setBucket(k) {
@@ -936,7 +993,7 @@ function setBucket(k) {
     if (sel && sel.value !== 'open') sel.value = 'open';
   }
   renderBuckets();
-  render();
+  renderFromStart();
 }
 
 // ============================================================
@@ -955,7 +1012,7 @@ function taskNavBack() {
   bucket = null;
   syncTaskDatePicker();
   renderBuckets();
-  render();
+  renderFromStart();
 }
 
 function taskNavForward() {
@@ -963,7 +1020,7 @@ function taskNavForward() {
   bucket = null;
   syncTaskDatePicker();
   renderBuckets();
-  render();
+  renderFromStart();
 }
 
 function taskGoToday() {
@@ -971,7 +1028,7 @@ function taskGoToday() {
   bucket = null;
   syncTaskDatePicker();
   renderBuckets();
-  render();
+  renderFromStart();
 }
 
 function taskJumpToDate(value) {
@@ -979,7 +1036,122 @@ function taskJumpToDate(value) {
   selectedDate = parseLocalDate(value);
   bucket = null;
   renderBuckets();
+  renderFromStart();
+}
+
+// ============================================================
+// SEARCH + PAGING (Oct 2026)
+// The list outgrew one long scroll once a few months of closed tasks
+// piled up, so it is shown TASKS_PER_PAGE at a time, and a search box
+// finds the tasks about a given family.
+// ============================================================
+const TASKS_PER_PAGE = 25;
+let currentPage = 1;
+
+// Back to page 1 — for anything that changes WHICH tasks are listed.
+// (Closing/reopening a task re-renders in place and keeps the page.)
+function renderFromStart() { currentPage = 1; render(); }
+
+function goToTaskPage(n) {
+  currentPage = n;
   render();
+  // The pager is under the list; bring the top of the list back into view
+  document.getElementById('buckets')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+
+let searchTimer = null;
+function onTaskSearchInput() {
+  const v = document.getElementById('taskSearch').value;
+  document.getElementById('taskSearchClear').classList.toggle('hidden', !v);
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(renderFromStart, 150);
+}
+function clearTaskSearch() {
+  const el = document.getElementById('taskSearch');
+  el.value = '';
+  document.getElementById('taskSearchClear').classList.add('hidden');
+  clearTimeout(searchTimer);
+  renderFromStart();
+  el.focus();
+}
+function searchIncludeClosed() {
+  document.getElementById('filterStatus').value = 'all';
+  onStatusFilterChange();
+}
+
+// Phone numbers are typed in every shape (spaces, dashes, +61). Compare
+// digits only, with a +61 / 61 prefix folded to the leading 0.
+function normPhoneDigits(str) {
+  let d = String(str ?? '').replace(/\D/g, '');
+  if (d.startsWith('61') && d.length >= 10) d = '0' + d.slice(2);
+  return d;
+}
+
+// Everything a person might remember a task by: its title, and who it is
+// about — the student's own and their parent's name, email and phone.
+function taskSearchText(t) {
+  const out = [t.title, t.subjectName];
+  let phones = [];
+  if (t.subject_type === 'student') {
+    const s = studentOpts.find(x => x.id === t.subject_id);
+    if (s) {
+      out.push(s.email, s.parent_name, s.parent_email, s.enquiry_notes);
+      phones = [s.phone, s.parent_phone];
+    }
+  } else if (t.subject_type === 'teacher') {
+    const x = teacherOpts.find(y => y.id === t.subject_id);
+    if (x) phones = [x.phone];
+  }
+  return {
+    text: out.filter(Boolean).join(' ').toLowerCase(),
+    phones: phones.map(normPhoneDigits).filter(Boolean),
+  };
+}
+
+// All words must match (so "sarah smith" or "smith guitar" both work).
+// A word of 4+ digits is also tried as a phone number.
+function taskMatchesSearch(t, tokens) {
+  const { text, phones } = taskSearchText(t);
+  return tokens.every(tok => {
+    if (text.includes(tok)) return true;
+    // Only a word that is all digits (and + - ( )) is tried as a phone number
+    if (!/^[\d+()\-]+$/.test(tok)) return false;
+    const dg = normPhoneDigits(tok);
+    return dg.length >= 4 && phones.some(p => p.includes(dg));
+  });
+}
+
+// 1 … 4 5 [6] 7 8 … 20
+function pageNumbers(cur, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const set = new Set([1, total, cur, cur - 1, cur + 1]);
+  if (cur <= 3) { set.add(2); set.add(3); set.add(4); }
+  if (cur >= total - 2) { set.add(total - 1); set.add(total - 2); set.add(total - 3); }
+  const nums = [...set].filter(n => n >= 1 && n <= total).sort((a, b) => a - b);
+  const out = [];
+  nums.forEach((n, i) => { if (i && n - nums[i - 1] > 1) out.push('…'); out.push(n); });
+  return out;
+}
+
+function renderPager(total) {
+  const el = document.getElementById('taskPager');
+  if (!el) return;
+  if (total <= TASKS_PER_PAGE) { el.innerHTML = ''; return; }
+  const pages = Math.ceil(total / TASKS_PER_PAGE);
+  const from = (currentPage - 1) * TASKS_PER_PAGE + 1;
+  const to   = Math.min(total, currentPage * TASKS_PER_PAGE);
+  const nums = pageNumbers(currentPage, pages).map(n =>
+    n === '…' ? `<span class="pg-gap">…</span>`
+    : `<button class="pg-btn ${n === currentPage ? 'active' : ''}" ${n === currentPage ? 'disabled' : ''}
+         onclick="goToTaskPage(${n})">${n}</button>`).join('');
+  el.innerHTML = `<div class="task-pager">
+    <div class="task-pager-info">Showing ${from}–${to} of ${total}</div>
+    <div class="task-pager-btns">
+      <button class="pg-btn" ${currentPage <= 1 ? 'disabled' : ''} onclick="goToTaskPage(${currentPage - 1})">‹ Back</button>
+      ${nums}
+      <button class="pg-btn" ${currentPage >= pages ? 'disabled' : ''} onclick="goToTaskPage(${currentPage + 1})">Next ›</button>
+    </div>
+  </div>`;
 }
 
 // ============================================================
@@ -996,12 +1168,21 @@ function render() {
 
   let list = tasks.slice();
 
+  // A phone number typed with spaces ("0412 345 678") is one search word
+  const searchTokens = (document.getElementById('taskSearch')?.value ?? '')
+    .toLowerCase().trim().replace(/(\d)\s+(?=\d)/g, '$1').split(/\s+/).filter(Boolean);
+  const searching = searchTokens.length > 0;
 
   // Bucket. Every view except "Waiting list" excludes waitlist
   // entries, so open-ended items don't clutter the day's work.
   const notWait = t => t.kind !== 'waitlist';
   const selectedStr = toISODate(selectedDate);
-  if (bucket === null) {
+  if (searching) {
+    // A search looks across all dates: the day/bucket view only decides
+    // what is shown when nobody is searching. The Open / Done / Everything
+    // choice still applies (see the hint under the filters).
+  }
+  else if (bucket === null) {
     // The landing view: overdue is always against the real today, not
     // wherever the date-nav is pointed — an overdue task doesn't stop
     // being overdue because you're browsing next Friday.
@@ -1029,7 +1210,33 @@ function render() {
   else if (fAssignee === '__none') list = list.filter(t => !t.assigned_to);
   else if (fAssignee)              list = list.filter(t => t.assigned_to === fAssignee);
 
-  const dateNote = bucket === null
+  if (searching) list = list.filter(t => taskMatchesSearch(t, searchTokens));
+
+  // Looking back through finished work: newest first, not oldest due date
+  if (fStatus === 'done') {
+    const when = t => t.completed_at || t.due_date || '';
+    list.sort((a, b) => when(b).localeCompare(when(a)));
+  }
+
+  // Say what a search is (and isn't) covering
+  const hint = document.getElementById('searchHint');
+  if (hint) {
+    if (searching) {
+      const closedElsewhere = fStatus === 'open'
+        ? tasks.filter(t => t.status !== 'open' && (!fStudio || t.studio_id === fStudio) &&
+            taskMatchesSearch(t, searchTokens)).length
+        : 0;
+      hint.innerHTML = 'Searching ' + (fStatus === 'open' ? 'open tasks' : fStatus === 'done' ? 'done &amp; cancelled tasks' : 'all tasks') +
+        ' on every date' + (fStudio ? ' in the selected studio' : '') + '.' +
+        (closedElsewhere ? ` <a onclick="searchIncludeClosed()">Include ${closedElsewhere} done &amp; cancelled</a>` : '');
+      hint.classList.remove('hidden');
+    } else {
+      hint.classList.add('hidden');
+    }
+  }
+
+  const dateNote = searching ? ' · matching your search'
+    : bucket === null
     ? ` · showing overdue + ${selectedStr === today ? 'today' : formatShortDate(selectedDate)}`
     : '';
   // Same studio scope as the list below and the bucket tiles above —
@@ -1040,11 +1247,12 @@ function render() {
     ? tasks.filter(t => t.status === 'open' && t.studio_id === fStudio)
     : tasks.filter(t => t.status === 'open');
   document.getElementById('pageSub').textContent =
-    `${openInScope.length} open · ${list.length} shown${dateNote}`;
+    `${openInScope.length} open · ${list.length} ${searching ? 'found' : 'shown'}${dateNote}`;
 
   const el = document.getElementById('taskList');
   if (!list.length) {
     const emptyMsg = isTeacher ? 'No tasks for you right now.'
+      : searching ? 'No tasks match your search.'
       : bucket === null ? `Nothing overdue, and nothing due ${selectedStr === today ? 'today' : `on ${formatShortDate(selectedDate)}`}.`
       : 'Nothing matches this view.';
     el.innerHTML = `<div class="empty-state">
@@ -1052,8 +1260,16 @@ function render() {
       <h3>Nothing here</h3>
       <p>${emptyMsg}</p>
     </div>`;
+    renderPager(0);
     return;
   }
+
+  // Page the list. Clamp, because closing tasks can shrink it under us.
+  const pageCount = Math.ceil(list.length / TASKS_PER_PAGE);
+  if (currentPage > pageCount) currentPage = pageCount;
+  if (currentPage < 1) currentPage = 1;
+  const total = list.length;
+  list = list.slice((currentPage - 1) * TASKS_PER_PAGE, currentPage * TASKS_PER_PAGE);
 
   const studioName  = id => studios.find(s => s.id === id)?.name;
   const adminName   = id => admins.find(a => a.id === id)?.name;
@@ -1107,6 +1323,9 @@ function render() {
         : `<span class="tag tag-unassigned">Unassigned</span>`);
     }
     if (dueTxt) bits.push(`<span class="${dueCls}">${dueTxt}</span>`);
+    if (done && t.completed_at) {
+      bits.push(`<span class="text-muted" style="font-size:0.78rem;">${isCancelled ? 'Cancelled' : 'Done'} ${formatShortDate(new Date(t.completed_at))}</span>`);
+    }
     if (t.kind === 'waitlist') {
       bits.push(`<span class="tag tag-wait">Waiting</span>`);
       bits.push(`<span class="text-muted" style="font-size:0.78rem;">${escapeHtml(waitlistSummary(t))}</span>`);
@@ -1135,6 +1354,7 @@ function render() {
       </div>
     </div>`;
   }).join('');
+  renderPager(total);
 }
 
 function escapeHtml(s) {

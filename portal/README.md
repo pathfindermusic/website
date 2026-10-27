@@ -2219,6 +2219,50 @@ shared code in `js/events-common.js`; database in `supabase/events.sql`.
   fails it falls back to hiding as before). Works for existing data, no SQL.
   Limit: a one-off cancel on a lesson with NO students writes no attendance, so
   that case in an ended series still hides.
+- **Tasks: paging and search (Oct 2026).** `tasks.html` lists 25 tasks per page
+  (`TASKS_PER_PAGE`) with Back / numbered pages / Next under the list and a
+  "Showing 26-50 of 137" count; the page resets to 1 whenever the studio,
+  assignee, status, bucket, date or search changes, but closing or reopening a
+  task keeps you on the page (clamped if the list shrinks). The sub-title count
+  ("N found/shown") is the total across all pages. A search box in the filter bar
+  finds tasks by title and by the person they are about: the student's name,
+  email, phone (profile phone), parent name/email/phone and enquiry notes, or a
+  teacher's name/phone. All words must match; phone numbers match on digits only
+  (spaces, dashes, +61 vs 0 ignored; 4+ digits). A search ignores the day/bucket
+  view and looks across all dates, but still respects the Open / Done / Everything
+  choice, with a hint offering to include closed tasks. The Done view lists
+  newest-closed first and rows show "Done <date>". No SQL needed; the page now
+  also selects `parent_name, parent_email, parent_phone` (students) and `phone`
+  (profiles) for the search. Teachers' own My Tasks view is paged but has no
+  search box.
+- **Daily view: "Only teachers with lessons" (Oct 2026).** A tick box in the
+  Lessons filter bar (daily view only; hidden in Weekly/Monthly). Off (default):
+  as before — every teacher available that day plus any with a lesson. On: only
+  teachers who have a lesson at that studio that day; a teacher whose lessons are
+  all cancelled still counts, so the cancellation stays visible. The time rows
+  then follow only the shown teachers' lessons and availability. The choice is
+  remembered in the browser (`localStorage` key `pfLessonsBusyOnly`, wrapped in
+  try/catch). No SQL. Empty studio message: "No teachers have lessons at this
+  studio today."
+- **A student can be in any number of bands at an event (Oct 2026).** The first
+  band design allowed only ONE band per student per event (`already_in_band`);
+  admins hit it when a student played in two bands. **Run
+  `supabase/events-band-multi.sql` (one statement at a time) before deploying
+  `events.html` and `js/events-common.js`.** There is deliberately NO limit on
+  two bands in the same time block: students usually want their band
+  performances back to back, i.e. in the same block (a first version of this
+  migration refused that — it was a misunderstanding and has been removed; the
+  current file replaces both functions without it and drops the helper
+  `_event_band_clash`, so it is safe whether or not the first version was run).
+  `combine_event_bookings()` no longer checks other bands at all and
+  `move_event_booking()` is the plain version again. The band window lists
+  students who are in another band with a note ("also in "Beta" (Block 2)") but
+  never hides or blocks them. Other rules are unchanged: members must be
+  Active/Trial and in the event's studio, 2–12 members, individual Band
+  bookings of members are cancelled when the band is saved, and each slot holds
+  one performance. Per-student limits for solo bookings (one per instrument,
+  `max_per_student` overall — default 5, admins can exceed) are unchanged and do
+  not count band membership; a band booking counts only toward its lead's total.
 - **Student flags — "Watch" / "Do not re-enrol" (Oct 2026).** Admins can flag a
   student (mostly bad payers) so a family that comes back is spotted. **Run
   `supabase/student-flags.sql` first, one statement at a time.** Design choices:
