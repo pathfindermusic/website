@@ -413,8 +413,9 @@
       <div class="ev-msg"></div>
       <div class="form-group" data-f="studentWrap">
         <label class="form-label">Who is performing?</label>
-        ${cfg.isAdmin ? '<input class="form-input" data-f="studentFilter" placeholder="Type to search students…" autocomplete="off" style="margin-bottom:.4rem">' : ''}
+        ${cfg.isAdmin && !ex ? '<input class="form-input" data-f="studentFilter" placeholder="Type to search students…" autocomplete="off" style="margin-bottom:.4rem">' : ''}
         <select class="form-select" data-f="student" ${ex ? 'disabled' : ''}></select>
+        ${cfg.isAdmin && !ex ? '<div class="form-hint" data-f="studentHint" style="margin-top:.3rem"></div>' : ''}
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -466,18 +467,45 @@
 
     // -- students
     let studentChoices = (cfg.students ?? []).slice();
+    // The search box narrows the student list. A closed drop-down hides
+    // what it now holds, so while there is something typed the matches are
+    // shown open as a short list (and a single match is picked for you) —
+    // before, the box DID filter, but nothing on screen changed, so it
+    // looked as if it did nothing (reported Nov 2026).
     const fillStudents = (filter) => {
       const sel = $('student');
       const cur = sel.value;
-      const f = (filter ?? '').trim().toLowerCase();
-      const list = studentChoices.filter(s => !f || s.name.toLowerCase().includes(f));
-      sel.innerHTML = (cfg.isAdmin ? '<option value="">— Select a student —</option>' : '') +
+      const words = (filter ?? '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+      const list = studentChoices.filter(s => {
+        const n = s.name.toLowerCase();
+        return words.every(w => n.includes(w));
+      });
+      const searching = cfg.isAdmin && words.length > 0;
+      const showAsList = searching && list.length > 1;
+      sel.size = showAsList ? Math.min(list.length, 6) : 1;
+      sel.innerHTML = (cfg.isAdmin && !showAsList ? '<option value="">— Select a student —</option>' : '') +
         list.map(s => `<option value="${PF.esc(s.id)}">${PF.esc(s.name)}</option>`).join('');
       if (cur && list.some(s => s.id === cur)) sel.value = cur;
+      else if (showAsList) sel.selectedIndex = -1;
+      else if (searching && list.length === 1) {
+        sel.value = list[0].id;
+        sel.dispatchEvent(new Event('change'));   // load this student's teachers / instruments
+      }
       else if (!cfg.isAdmin && list.length) sel.value = (ex ? ex.student_id : (cfg.defaultStudentId ?? list[0].id));
+      const hint = $('studentHint');
+      if (hint) {
+        hint.textContent = !searching ? ''
+          : !list.length ? 'No active or trial student at this studio matches that.'
+          : list.length === 1 ? 'One match — selected.'
+          : `${list.length} matches — click one.`;
+      }
     };
     fillStudents();
     if (ex) { $('student').innerHTML = `<option value="${PF.esc(ex.student_id)}">${PF.esc((studentChoices.find(s => s.id === ex.student_id) || {}).name ?? '')}</option>`; }
+    // Picking from the open list closes it again
+    $('student').addEventListener('change', () => {
+      if ($('student').size > 1 && $('student').value) { $('student').size = 1; if ($('studentHint')) $('studentHint').textContent = ''; }
+    });
     if (single) { $('studentWrap').querySelector('label').textContent = 'Performer'; }
     if ($('studentFilter')) $('studentFilter').addEventListener('input', e => { fillStudents(e.target.value); });
 

@@ -283,8 +283,9 @@
       <dl class="ev-kv" id="detailBody"></dl>
       <div id="movePanel" class="hidden" style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)">
         <label class="form-label">Move to slot</label>
+        <div id="moveQuick" style="margin-bottom:.5rem"></div>
         <select class="form-select" id="moveSel"></select>
-        <div class="form-hint" style="margin:.35rem 0 .6rem">Choosing a taken slot swaps the two performances.</div>
+        <div class="form-hint" style="margin:.35rem 0 .6rem">Slots in this performance's own block are listed first, so it can be moved earlier or later within the block. Choosing a taken slot swaps the two performances.</div>
         <button class="btn btn-primary btn-sm" onclick="doMove()">Move</button>
         <button class="btn btn-ghost btn-sm" onclick="document.getElementById('movePanel').classList.add('hidden')">Never mind</button>
       </div>
@@ -430,7 +431,7 @@ function renderSidebar() {
       html += `<div class="sidebar-section">Super User</div>
         ${item('studios.html','Studios',I.home)}
         ${item('admins.html','Admins',I.shield)}
-        ${item('teacher-utilisation.html','Teachers utilisation','<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>')}`;
+        ${item('teacher-billability.html','Teachers billability','<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>')}`;
     }
     html += `<div class="sidebar-section">Manuals</div>
       ${item('manuals/index.html','How-To Guide',I.help)}`;
@@ -666,32 +667,160 @@ function setTab(t, quiet) {
   document.getElementById('dRun').classList.toggle('hidden', t !== 'list');
 }
 
-function renderRunOrder() {
+// A backing-track link is only ever used as a link if it is a plain web address
+function safeUrl(u) { u = String(u ?? '').trim(); return /^https?:\/\/[^\s]+$/i.test(u) ? u : ''; }
+function urlHost(u) { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (_) { return 'link'; } }
+
+// One row of the running order, as plain data: used by the on-screen table
+// and by the printable sheet, so the two can never disagree.
+function runOrderModel() {
   const ev = grid.event;
-  const rows = [];
+  const showNotes = isAdmin || isTeacher;
+  const out = [];
   let lastBlock = 0;
   grid.bookings.forEach(b => {
     if (b.block !== lastBlock) {
       lastBlock = b.block;
-      rows.push(`<tr class="blockrow"><td colspan="${(isAdmin || isTeacher) ? 7 : 6}">Block ${b.block} · ${PF.blockTimes(ev, b.block)}</td></tr>`);
+      out.push({ blockRow: true, text: `Block ${b.block} · ${PF.blockTimes(ev, b.block)}` });
     }
     const acc = (isTeacher && b.accompany) ? 'With you'
       : b.accompaniment === 'peer'
-        ? 'Peer' + (b.accompanist_name ? ': ' + PF.esc(b.accompanist_name) : '')
+        ? 'Peer' + (b.accompanist_name ? ': ' + b.accompanist_name : '')
         : PF.ACCOMP[b.accompaniment] ?? '';
-    rows.push(`<tr class="${b.accompany ? 'acc' : b.own ? 'own' : ''}">
-      <td>~${PF.clock(PF.slotMinute(ev, b.block, b.position))}</td>
-      <td>#${b.position}</td>
-      <td><b>${PF.esc(b.student_name)}</b>${b.band_name ? `<div style="color:var(--mid-grey);font-size:.74rem">${PF.esc(PF.bandLine(b))}</div>` : ''}</td>
-      <td>${PF.esc(b.instrument)}</td>
-      <td>${PF.esc(b.piece)}</td>
-      <td>${PF.esc(acc)}</td>
-      ${(isAdmin || isTeacher) ? `<td>${PF.esc(b.teacher_name ?? '')}${b.notes ? `<div style="color:var(--mid-grey);font-size:.74rem">${PF.esc(b.notes)}</div>` : ''}</td>` : ''}
-    </tr>`);
+    out.push({
+      id: b.id,
+      cls: b.accompany ? 'acc' : b.own ? 'own' : '',
+      time: '~' + PF.clock(PF.slotMinute(ev, b.block, b.position)),
+      slot: '#' + b.position,
+      student: b.student_name,
+      band: b.band_name ? PF.bandLine(b) : '',
+      instrument: b.instrument,
+      piece: b.piece,
+      acc,
+      backing: b.accompaniment === 'backing_track',
+      track: safeUrl(b.backing_track_url),
+      teacher: showNotes ? (b.teacher_name ?? '') : null,
+      notes: showNotes ? (b.notes ?? '') : '',
+    });
   });
+  return out;
+}
+
+// Under "Backing track": the link (everyone who may see it), and for admins a
+// nudge when the teacher's link has not been recorded yet.
+function runOrderTrackHtml(r) {
+  if (!r.backing) return '';
+  const edit = isAdmin
+    ? ` <a href="#" class="no-print" title="Add or change the link" onclick="openTrackEditor('${PF.esc(r.id)}');return false">✎</a>` : '';
+  if (r.track) return `<div style="font-size:.78rem"><a href="${PF.esc(r.track)}" target="_blank" rel="noopener">▶ Open track (${PF.esc(urlHost(r.track))})</a>${edit}</div>`;
+  if (isAdmin) return `<div style="font-size:.76rem;color:var(--orange,#c2410c)">⚠ no link yet <a href="#" onclick="openTrackEditor('${PF.esc(r.id)}');return false">Add</a></div>`;
+  return '';
+}
+
+function openTrackEditor(id) {
+  const b = grid.bookings.find(x => x.id === id);
+  if (!b) return;
+  openDetailModal(b);
+  const el = document.getElementById('btUrl');
+  if (el) { el.focus(); el.select(); }
+}
+
+function renderRunOrder() {
+  const showNotes = isAdmin || isTeacher;
+  const rows = runOrderModel().map(r => r.blockRow
+    ? `<tr class="blockrow"><td colspan="${showNotes ? 7 : 6}">${PF.esc(r.text)}</td></tr>`
+    : `<tr class="${r.cls}">
+      <td>${PF.esc(r.time)}</td>
+      <td>${PF.esc(r.slot)}</td>
+      <td><b>${PF.esc(r.student)}</b>${r.band ? `<div style="color:var(--mid-grey);font-size:.74rem">${PF.esc(r.band)}</div>` : ''}</td>
+      <td>${PF.esc(r.instrument)}</td>
+      <td>${PF.esc(r.piece)}</td>
+      <td>${PF.esc(r.acc)}${runOrderTrackHtml(r)}</td>
+      ${showNotes ? `<td>${PF.esc(r.teacher)}${r.notes ? `<div style="color:var(--mid-grey);font-size:.74rem">${PF.esc(r.notes)}</div>` : ''}</td>` : ''}
+    </tr>`);
   document.getElementById('dRun').innerHTML = rows.length
-    ? `<table class="ev-table"><thead><tr><th>Time</th><th>Slot</th><th>Student</th><th>Instrument</th><th>Piece</th><th>Accompaniment</th>${(isAdmin || isTeacher) ? '<th>Teacher / notes</th>' : ''}</tr></thead><tbody>${rows.join('')}</tbody></table>`
+    ? `<div class="no-print" style="display:flex;justify-content:flex-end;margin-bottom:.6rem">
+         <button class="btn btn-secondary btn-sm" onclick="printRunOrder()" title="Opens the print dialog. Choose &quot;Save as PDF&quot; there to keep a PDF.">🖨️ Print / save as PDF</button>
+       </div>
+       <table class="ev-table"><thead><tr><th>Time</th><th>Slot</th><th>Student</th><th>Instrument</th><th>Piece</th><th>Accompaniment</th>${showNotes ? '<th>Teacher / notes</th>' : ''}</tr></thead><tbody>${rows.join('')}</tbody></table>`
     : '<div class="empty-state"><div class="empty-state-text">No performances booked yet.</div></div>';
+}
+
+// The running order as a clean, paper-friendly sheet: event name, date and
+// venue on top, one table with the block times as sub-headings, header row
+// repeated on every page. Printed from a hidden frame so the page behind it
+// (sidebar, tabs, buttons) never gets in the way; "Save as PDF" in the print
+// dialog turns it into a PDF.
+function runOrderPrintHtml() {
+  const ev = grid.event;
+  const showNotes = isAdmin || isTeacher;
+  const model = runOrderModel();
+  const where = [ev.venue_name, ev.venue_address].filter(Boolean).join(', ');
+  const printed = new Date().toLocaleString('en-AU', { timeZone: 'Australia/Melbourne', dateStyle: 'medium', timeStyle: 'short' });
+  const n = grid.bookings.length;
+  const rows = model.map(r => r.blockRow
+    ? `<tr class="blk"><td colspan="${showNotes ? 7 : 6}">${PF.esc(r.text)}</td></tr>`
+    : `<tr class="${r.cls}">
+        <td class="t">${PF.esc(r.time)}</td><td class="s">${PF.esc(r.slot)}</td>
+        <td><b>${PF.esc(r.student)}</b>${r.band ? `<div class="sub">${PF.esc(r.band)}</div>` : ''}</td>
+        <td>${PF.esc(r.instrument)}</td><td>${PF.esc(r.piece)}</td><td>${PF.esc(r.acc)}${r.backing && r.track ? `<div class="sub"><a href="${PF.esc(r.track)}">▶ ${PF.esc(urlHost(r.track))}</a></div>` : ''}</td>
+        ${showNotes ? `<td>${PF.esc(r.teacher)}${r.notes ? `<div class="sub">${PF.esc(r.notes)}</div>` : ''}</td>` : ''}
+      </tr>`).join('');
+  const title = `Running order — ${ev.name}`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${PF.esc(title)}</title><style>
+    @page { size: A4 landscape; margin: 12mm 12mm 14mm; @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 8pt Arial, sans-serif; color: #666; } }
+    * { box-sizing: border-box; }
+    body { font: 10pt/1.35 Arial, Helvetica, sans-serif; color: #1a1a1a; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    h1 { font-size: 17pt; margin: 0 0 2pt; }
+    .kind { font-size: 9pt; font-weight: bold; letter-spacing: .06em; text-transform: uppercase; color: #E8491E; margin-bottom: 2pt; }
+    .meta { font-size: 10pt; color: #333; margin-bottom: 8pt; }
+    .meta span { margin-right: 14pt; }
+    table { width: 100%; border-collapse: collapse; }
+    thead { display: table-header-group; }
+    th { text-align: left; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .04em; background: #2b2b2b; color: #fff; padding: 4pt 6pt; }
+    td { padding: 4pt 6pt; border-bottom: .5pt solid #bbb; vertical-align: top; }
+    tr { page-break-inside: avoid; break-inside: avoid; }
+    tr.blk td { background: #f1ece6; font-weight: bold; font-size: 10pt; border-top: 1pt solid #888; break-after: avoid; page-break-after: avoid; }
+    td.t { white-space: nowrap; font-weight: bold; width: 62pt; }
+    td.s { white-space: nowrap; width: 34pt; color: #555; }
+    tr.own td, tr.acc td { background: #fdf0ea; }
+    .sub { font-size: 8.5pt; color: #555; }
+    a { color: #1d4ed8; text-decoration: none; }
+    .foot { margin-top: 8pt; font-size: 8pt; color: #666; }
+  </style></head><body>
+    <div class="kind">Running order</div>
+    <h1>${PF.esc(ev.name)}</h1>
+    <div class="meta">
+      <span><b>${PF.esc(PF.fmtDate(ev.event_date))}</b>, ${PF.esc(PF.timeRange(ev))}</span>
+      ${where ? `<span>${PF.esc(where)}</span>` : ''}
+      <span>${n} performance${n === 1 ? '' : 's'}</span>
+    </div>
+    <table><thead><tr><th>Time</th><th>Slot</th><th>Student</th><th>Instrument</th><th>Piece</th><th>Accompaniment</th>${showNotes ? '<th>Teacher / notes</th>' : ''}</tr></thead>
+    <tbody>${rows}</tbody></table>
+    <div class="foot">Times are approximate. Pathfinder Music Lessons · printed ${PF.esc(printed)}</div>
+  </body></html>`;
+}
+
+function printRunOrder() {
+  if (!grid || !grid.bookings.length) return;
+  const frame = document.createElement('iframe');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(frame);
+  const win = frame.contentWindow;
+  win.document.open();
+  win.document.write(runOrderPrintHtml());
+  win.document.close();
+  // The suggested file name in "Save as PDF" is the page title
+  const oldTitle = document.title;
+  document.title = `Running order - ${grid.event.name} - ${grid.event.event_date}`;
+  const cleanup = () => { document.title = oldTitle; setTimeout(() => frame.remove(), 500); };
+  win.onafterprint = cleanup;
+  setTimeout(() => {
+    try { win.focus(); win.print(); }
+    catch (e) { cleanup(); showToast('Could not open the print dialog: ' + e.message, 'error'); }
+    setTimeout(cleanup, 120000);      // in case the browser never reports afterprint
+  }, 300);
 }
 
 // ============================================================
@@ -1024,6 +1153,7 @@ function openDetailModal(b) {
     <dt>Piece</dt><dd>${PF.esc(b.piece)}</dd>
     <dt>Teacher</dt><dd>${PF.esc(b.teacher_name ?? '—')}</dd>
     <dt>Accompaniment</dt><dd>${PF.esc(acc)}</dd>
+    ${backingTrackRow(b)}
     ${prefs ? `<dt>Preferred blocks</dt><dd>${prefs}</dd>` : ''}
     ${b.notes ? `<dt>Comments</dt><dd style="white-space:pre-line">${PF.esc(b.notes)}</dd>` : ''}
     ${b.created_at ? `<dt>Booked</dt><dd>${new Date(b.created_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}</dd>` : ''}`;
@@ -1037,27 +1167,90 @@ function openDetailModal(b) {
   openModal('detailModal');
 }
 
+// Backing-track link: admins can paste / change / clear it; the teacher and the
+// family just see it (a teacher who has not been asked yet sees nothing).
+function backingTrackRow(b) {
+  if (b.accompaniment !== 'backing_track') return '';
+  const url = safeUrl(b.backing_track_url);
+  if (!isAdmin) {
+    if (url) return `<dt>Backing track</dt><dd><a href="${PF.esc(url)}" target="_blank" rel="noopener">▶ Open backing track</a><div class="form-hint">${PF.esc(urlHost(url))}</div></dd>`;
+    return isTeacher ? '<dt>Backing track</dt><dd style="color:var(--mid-grey)">No link recorded yet.</dd>' : '';
+  }
+  return `<dt>Backing track link</dt><dd>
+      <div style="display:flex;gap:.4rem;align-items:center">
+        <input class="form-input" id="btUrl" maxlength="500" style="flex:1;min-width:0" placeholder="Paste the YouTube or Google Drive link"
+               value="${PF.esc(url)}" onkeydown="if(event.key==='Enter'){saveBackingTrack();event.preventDefault()}">
+        <button class="btn btn-primary btn-sm" id="btSave" onclick="saveBackingTrack()">Save</button>
+      </div>
+      <div class="form-hint" id="btHint">${url
+        ? `Saved. <a href="${PF.esc(url)}" target="_blank" rel="noopener">Open ↗</a> · empty the box and Save to remove it.`
+        : "The link the teacher replied with. It then shows in the Running order."}</div>
+    </dd>`;
+}
+
+async function saveBackingTrack() {
+  const b = activeBooking, inp = document.getElementById('btUrl');
+  if (!b || !inp) return;
+  let v = inp.value.trim();
+  if (v && !/^[a-z][a-z0-9+.-]*:/i.test(v)) v = 'https://' + v;      // "youtu.be/abc" -> https://youtu.be/abc
+  const hint = document.getElementById('btHint'), btn = document.getElementById('btSave');
+  if (v && !safeUrl(v)) { hint.textContent = 'That does not look like a web link (it should start with http:// or https:// and have no spaces).'; return; }
+  btn.disabled = true;
+  const { data, error } = await db.rpc('set_event_backing_track', { p_booking: b.id, p_url: v });
+  btn.disabled = false;
+  if (error) {
+    hint.textContent = /bad_url/.test(error.message) ? 'That does not look like a web link.' : 'Could not save: ' + error.message;
+    return;
+  }
+  b.backing_track_url = data?.backing_track_url ?? null;
+  const gb = grid.bookings.find(x => x.id === b.id);
+  if (gb) gb.backing_track_url = b.backing_track_url;
+  inp.value = b.backing_track_url ?? '';
+  const u = safeUrl(b.backing_track_url);
+  hint.innerHTML = u
+    ? `Saved. <a href="${PF.esc(u)}" target="_blank" rel="noopener">Open ↗</a> · empty the box and Save to remove it.`
+    : 'Link removed.';
+  renderRunOrder();
+  showToast(u ? 'Backing track link saved.' : 'Backing track link removed.');
+}
+
 function editBooking() { openBookModal(activeBooking, null); }
 
 function showMove() {
   const ev = grid.event;
+  const cur = activeBooking.block;
   const at = new Map(grid.bookings.map(b => [b.block + ':' + b.position, b]));
+  // This performance's own block first: moving earlier/later within it is
+  // the common case, and the other blocks sit below.
+  const order = [cur, ...Array.from({ length: ev.block_count }, (_, i) => i + 1).filter(n => n !== cur)];
   let html = '';
-  for (let blk = 1; blk <= ev.block_count; blk++) {
-    html += `<optgroup label="Block ${blk} · ${PF.blockTimes(ev, blk)}">`;
+  order.forEach(blk => {
+    html += `<optgroup label="${blk === cur ? 'This block — ' : ''}Block ${blk} · ${PF.blockTimes(ev, blk)}">`;
     for (let p = 1; p <= ev.slots_per_block; p++) {
       const o = at.get(blk + ':' + p);
       const here = o && o.id === activeBooking.id;
       html += `<option value="${blk}:${p}" ${here ? 'selected' : ''}>#${p} · ~${PF.clock(PF.slotMinute(ev, blk, p))} — ${here ? 'current slot' : o ? PF.esc(o.student_name) + ' (swap)' : 'free'}</option>`;
     }
     html += '</optgroup>';
-  }
+  });
   document.getElementById('moveSel').innerHTML = html;
+
+  // One-click: the latest free slot in this block (a student who can only
+  // make the tail end of the block)
+  let lastFree = null;
+  for (let p = ev.slots_per_block; p >= 1; p--) { if (!at.has(cur + ':' + p)) { lastFree = p; break; } }
+  document.getElementById('moveQuick').innerHTML = lastFree && lastFree > activeBooking.position
+    ? `<button class="btn btn-secondary btn-sm" onclick="moveToSlot(${cur}, ${lastFree})">Move to the last free slot in this block (#${lastFree}, ~${PF.clock(PF.slotMinute(ev, cur, lastFree))})</button>`
+    : '';
   document.getElementById('movePanel').classList.remove('hidden');
 }
 
 async function doMove() {
   const [blk, pos] = document.getElementById('moveSel').value.split(':').map(Number);
+  return moveToSlot(blk, pos);
+}
+
+async function moveToSlot(blk, pos) {
   if (blk === activeBooking.block && pos === activeBooking.position) { closeModal('detailModal'); return; }
   const { error } = await db.rpc('move_event_booking', { p_booking: activeBooking.id, p_block: blk, p_position: pos, p_swap: true });
   if (error) { showToast(PF.errorText(error), 'error'); await loadGrid(); return; }

@@ -70,6 +70,10 @@
       color: var(--mid-grey);
     }
     .avail-day.on { background: rgba(232,73,30,0.12); color: var(--orange); }
+    /* Employment type colours (superuser only; see js below) */
+    .teacher-card.et { border-top: 5px solid var(--et-fg); }
+    .teacher-card.et .teacher-avatar { background: var(--et-fg); }
+    .et-pill { display:inline-block; font-size:0.66rem; font-weight:700; padding:0.12rem 0.55rem; border-radius:99px; white-space:nowrap; margin-top:0.3rem; }
     .teacher-card-footer {
       border-top: 1px solid var(--border);
       padding: 0.85rem 1.1rem;
@@ -184,9 +188,9 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
       Admins
     </a>
-    <a class="nav-item hidden" href="teacher-utilisation.html" id="utilLink">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      Teachers utilisation
+    <a class="nav-item hidden" href="teacher-billability.html" id="billLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Teachers billability
     </a>
     <div class="sidebar-section">Manuals</div>
     <a class="nav-item" href="manuals/index.html">
@@ -250,6 +254,16 @@
         <label class="form-label">Teaching Room</label>
         <input class="form-input" type="text" id="tRoom" placeholder="e.g. Ringwood - Dave's Room">
         <div class="form-hint">Default: Studio Name - Teacher First Name's Room. Leave blank to auto-generate.</div>
+      </div>
+      <div class="form-group hidden" id="tEmploymentGroup">
+        <label class="form-label">Employment type <span class="text-muted" style="font-weight:400;">(super user only)</span></label>
+        <select class="form-select" id="tEmployment">
+          <option value="">— Not set —</option>
+          <option value="full_time">Full-time</option>
+          <option value="part_time">Part-time</option>
+          <option value="casual">Casual</option>
+        </select>
+        <div class="form-hint">Used by the Teachers billability report: full-time and part-time teachers are billed on their availability, casual teachers on the lessons they teach.</div>
       </div>
       <div class="form-group">
         <label class="form-label">Instruments taught</label>
@@ -324,6 +338,12 @@ const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 let allTeachers = [];
 let allStudios  = [];
 let currentProfile = null;
+const EMP_TYPES = {
+  full_time: { label: 'Full-time', bg: '#dbeafe', fg: '#1d4ed8' },
+  part_time: { label: 'Part-time', bg: '#dcfce7', fg: '#15803d' },
+  casual:    { label: 'Casual',    bg: '#ffedd5', fg: '#c2410c' },
+};
+let employment = {};      // { teacherId: 'full_time'|'part_time'|'casual' } — filled for the super user only
 
 (async () => {
   currentProfile = await requireAuth(['superuser','admin']);
@@ -333,7 +353,7 @@ let currentProfile = null;
     document.getElementById('superuserSection').classList.remove('hidden');
     document.getElementById('studiosLink').classList.remove('hidden');
     document.getElementById('adminsLink').classList.remove('hidden');
-    document.getElementById('utilLink').classList.remove('hidden');
+    document.getElementById('billLink').classList.remove('hidden');
   }
   if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
   await loadStudios();
@@ -383,6 +403,14 @@ async function loadTeachers() {
 
   allTeachers = data ?? [];
 
+  // Employment type: super user only (RLS returns nothing to anyone else).
+  employment = {};
+  if (currentProfile.role === 'superuser') {
+    const { data: emp, error: empErr } = await db.from('teacher_employment').select('teacher_id, employment_type');
+    if (empErr) console.warn('[teachers] Could not read employment types (run teacher-billability.sql?):', empErr.message);
+    (emp ?? []).forEach(e => { employment[e.teacher_id] = e.employment_type; });
+  }
+
   const active = allTeachers.filter(t => t.profiles?.status === 'active').length;
   document.getElementById('teacherCount').textContent = `${active} active · ${allTeachers.length} total`;
   renderTeachers();
@@ -406,12 +434,18 @@ function renderTeachers() {
     const avail    = t.teacher_availability ?? [];
     const availDays = avail.map(a => a.day_of_week);
 
-    return `<div class="teacher-card">
+    const isSuper = currentProfile.role === 'superuser';
+    const et = EMP_TYPES[employment[t.id]];
+    const etPill = !isSuper ? ''
+      : et ? `<div><span class="et-pill" style="background:${et.bg};color:${et.fg}">${et.label}</span></div>`
+           : `<div><span class="et-pill" style="background:#f3f4f6;color:#6b7280">Employment type not set</span></div>`;
+    return `<div class="teacher-card ${et ? 'et' : ''}" ${et ? `style="--et-fg:${et.fg}"` : ''}>
       <div class="teacher-card-top">
         <div class="teacher-avatar">${initials}</div>
         <div>
           <div class="teacher-card-name">${p.first_name ?? ''} ${p.last_name ?? ''}</div>
           <div class="teacher-card-email">${p.email ?? ''}</div>
+          ${etPill}
         </div>
         <div style="margin-left:auto;">
           <span class="pill pill-${p.status === 'active' ? 'active' : 'inactive'}">${p.status === 'active' ? 'Active' : 'Inactive'}</span>
@@ -499,6 +533,7 @@ function openTeacherModal(teacher = null) {
     document.getElementById('tPhone').value            = teacher.profiles?.phone      ?? '';
     document.getElementById('tZoom').value             = teacher.virtual_room_link    ?? '';
     document.getElementById('tRoom').value             = teacher.teaching_room        ?? '';
+    document.getElementById('tEmployment').value = employment[teacher.id] ?? '';
     (teacher.teacher_availability ?? []).forEach(a => addAvailSlot(a));
 
     // Fetch email from auth.users via Netlify Function
@@ -521,8 +556,10 @@ function openTeacherModal(teacher = null) {
     document.getElementById('editTeacherId').value     = '';
     document.getElementById('editTeacherUserId').value = '';
     ['tFirstName','tLastName','tEmail','tPhone','tZoom','tRoom'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('tEmployment').value = '';
     addAvailSlot();
   }
+  document.getElementById('tEmploymentGroup').classList.toggle('hidden', currentProfile.role !== 'superuser');
   document.getElementById('teacherModal').classList.remove('hidden');
 }
 
@@ -685,6 +722,15 @@ async function saveTeacher() {
     await db.from('teacher_availability').delete().eq('teacher_id', teacherId);
     if (availability.length > 0) {
       await db.from('teacher_availability').insert(availability.map(a => ({ ...a, teacher_id: teacherId })));
+    }
+
+    // Employment type (super user only)
+    if (currentProfile.role === 'superuser') {
+      const et = document.getElementById('tEmployment').value;
+      const res = et
+        ? await db.from('teacher_employment').upsert({ teacher_id: teacherId, employment_type: et, updated_at: new Date().toISOString() }, { onConflict: 'teacher_id' })
+        : await db.from('teacher_employment').delete().eq('teacher_id', teacherId);
+      if (res.error) showToast('The teacher was saved, but the employment type was not: ' + res.error.message, 'error');
     }
 
     showToast(editId ? 'Teacher updated.' : 'Teacher added.', 'success');

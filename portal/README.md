@@ -2219,6 +2219,57 @@ shared code in `js/events-common.js`; database in `supabase/events.sql`.
   fails it falls back to hiding as before). Works for existing data, no SQL.
   Limit: a one-off cancel on a lesson with NO students writes no attendance, so
   that case in an ended series still hides.
+- **Events: "Type to search students" on Add a performance (Nov 2026).** The
+  search box did filter the student drop-down, but a closed drop-down shows no
+  change, so it looked broken (reported: even a full name "gave nothing"). Now,
+  while something is typed, 2+ matches are shown as an open list ("N matches -
+  click one"), exactly one match is selected automatically (which also loads that
+  student's teachers/instruments), and no match says so. Words can be in any
+  order ("smith alice"). Still lists only active and trial students of the
+  event's studio. The box is no longer shown when editing an existing
+  performance (it used to wipe the fixed student there). `events-common.js` only.
+- **Events: backing-track link on a performance (Nov 2026).** The teacher
+  replies to their "Backing track for ..." task with a YouTube / Google Drive link;
+  an admin or the superuser then records it on the performance: open the
+  performance (click it in the schedule, or the **Add / ✎** next to "no link yet"
+  in the Running order), paste the link in **Backing track link**, Save. An empty
+  box removes it, and an address typed without `https://` gets it added. The
+  Running order shows **▶ Open track (youtube.com)** under "Backing track" (admins
+  see an orange "no link yet" where it is still missing), and the print / PDF
+  sheet carries the same clickable link. Who sees it: admins, the performer's
+  teacher(s) and the performer's own family; other families never do. Only a
+  plain `http(s)://` address is accepted (checked in the browser, in
+  `set_event_backing_track()` and by a column CHECK). If the student later
+  switches to another kind of accompaniment the link is kept but hidden. Students
+  re-saving their booking do not touch it. Database:
+  `supabase/events-backing-track-link.sql` (migration 51) — run it statement by
+  statement, STEP 1 to 6, **before** deploying the new `events.html`: new column
+  `event_bookings.backing_track_url`, new `set_event_backing_track(booking, url)`
+  (admin / superuser only), and `get_event_grid()` re-created with the extra field
+  (otherwise unchanged from `events-bands.sql`).
+- **Events: printable / PDF running order (Nov 2026).** The Running order tab
+  now has a **Print / save as PDF** button. It builds a clean A4-landscape sheet
+  (event name, date and time, venue, number of performances; one table with a
+  shaded sub-heading per block; column headings repeated on every page; "Page x
+  of y" and a Melbourne print time in the footer) in a hidden frame and opens the
+  browser's print dialog, so the sidebar, tabs and buttons never get printed.
+  Choose *Save as PDF* as the destination to keep a PDF (the suggested file name
+  is `Running order - <event> - <date>`). Teachers and admins also get the Teacher
+  / notes column; students do not. The on-screen table and the printed sheet
+  share one function (`runOrderModel()` in `events.html`), so they cannot
+  disagree. `events.html` only, no SQL. The older event-level Print buttons are
+  unchanged.
+- **Events: moving a performance within its block (Nov 2026).** Admins asked to
+  move a performance within a block (a student who can only do the tail end while
+  the block has gaps at the start; new bookings take the lowest free slot). This
+  was already possible - booking details -> **Move...** calls
+  `move_event_booking()`, which takes any block + slot and swaps if taken (checked
+  against a local Postgres: free tail slot, and swap within a block) - and so is
+  clicking an empty slot in the grid to add a performance exactly there. It was
+  just hard to find in a drop-down of every slot of every block. The Move panel
+  now lists the performance's own block first ("This block - Block N ...") and
+  offers a one-click "Move to the last free slot in this block (#n, ~time)" when
+  a later free slot exists. `events.html` only; no SQL.
 - **Tasks: paging and search (Oct 2026).** `tasks.html` lists 25 tasks per page
   (`TASKS_PER_PAGE`) with Back / numbered pages / Next under the list and a
   "Showing 26-50 of 137" count; the page resets to 1 whenever the studio,
@@ -2365,7 +2416,8 @@ Email: `netlify/functions/send-voucher.js`. Database: `supabase/gift-vouchers.sq
   and the page picks a new number and retries on the (very unlikely) collision.
 - **Expiry** is `purchase_date + 1 year`, set by the insert trigger (29 Feb →
   28 Feb) — the browser shows the same date but never decides it. Purchase date
-  cannot be in the future. *Expired* is derived on the page (`issued` and past
+  may be set up to a year ahead (see *Prepared ahead* below); it used to be
+  refused after tomorrow. *Expired* is derived on the page (`issued` and past
   `expires_on`), not stored.
 - **What can change.** A trigger freezes everything the PDF printed (number,
   subject, value, names, message, dates, studio). Only contact emails, status and
@@ -2386,6 +2438,20 @@ Email: `netlify/functions/send-voucher.js`. Database: `supabase/gift-vouchers.sq
   `emailed_at/emailed_to/send_count`, and writes an `email_log` row
   (`recipient_mode = 'voucher'`). A resend to a corrected address updates the
   stored recipient email.
+- **Prepared ahead (Nov 2026, `supabase/voucher-prepare-ahead.sql`).** Admins often
+  prepare a voucher with the expected purchase date and email it when the payment
+  arrives. The guard trigger now allows a purchase date up to 366 days ahead (the
+  page limits it to 365; same function as in `voucher-sales.sql`, one rule changed;
+  run it on its own before deploying). On the Preview screen **Save without
+  sending** inserts the register row and stops (`insertVoucher()` is shared with
+  Send); the voucher is emailed later from its page in the list (**Send email**,
+  which rebuilds the same PDF from the register). A register row that is `issued`,
+  never emailed, not online and dated in the future is shown as **Prepared**
+  (purple pill, own filter option, "N prepared, not sent" in the sub-title, not
+  counted as Active, and *Mark redeemed* is hidden). Once emailed it is simply
+  Active. The dates stay frozen like any voucher: if the payment date drifts a
+  lot, void and reissue. Online vouchers are unaffected. Previewing a future-dated
+  voucher shows a note suggesting Save without sending.
 - **Student link.** Choosing a student in the picker records
   `recipient_student_id`; overwriting the name unlinks it (the voucher is then
   for someone else). Picker data comes from `students` (active/trial/prospective),
@@ -2521,54 +2587,78 @@ mobile, no horizontal scroll, typo hints, validation, remembered fields, redirec
 the admin page (including before the migration exists); the PDF rendered and inspected.
 **Not yet tested against real eWAY or Resend.**
 
-## Teachers utilisation report (Oct 2026) — superuser only
+## Teachers billability report (Nov 2026) — superuser only
 
-Page: `teacher-utilisation.html` (sidebar → **Super User → Teachers utilisation**;
-`requireAuth(['superuser'])`, so an admin who types the URL is sent to the login
-page). Calculations: `js/utilisation-calc.js` (pure functions, `window.PFUtil`,
-also loadable from Node for tests). **No database change** — it reads existing
-tables as the signed-in superuser: `teacher_availability`, `schedule_view` and
-`attendance`.
+Page: `teacher-billability.html` (sidebar → **Super User → Teachers billability**;
+`requireAuth(['superuser'])`). Calculations: `js/billability-calc.js` (pure
+functions, `window.PFBill`, also loadable from Node; self-contained).
+Database: `supabase/teacher-billability.sql` (migration 50) — run it statement by
+statement **before** deploying.
 
-- **Controls.** Teacher drop-down (inactive teachers are listed and labelled),
-  From / To calendar pickers (both days inclusive: `gte` / `lte`), defaulting to
-  the last complete **Wednesday–Tuesday fortnight** (ends on the most recent
-  Tuesday *before* today, starts 13 days earlier). The report runs as soon as a
-  teacher and a valid period are set; the limit is 13 months. Export CSV and
-  Print are included.
-- **Grid.** One column per *day + studio* in the format
-  `Tue 29/09/2026 (Ringwood)`, plus a Total column. A column exists for every
-  date that has availability for that weekday **or** any lesson (so an
-  available-but-empty day shows zeros, and a lesson outside the set availability
-  still appears with "—" for availability). Rows: **Availability** (each range
-  as `03:00 PM-08:00 PM (5 Hrs)`; several ranges on a day are listed in time
-  order), **Lessons booked** (`n (x Hrs)`), **Lessons taught**
-  (`n (% of booked)` and `x Hrs (% of booked time)`), **Billable lessons**
-  (same shape).
-- **Counting rules (agreed with the superuser).** One lesson = one scheduled
-  occurrence; a group lesson counts once with its length. *Booked* = every
-  occurrence, including ones later cancelled. *No-show* = the occurrence is
-  cancelled, or every student on its roster is marked Absent (no credit),
-  Absent (notice given) or Teacher cancelled. *Taught* = booked less no-shows.
-  A lesson that hasn't been marked yet counts as taught (not billable) — the
-  page lists how many are unmarked. *Billable* = at least one student marked
-  Present (a cancelled occurrence is never billable). Whoever actually taught
-  the occurrence gets it (`schedule_view.teacher_id` already resolves
-  substitutes), so a covered lesson counts for the substitute.
-- **Limitations.** Availability is the teacher's *current* weekly availability
-  applied to every matching date (there is no history of past availability, so
-  a changed roster rewrites past periods). Percentages are rounded to whole
-  numbers; hours to two decimals.
-- **Menu.** The link is a hidden `utilLink` in each page's Super User section,
-  revealed in the same place as `studiosLink` / `adminsLink`; the pages that
-  build their sidebar in JavaScript (Tasks, Enquiries, Events, Vouchers) add it
-  inside their `if (me.role === 'superuser')` block.
-- **Tests run.** 37 unit checks on the sums (default fortnight incl. year-end,
-  clock/hours formatting, availability ranges, every attendance outcome, group
-  lessons, cancelled/unmarked, empty periods, CSV) and a jsdom run of the page
-  against a fake database (superuser-only, query bounds, validation, error
-  display, CSV file name, non-superuser). **Not yet tested live** against the
-  real data.
+- **Tables (both superuser-only via RLS; explicit GRANTs, no `anon`).**
+  `teacher_employment (teacher_id PK, employment_type full_time|part_time|casual)` —
+  a separate table, not a column on `teachers`, so the pay arrangement is not
+  readable through the normal teacher/student API; no row = "not set".
+  `billability_reports (period_start, period_end UNIQUE, cells jsonb, types jsonb,
+  notes, saved_by, saved_at)` — one saved report per exact start/end pair
+  (max 93 days); a BEFORE trigger stamps `saved_by`/`saved_at` whatever the page sends.
+- **Employment type** is set on **Teachers → Edit** (super user only; a drop-down
+  under Teaching Room) and shown as a coloured card on Teachers: blue Full-time,
+  green Part-time, orange Casual, grey "Employment type not set". Admins see no
+  colours or pills (RLS returns them nothing).
+- **Grid.** Rows = teachers (grouped Full-time, Part-time, Casual, not set; then by
+  name; inactive teachers appear only if they have hours). Columns = every day of
+  the period, plus a Total column and a Total row. Every cell is an editable
+  number (0.25 steps, 0–24). An edited cell is outlined, with the calculated figure
+  in its tooltip; clearing a cell restores the calculated figure. Notes box under
+  the grid. Calendar pickers for Start / End (inclusive); default = the Wednesday
+  of the current Monday–Sunday week through the Tuesday 13 days later.
+- **Calculation.** *Full-time / Part-time*: the hours available that weekday from
+  `teacher_availability` (all studios added together; the Teachers page already
+  forbids overlapping windows). *Casual*: first billable lesson's start to last
+  billable lesson's end that day, gaps included, all studios together. A lesson is
+  billable unless it is cancelled or every student on it is marked Absent (no
+  credit) / Absent (notice given) / Teacher cancelled - so Present or not yet
+  marked counts (the test the old Utilisation report used for "Lessons taught"; whoever
+  taught it, via `schedule_view.teacher_id`, gets it). **Cover rule (Nov 2026):** while
+  another teacher covers a lesson of theirs, the usual teacher is *away*: that lesson splits
+  the day into separate stretches, each billed first start to last end, so the time between
+  their lesson before and the lesson after the cover is not billed (A teaches 3:00-3:30 and
+  7:00-7:30, B covers A's 4-6pm: A = 1 h, B = 4:00-6:00 plus anything of their own, gaps
+  included). A cover that was cancelled or where every student was absent breaks nothing,
+  because no one billed for it. The page therefore also fetches lessons *booked with* a
+  casual teacher but taught by someone else (`schedule_view.original_teacher_id`). *Not set*: 0, with a "Set
+  type" link. Hours are rounded to two decimals.
+- **Saving.** Save stores the WHOLE grid for that start/end (upsert on
+  `period_start,period_end`), the employment types at that time and the notes.
+  Reopening the same dates loads the saved figures (edited cells still outlined
+  against today's calculation); a teacher or day missing from the saved report is
+  filled from the calculation and the page shows "Unsaved changes". If a
+  teacher's type changed since saving, a warning mark appears by their name.
+  **Recalculate** replaces everything with fresh figures (asks first; nothing is
+  stored until Save). Changing the dates with unsaved changes asks first, as does
+  closing the tab. Export CSV is included.
+- **Limitations.** Availability is the teacher's *current* roster (no history), so
+  an unsaved past period changes if the roster changes - which is why saving
+  freezes a period. No allowance for public holidays or leave beyond editing the
+  cell. Lessons with no students enrolled count as billable for casual teachers
+  (consistent with Utilisation).
+- **Tested** with unit tests (`calculate`, totals, CSV), the page in jsdom with a
+  fake database (load, edit, revert, save, reload, type-change warning, recalculate,
+  dates guard), the Teachers page (superuser vs admin) and the migration against a
+  local Postgres (constraints, upsert, trigger, RLS for superuser / admin / anon).
+  **Not yet tested live.**
+
+## Teachers utilisation report — removed (Nov 2026)
+
+The superuser's Teachers utilisation report was rarely used and has been taken
+out: its sidebar link is gone from every page. Its files `teacher-utilisation.html`
+and `js/utilisation-calc.js` are no longer used by anything (the billability report
+carries its own small date helpers) and can be deleted with
+`git rm portal/teacher-utilisation.html portal/js/utilisation-calc.js`. No database
+change was ever involved. Its counting rules (a lesson is "taught" unless cancelled
+or every student is marked absent / teacher cancelled) live on in the Teachers
+billability report below.
 
 ## Concert ticket sales (Oct 2026, migration #46) — verified server-side, not a pay button
 
@@ -2998,6 +3088,12 @@ Run in order. All are re-runnable.
     `source` + `order_id`, guard triggers, admin-read RLS, `voucher_issue_order()` (see
     Gift voucher online sales section above). Run statement by statement **before**
     deploying the voucher pages and functions
+49. `voucher-prepare-ahead.sql` — replaces `gift_vouchers_guard()` so a voucher can be
+    prepared with a purchase date up to a year ahead (see *Prepared ahead* in the Gift
+    vouchers section). One statement; run it **before** deploying the new `vouchers.html`
+50. `teacher-billability.sql` — `teacher_employment` and `billability_reports` (superuser-only RLS,
+    GRANTs, stamp trigger); see Teachers billability report section. Run statement by statement
+    **before** deploying `teacher-billability.html` and the new `teachers.html`
 
 *(Several migrations applied between 27 and 35 — schedule performance
 indexes, BoK grading, fortnightly lessons, recurring tasks, and others —

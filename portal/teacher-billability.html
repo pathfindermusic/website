@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teachers Billability — Pathfinder Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/portal.css">
+  <style>
+    .report-toolbar { display:flex; align-items:flex-end; gap:.75rem; flex-wrap:wrap; margin-bottom:1.25rem; }
+    .toolbar-field { display:flex; flex-direction:column; gap:.3rem; }
+    .toolbar-field label { font-size:.72rem; font-weight:600; color:var(--mid-grey); text-transform:uppercase; letter-spacing:.04em; }
+    .toolbar-field input[type="date"], .toolbar-field select {
+      font-size:.82rem; font-family:'Inter',sans-serif; padding:.46rem .7rem; border:1px solid var(--border);
+      border-radius:var(--r-sm); background:var(--white); color:var(--charcoal); min-width:150px; }
+    .toolbar-field select { min-width:220px; }
+
+    .util-note { font-size:.78rem; color:var(--mid-grey); line-height:1.6; margin-top:.9rem; }
+    .save-status { font-size:.8rem; color:var(--mid-grey); margin-bottom:.45rem; margin-left:.25rem; }
+    .save-status.ok { color:#16a34a; }
+    .save-status.unsaved { color:#b45309; font-weight:600; }
+
+    .bill-wrap { overflow-x:auto; border-radius:var(--r); border:1px solid var(--border); background:var(--white); box-shadow:var(--shadow); }
+    .bill-empty { padding:2.5rem 1rem; text-align:center; color:var(--mid-grey); }
+    .bill-table { border-collapse:collapse; width:100%; font-size:.84rem; }
+    .bill-table th, .bill-table td { padding:.35rem .4rem; border-bottom:1px solid var(--border); border-right:1px solid var(--border); text-align:center; }
+    .bill-table th:last-child, .bill-table td:last-child { border-right:none; }
+    .bill-table thead th { background:var(--charcoal); color:rgba(255,255,255,.85); font-weight:600; font-size:.74rem; white-space:nowrap; padding:.55rem .4rem; }
+    .bill-table thead th small { display:block; font-weight:500; color:rgba(255,255,255,.6); margin-top:.1rem; }
+    .bill-table thead th.wk, .bill-table td.wk { background-color:rgba(0,0,0,.025); }
+    .bill-table thead th.wk { background:#4b4b4b; }
+    .bill-table .tname { text-align:left; white-space:nowrap; position:sticky; left:0; z-index:1; background:var(--off-white); min-width:210px; padding:.4rem .7rem; font-size:.82rem; }
+    .bill-table tbody .tname { border-left:4px solid var(--tc, var(--border)); }
+    .bill-table thead .tname { z-index:2; background:var(--charcoal); }
+    .bill-table tfoot .tname { background:var(--off-white); font-weight:700; }
+    .bill-table .tn { font-weight:600; margin-right:.5rem; }
+    .bill-table th.tot, .bill-table td.tot { background:rgba(232,73,30,.06); font-weight:700; min-width:58px; }
+    .bill-table thead th.tot { background:var(--orange); color:#fff; }
+    .bill-table tfoot td { background:rgba(232,73,30,.06); font-weight:700; border-top:2px solid var(--border); }
+    .bill-table td.grand { background:rgba(232,73,30,.14); }
+    input.bh { width:58px; padding:.3rem .25rem; text-align:center; font:inherit; border:1px solid transparent; border-radius:var(--r-sm); background:transparent; color:var(--charcoal); -moz-appearance:textfield; }
+    input.bh::-webkit-outer-spin-button, input.bh::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+    input.bh:hover { border-color:var(--border); background:var(--white); }
+    input.bh:focus { outline:none; border-color:var(--orange); background:var(--white); }
+    input.bh.zero { color:var(--light-grey); }
+    input.bh.edited { border-color:var(--orange); background:rgba(232,73,30,.08); font-weight:700; }
+    .tpill { display:inline-block; font-size:.66rem; font-weight:700; padding:.1rem .5rem; border-radius:99px; white-space:nowrap; text-decoration:none; }
+    .bill-legend { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; margin-top:.8rem; font-size:.78rem; color:var(--dark-grey); }
+    .leg-edit { margin-left:.5rem; color:var(--mid-grey); }
+    .leg-warn { color:#b45309; font-weight:600; }
+    @media print {
+      .sidebar, .topnav, .report-toolbar, .no-print { display:none !important; }
+      .main { margin:0 !important; padding:0 !important; }
+      .bill-wrap { box-shadow:none; overflow:visible; }
+      .bill-table { font-size:.7rem; }
+      .bill-table .tname { position:static; min-width:0; }
+      input.bh { border:none; width:40px; }
+    }
+  </style>
+</head>
+<body>
+<div class="portal-shell">
+
+  <nav class="topnav">
+    <a href="#" class="topnav-logo"><img src="../Logo_-_long.png" alt="Pathfinder Music Lessons"></a>
+    <div class="topnav-right">
+      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none;" onclick="toggleSidebar()">☰</button>
+      <div class="topnav-user">
+        <div class="topnav-avatar" id="navAvatar">–</div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:500;color:var(--white);" id="navName">Loading…</div>
+          <span class="topnav-role-badge" id="navRole">–</span>
+        </div>
+      </div>
+      <a href="change-password.html" class="btn-logout" style="text-decoration:none;">🔑 Password</a>
+      <button class="btn-logout" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">Front desk</div>
+    <a class="nav-item" href="tasks.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Tasks
+    </a>
+    <a class="nav-item" href="enquiries.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+      Enquiries
+    </a>
+    <a class="nav-item" href="notifications.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><polyline points="4 6 12 13 20 6"/></svg>
+      Notifications
+    </a>
+    <a class="nav-item" href="day-sheet.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
+      Day Sheet
+    </a>
+    <a class="nav-item" href="events.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      Events
+    </a>
+    <a class="nav-item" href="vouchers.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+      Vouchers
+    </a>
+    <div class="sidebar-section">Teaching</div>
+    <a class="nav-item" href="lessons.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Lessons
+    </a>
+    <a class="nav-item" href="students.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      Students
+    </a>
+    <a class="nav-item" href="teachers.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+      Teachers
+    </a>
+    <div class="sidebar-section">Curriculum</div>
+    <a class="nav-item" href="bok-artefacts.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Artefact Library
+    </a>
+    <div class="sidebar-section">Reports</div>
+    <a class="nav-item" href="attendance-report.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Attendance
+    </a>
+    <a class="nav-item" href="grading-report.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+      Grading
+    </a>
+    <a class="nav-item" href="credits.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/></svg>
+      Credits
+    </a>
+    <a class="nav-item" href="distribution-lists.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      Distribution Lists
+    </a>
+    <a class="nav-item" href="portal-logins.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+      Portal Logins
+    </a>
+    <div class="sidebar-section hidden" id="superuserSection">Super User</div>
+    <a class="nav-item hidden" href="studios.html" id="studiosLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Studios
+    </a>
+    <a class="nav-item hidden" href="admins.html" id="adminsLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Admins
+    </a>
+    <a class="nav-item hidden active" href="teacher-billability.html" id="billLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Teachers billability
+    </a>
+    <div class="sidebar-section">Manuals</div>
+    <a class="nav-item" href="manuals/index.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      How-To Guide
+    </a>
+  </aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Teachers billability</div>
+        <div class="page-sub" id="pageSub">Billable hours of every teacher, day by day.</div>
+      </div>
+      <div class="flex gap-1 no-print" style="flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm" onclick="exportCSV()">⬇ Export CSV</button>
+        <button class="btn btn-secondary btn-sm" onclick="recalculate()">↻ Recalculate</button>
+        <button class="btn btn-primary btn-sm" id="saveBtn" onclick="saveReport()">Save</button>
+      </div>
+    </div>
+
+    <div class="report-toolbar">
+      <div class="toolbar-field">
+        <label for="fromDate">Start date</label>
+        <input type="date" id="fromDate" onchange="onDatesChanged()">
+      </div>
+      <div class="toolbar-field">
+        <label for="toDate">End date (inclusive)</label>
+        <input type="date" id="toDate" onchange="onDatesChanged()">
+      </div>
+      <button class="btn btn-secondary btn-sm" style="margin-bottom:.1rem" onclick="resetDates()">Current fortnight (Wed–Tue)</button>
+      <div class="save-status" id="saveStatus"></div>
+    </div>
+
+    <div class="bill-wrap" id="billWrap">
+      <div class="bill-empty">Loading…</div>
+    </div>
+
+    <div class="bill-legend" id="billLegend"></div>
+
+    <div class="card" style="margin-top:1.25rem;padding:1rem 1.1rem;">
+      <label class="form-label" for="notes">Notes for this period</label>
+      <textarea class="form-textarea" id="notes" rows="5" maxlength="10000" style="min-height:110px;"
+                placeholder="Anything worth keeping about this reporting period — adjustments, public holidays, who covered whom…"
+                oninput="onNotesInput()"></textarea>
+      <span class="form-hint">Saved together with the hours, for exactly this start and end date.</span>
+    </div>
+
+    <div class="util-note" id="billNote"></div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/billability-calc.js"></script>
+<script>
+const B = window.PFBill, U = B.U;
+let currentProfile = null;
+
+// ---- state ----
+let period = { from: '', to: '' };     // the dates the grid below is for
+let dates = [];                        // every day of the period
+let rows = [];                         // [{ id, name, type, savedType }] in display order
+let calc = {};                         // { teacherId: { date: hours } } worked out from current data
+let cells = {};                        // { teacherId: { date: hours } } what is on screen / will be saved
+let notes = '';
+let saved = null;                      // the saved report row for this period, if any
+let dirty = false;
+let loadToken = 0;
+let ready = false;
+
+(async () => {
+  currentProfile = await requireAuth(['superuser']);
+  if (!currentProfile) return;
+  renderTopNavUser(currentProfile);
+  ['superuserSection', 'studiosLink', 'adminsLink', 'billLink']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('hidden'); });
+  if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
+  resetDates(true);
+  await loadPeriod();
+})();
+
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+// ---- dates ----
+function resetDates(quiet) {
+  const p = B.defaultPeriod(new Date());
+  document.getElementById('fromDate').value = p.from;
+  document.getElementById('toDate').value   = p.to;
+  if (!quiet) onDatesChanged();
+}
+
+async function onDatesChanged() {
+  const from = document.getElementById('fromDate').value;
+  const to   = document.getElementById('toDate').value;
+  if (from === period.from && to === period.to) return;
+  if (dirty && !confirm('You have unsaved changes to this period. Discard them and change the dates?')) {
+    document.getElementById('fromDate').value = period.from;
+    document.getElementById('toDate').value   = period.to;
+    return;
+  }
+  dirty = false;
+  await loadPeriod();
+}
+
+// ---- loading ----
+async function fetchAll(build) {
+  const size = 1000, out = [];
+  for (let from = 0; ; from += size) {
+    const { data, error } = await build().range(from, from + size - 1);
+    if (error) throw error;
+    out.push(...(data ?? []));
+    if (!data || data.length < size) break;
+  }
+  return out;
+}
+
+function showEmpty(msg, isErr) {
+  document.getElementById('billWrap').innerHTML = `<div class="bill-empty"${isErr ? ' style="color:#dc2626"' : ''}>${U.esc(msg)}</div>`;
+  document.getElementById('billLegend').innerHTML = '';
+}
+
+async function loadPeriod() {
+  const from = document.getElementById('fromDate').value;
+  const to   = document.getElementById('toDate').value;
+  ready = false;
+  if (!from || !to) { showEmpty('Choose a start and an end date.'); return; }
+  if (from > to)    { showEmpty('The start date must be on or before the end date.'); return; }
+  if (U.daysBetween(from, to) > 92) { showEmpty('Please choose a period of 93 days or less.'); return; }
+
+  const token = ++loadToken;
+  showEmpty('Loading…');
+  try {
+    const [tRows, empRows, availRows, reportRows] = await Promise.all([
+      fetchAll(() => db.from('teachers').select('id, profiles(first_name, last_name, status)').order('id')),
+      fetchAll(() => db.from('teacher_employment').select('teacher_id, employment_type').order('teacher_id')),
+      fetchAll(() => db.from('teacher_availability').select('teacher_id, day_of_week, start_time, end_time').order('id')),
+      db.from('billability_reports').select('*').eq('period_start', from).eq('period_end', to).limit(1)
+        .then(r => { if (r.error) throw r.error; return r.data ?? []; }),
+    ]);
+
+    const types = {};
+    empRows.forEach(e => { types[e.teacher_id] = e.employment_type; });
+    const teachers = tRows.map(t => ({
+      id: t.id,
+      name: `${t.profiles?.first_name ?? ''} ${t.profiles?.last_name ?? ''}`.trim() || '(unnamed)',
+      inactive: t.profiles?.status === 'inactive',
+    }));
+
+    // Casual teachers are billed from their lessons: fetch those (and the
+    // attendance marks) only for them.
+    const casualIds = teachers.filter(t => types[t.id] === 'casual').map(t => t.id);
+    let occs = [], marks = [];
+    if (casualIds.length) {
+      // Lessons they taught, and lessons booked with them that someone else
+      // covered (they are away for those).
+      const idList = casualIds.join(',');
+      occs = await fetchAll(() => db.from('schedule_view')
+        .select('occurrence_id, teacher_id, original_teacher_id, date, occurrence_status, start_time, duration_mins, student_count')
+        .or(`teacher_id.in.(${idList}),original_teacher_id.in.(${idList})`)
+        .gte('date', from).lte('date', to).order('occurrence_id'));
+      const ids = occs.filter(o => o.occurrence_status !== 'cancelled').map(o => o.occurrence_id);
+      for (let i = 0; i < ids.length; i += 100) {
+        const chunk = ids.slice(i, i + 100);
+        marks.push(...await fetchAll(() => db.from('attendance')
+          .select('lesson_occurrence_id, status').in('lesson_occurrence_id', chunk).order('id')));
+      }
+    }
+    if (token !== loadToken) return;      // a newer load took over
+
+    period = { from, to };
+    dates = B.datesBetween(from, to);
+    calc = B.calculate({ from, to, teachers, types, avail: availRows, occs, marks }).cells;
+    saved = reportRows[0] ?? null;
+
+    // On-screen figures: the saved ones where there are any, else calculated.
+    cells = {};
+    let missing = false;
+    teachers.forEach(t => {
+      const sv = saved?.cells?.[t.id];
+      cells[t.id] = {};
+      dates.forEach(d => {
+        if (sv && sv[d] !== undefined && sv[d] !== null) cells[t.id][d] = +sv[d];
+        else { cells[t.id][d] = calc[t.id][d]; if (saved) missing = true; }
+      });
+    });
+    notes = saved?.notes ?? '';
+    document.getElementById('notes').value = notes;
+    dirty = !!missing;     // a teacher or day the saved report did not have
+
+    const order = { full_time: 0, part_time: 1, casual: 2 };
+    rows = teachers
+      .filter(t => !t.inactive || dates.some(d => (+cells[t.id][d] || 0) > 0))
+      .map(t => ({ id: t.id, name: t.name, type: types[t.id] || null, savedType: saved?.types?.[t.id] ?? undefined }))
+      .sort((a, b) => (a.type ? order[a.type] : 3) - (b.type ? order[b.type] : 3) || a.name.localeCompare(b.name));
+    ready = true;
+    renderGrid();
+  } catch (err) {
+    if (token !== loadToken) return;
+    console.error(err);
+    const hint = /relation .* does not exist|teacher_employment|billability_reports/i.test(err.message ?? '')
+      ? ' Run teacher-billability.sql first.' : '';
+    showEmpty('Could not load the report: ' + (err.message ?? String(err)) + hint, true);
+  }
+}
+
+// ---- grid ----
+function cellClass(tid, d) {
+  const v = +cells[tid][d] || 0, c = +calc[tid]?.[d] || 0;
+  return (Math.abs(v - c) > 0.004 ? 'edited ' : '') + (v === 0 ? 'zero' : '');
+}
+
+function renderGrid() {
+  if (!rows.length) { showEmpty('There are no teachers to show for this period.'); return; }
+  const head = dates.map(d => {
+    const wk = [0, 6].includes(U.parseISO(d).getDay());
+    return `<th class="${wk ? 'wk' : ''}">${U.dowOf(d)}<small>${U.fmtDMY(d).slice(0, 5)}</small></th>`;
+  }).join('');
+  const body = rows.map(r => {
+    const info = B.typeInfo(r.type);
+    const changed = r.savedType !== undefined && (r.savedType || null) !== (r.type || null);
+    const pill = r.type
+      ? `<span class="tpill" style="background:${info.bg};color:${info.fg}">${info.label}</span>`
+      : `<a class="tpill" href="teachers.html" style="background:${info.bg};color:${info.fg}" title="Set the employment type on the Teachers page">Set type</a>`;
+    const warn = changed ? ` <span title="Employment type was ${U.esc(B.typeInfo(r.savedType).label)} when this report was saved" style="cursor:help">⚠</span>` : '';
+    const tds = dates.map(d => {
+      const wk = [0, 6].includes(U.parseISO(d).getDay());
+      return `<td class="${wk ? 'wk' : ''}"><input type="number" class="bh ${cellClass(r.id, d)}" step="0.25" min="0" max="24"
+        data-t="${r.id}" data-d="${d}" value="${B.fmt(cells[r.id][d])}"
+        title="Calculated: ${B.fmt(calc[r.id]?.[d]) || 0} h"
+        oninput="onCell(this)" onchange="onCellDone(this)" onfocus="this.select()"></td>`;
+    }).join('');
+    return `<tr style="--tc:${info.fg}">
+      <th class="tname"><span class="tn">${U.esc(r.name)}</span>${pill}${warn}</th>${tds}
+      <td class="tot" id="tt-${r.id}"></td></tr>`;
+  }).join('');
+  const foot = `<tr><th class="tname">Total hours</th>${dates.map(d => `<td class="tot" id="dt-${d}"></td>`).join('')}<td class="tot grand" id="gt"></td></tr>`;
+  document.getElementById('billWrap').innerHTML =
+    `<table class="bill-table"><thead><tr><th class="tname">Teacher</th>${head}<th class="tot">Total</th></tr></thead>
+     <tbody>${body}</tbody><tfoot>${foot}</tfoot></table>`;
+  renderTotals();
+  renderLegend();
+  renderStatus();
+}
+
+function renderTotals() {
+  const t = B.totals(cells, rows.map(r => r.id), dates);
+  rows.forEach(r => { const el = document.getElementById('tt-' + r.id); if (el) el.textContent = B.fmt(t.perTeacher[r.id]) || '0'; });
+  dates.forEach(d => { const el = document.getElementById('dt-' + d); if (el) el.textContent = B.fmt(t.perDate[d]) || '0'; });
+  const g = document.getElementById('gt'); if (g) g.textContent = B.fmt(t.grand) || '0';
+  return t;
+}
+
+function renderLegend() {
+  const notSet = rows.filter(r => !r.type).length;
+  document.getElementById('billLegend').innerHTML =
+    Object.entries(B.TYPES).map(([k, v]) => `<span class="tpill" style="background:${v.bg};color:${v.fg}">${v.label}</span>`).join(' ') +
+    ` <span class="tpill" style="background:${B.NOT_SET.bg};color:${B.NOT_SET.fg}">Not set</span>` +
+    ` <span class="leg-edit">Outlined figure = changed from the calculated hours (hover to see the calculated figure)</span>` +
+    (notSet ? ` <span class="leg-warn">${notSet} teacher${notSet === 1 ? ' has' : 's have'} no employment type yet, so show 0 hours. Set it in Teachers → Edit.</span>` : '');
+  document.getElementById('billNote').innerHTML = [
+    'Full-time and part-time teachers: the hours they are available that weekday, as set in their profile (all studios added together).',
+    'Casual teachers: from the start of their first billable lesson to the end of their last billable lesson that day, with any gaps between lessons included. A lesson is billable unless it is cancelled or every student on it is marked Absent (no credit), Absent (notice given) or Teacher cancelled. A lesson marked Present, or not marked yet, counts. A lesson covered by a substitute counts for the substitute, and while someone else covers a lesson of theirs they are away: that lesson splits the day into separate stretches, each billed from first start to last end, so the time they were away is not billed.',
+    'Every figure can be edited. Clear a figure to put the calculated hours back. Recalculate replaces everything with freshly calculated hours.',
+  ].map(n => '• ' + U.esc(n)).join('<br>');
+}
+
+function renderStatus() {
+  const el = document.getElementById('saveStatus');
+  const when = saved ? new Date(saved.saved_at).toLocaleString('en-AU', { timeZone: 'Australia/Melbourne', dateStyle: 'medium', timeStyle: 'short' }) : '';
+  el.className = 'save-status' + (dirty ? ' unsaved' : saved ? ' ok' : '');
+  el.textContent = dirty ? 'Unsaved changes'
+    : saved ? `Saved ${when}`
+    : 'Not saved yet — figures are calculated from current data';
+  document.getElementById('pageSub').textContent =
+    `${U.fmtDMY(period.from)} to ${U.fmtDMY(period.to)} (inclusive) · ${rows.length} teacher${rows.length === 1 ? '' : 's'}`;
+}
+
+// ---- editing ----
+function onCell(inp) {
+  const tid = inp.dataset.t, d = inp.dataset.d;
+  const raw = inp.value.trim();
+  if (raw === '') return;                          // wait: blank means "put the calculated figure back" (on change)
+  let v = parseFloat(raw);
+  if (!(v >= 0)) return;
+  v = Math.min(24, Math.round(v * 100) / 100);
+  cells[tid][d] = v;
+  afterEdit(inp);
+}
+function onCellDone(inp) {
+  const tid = inp.dataset.t, d = inp.dataset.d;
+  if (inp.value.trim() === '' || !(parseFloat(inp.value) >= 0)) {
+    cells[tid][d] = calc[tid]?.[d] ?? 0;
+    inp.value = B.fmt(cells[tid][d]);
+  } else {
+    inp.value = B.fmt(cells[tid][d]);              // tidy: 3.50 → 3.5, caps at 24
+  }
+  afterEdit(inp);
+}
+function afterEdit(inp) {
+  const tid = inp.dataset.t, d = inp.dataset.d;
+  inp.className = 'bh ' + cellClass(tid, d);
+  dirty = true;
+  renderTotals();
+  renderStatus();
+}
+function onNotesInput() {
+  notes = document.getElementById('notes').value;
+  if (!dirty) { dirty = true; renderStatus(); }
+}
+
+// ---- recalculate / save ----
+function recalculate() {
+  if (!ready) return;
+  const edited = rows.some(r => dates.some(d => Math.abs((+cells[r.id][d] || 0) - (+calc[r.id]?.[d] || 0)) > 0.004));
+  if ((edited || saved) && !confirm('Replace every figure with freshly calculated hours?' + (edited ? ' Your edits will be lost.' : '') + ' Nothing is saved until you press Save.')) return;
+  rows.forEach(r => { cells[r.id] = { ...calc[r.id] }; });
+  dirty = true;
+  renderGrid();
+}
+
+async function saveReport() {
+  if (!ready) return;
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const outCells = {}, outTypes = {};
+    rows.forEach(r => {
+      outCells[r.id] = {};
+      dates.forEach(d => { outCells[r.id][d] = Math.round((+cells[r.id][d] || 0) * 100) / 100; });
+      outTypes[r.id] = r.type;
+    });
+    const { data, error } = await db.from('billability_reports').upsert({
+      period_start: period.from, period_end: period.to,
+      cells: outCells, types: outTypes, notes: notes.trim() || null,
+    }, { onConflict: 'period_start,period_end' }).select().single();
+    if (error) throw error;
+    saved = data;
+    rows.forEach(r => { r.savedType = r.type; });
+    dirty = false;
+    renderGrid();
+    showToast('Report saved.', 'success');
+  } catch (err) {
+    console.error(err);
+    showToast('Could not save: ' + (err.message ?? err), 'error');
+  } finally { btn.disabled = false; btn.textContent = 'Save'; }
+}
+
+function exportCSV() {
+  if (!ready) { showToast('Nothing to export yet.', 'warning'); return; }
+  const totals = B.totals(cells, rows.map(r => r.id), dates);
+  const csv = B.toCSV({ from: period.from, to: period.to, rows, dates, cells, totals, notes });
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `teachers-billability_${period.from}_to_${period.to}.csv`;
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>

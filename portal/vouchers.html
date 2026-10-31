@@ -26,6 +26,7 @@
     .vpill.void     { background: #fee2e2; color: #dc2626; }
     .vpill.expired  { background: #fef3c7; color: #b45309; }
     .vpill.unsent   { background: #fef3c7; color: #b45309; }
+    .vpill.prepared { background: #ede9fe; color: #6d28d9; }
     .vpill.online   { background: #e0f2fe; color: #0369a1; margin-left: 0.35rem; }
     .vpill.waiting  { background: #f3f4f6; color: #6b7280; }
     .vpill.paid     { background: #dcfce7; color: #16a34a; }
@@ -105,6 +106,7 @@
       <input class="filter-select v-search" type="search" id="filterText" placeholder="Search number, name or email…" oninput="render()">
       <select class="filter-select" id="filterStatus" onchange="render()">
         <option value="active">Active</option>
+        <option value="prepared">Prepared (not sent)</option>
         <option value="redeemed">Redeemed</option>
         <option value="void">Void</option>
         <option value="expired">Expired</option>
@@ -234,6 +236,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" id="pBack" onclick="backToEdit()">← Edit</button>
+      <button class="btn btn-secondary" id="pSave" onclick="saveOnly()" title="Keep it in the register and email it later, from its page in the list">Save without sending</button>
       <button class="btn btn-primary" id="pSend" onclick="sendNew()">Send voucher</button>
     </div>
   </div>
@@ -436,7 +439,7 @@ function renderSidebar() {
     html += `<div class="sidebar-section">Super User</div>
       ${it('studios.html','Studios',I.home)}
       ${it('admins.html','Admins',I.shield)}
-        ${it('teacher-utilisation.html','Teachers utilisation','<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>')}`;
+        ${it('teacher-billability.html','Teachers billability','<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>')}`;
   }
   html += `<div class="sidebar-section">Manuals</div>
     ${it('manuals/index.html','How-To Guide',I.help)}`;
@@ -556,17 +559,23 @@ async function loadStudents() {
 const today = () => toISODate(new Date());
 function effStatus(v) {
   if (v.status === 'issued' && v.expires_on < today()) return 'expired';
+  // Made ahead of its purchase date and not emailed yet: waiting for the
+  // payment. Not "Active" until it has gone out.
+  if (v.status === 'issued' && !v.emailed_at && !orderOf[v.id] && v.purchase_date > today()) return 'prepared';
   return v.status;
 }
-const STATUS_LABEL = { issued: 'Active', redeemed: 'Redeemed', void: 'Void', expired: 'Expired' };
+const STATUS_LABEL = { issued: 'Active', prepared: 'Prepared', redeemed: 'Redeemed', void: 'Void', expired: 'Expired' };
+// How far ahead a purchase date may be set (the database allows a year)
+function maxPurchaseDate() { const d = new Date(); d.setDate(d.getDate() + 365); return toISODate(d); }
 const dmy = iso => PFVoucher.fmtDate(iso);
 
 function render() {
   const f  = $('filterStatus').value;
   const q  = $('filterText').value.trim().toLowerCase();
-  const counts = { issued: 0, redeemed: 0, void: 0, expired: 0 };
+  const counts = { issued: 0, prepared: 0, redeemed: 0, void: 0, expired: 0 };
   vouchers.forEach(v => counts[effStatus(v)]++);
   $('pageSub').textContent = `${counts.issued} active · ${counts.redeemed} redeemed` +
+    (counts.prepared ? ` · ${counts.prepared} prepared, not sent` : '') +
     (counts.expired ? ` · ${counts.expired} expired` : '') + (counts.void ? ` · ${counts.void} void` : '');
 
   const src = $('filterSource').value;
@@ -592,7 +601,7 @@ function render() {
     const s = effStatus(v);
     let emailed = v.emailed_at
       ? `<span class="v-sub">Sent ${esc(dmy(v.emailed_at.slice(0, 10)))}</span>`
-      : (s === 'issued' ? '<span class="vpill unsent">Not sent</span>' : '<span class="v-sub">—</span>');
+      : (s === 'issued' || s === 'prepared' ? '<span class="vpill unsent">Not sent</span>' : '<span class="v-sub">—</span>');
     const ord = orderOf[v.id];
     if (ord && s === 'issued') {          // online: delivered only when everyone who should have it has it
       const all = ord.purchaser_emailed_at && (!ord.recipient_email || ord.recipient_emailed_at);
@@ -619,7 +628,7 @@ function openNew() {
   saved = null; draft = null; draftPdf = null; linkedStudent = null;
   ['nStudentSearch', 'nTo', 'nToEmail', 'nSubject', 'nFrom', 'nFromEmail', 'nValue', 'nMessage'].forEach(i => { $(i).value = ''; });
   $('nMsgCount').textContent = '0';
-  $('nDate').value = today(); $('nDate').max = today();
+  $('nDate').value = today(); $('nDate').max = maxPurchaseDate();
   $('nCc').checked = true;
   $('nStudio').innerHTML = studios.map(s => `<option value="${s.id}">${esc(s.name)}${s.email ? '' : ' (no email on file)'}</option>`).join('');
   const mine = studios.find(s => myStudioIds.includes(s.id));
@@ -634,7 +643,8 @@ function closeNew() { $('newModal').classList.add('hidden'); }
 function showExpiry() {
   const d = $('nDate').value;
   $('nExpiry').innerHTML = d
-    ? `Valid for one year from the purchase date — until <b>${esc(dmy(PFVoucher.addOneYear(d)))}</b>.`
+    ? `Valid for one year from the purchase date — until <b>${esc(dmy(PFVoucher.addOneYear(d)))}</b>.` +
+      (d > today() ? ' <b>This date is still ahead</b> — on the next screen you can save the voucher now and email it once the payment arrives.' : '')
     : 'Choose the purchase date.';
 }
 function syncCcLabel() {
@@ -718,7 +728,7 @@ function readForm() {
   if (!v.purchaser_name) problems.push('Enter the purchaser\'s name (From).');
   if (v.purchaser_email && !validEmail(v.purchaser_email)) problems.push('The purchaser\'s email address doesn\'t look right.');
   if (!v.purchase_date) problems.push('Choose the purchase date.');
-  else if (v.purchase_date > today()) problems.push('The purchase date can\'t be in the future.');
+  else if (v.purchase_date > maxPurchaseDate()) problems.push('The purchase date can be at most a year ahead.');
   if (v.value_amount != null && !(v.value_amount >= 0)) problems.push('The value must be zero or more.');
   const stripped = PFVoucher.clean(v.subject);
   if (v.subject && !stripped) problems.push('The voucher headline has no printable characters.');
@@ -778,6 +788,11 @@ function showPreview() {
   $('pSend').style.display = '';
   $('pSend').textContent = saved ? 'Retry sending the email' : 'Send voucher';
   $('pSend').disabled = false;
+  $('pSave').style.display = saved ? 'none' : '';
+  $('pSave').disabled = false;
+  if (draft.purchase_date > today()) {
+    $('pSummary').innerHTML += `<b>Note</b><span>The purchase date (${esc(dmy(draft.purchase_date))}) is still ahead. If the payment hasn't arrived, press <b>Save without sending</b> and email it from the voucher's page in the list when it does.</span>`;
+  }
   $('newModal').classList.add('hidden');
   $('prevModal').classList.remove('hidden');
 }
@@ -839,7 +854,7 @@ async function insertVoucher() {
 async function sendNew() {
   if (sending) return;
   sending = true;
-  const btn = $('pSend'); btn.disabled = true; $('pBack').disabled = true;
+  const btn = $('pSend'); btn.disabled = true; $('pBack').disabled = true; $('pSave').disabled = true;
   hideErr('pErr');
   try {
     if (!saved) {
@@ -860,15 +875,37 @@ async function sendNew() {
     if (saved) {
       showErr('pErr', `The voucher ${saved.voucher_no} was saved, but the email didn't go: ${e.message} ` +
         'You can try again here, or find it in the list later and use “Email again”.');
-      $('pBack').style.display = 'none';
+      $('pBack').style.display = 'none'; $('pSave').style.display = 'none';
       btn.textContent = 'Retry sending the email';
     } else {
       showErr('pErr', 'Could not save the voucher: ' + e.message);
       btn.textContent = 'Send voucher';
-      $('pBack').disabled = false;
+      $('pBack').disabled = false; $('pSave').disabled = false;
     }
     btn.disabled = false;
   } finally { sending = false; }
+}
+
+// Keep the voucher in the register without emailing it — for one prepared
+// ahead of payment. It is emailed later from its page in the list
+// ("Send email"), which builds the very same PDF from the register.
+async function saveOnly() {
+  if (sending || saved) return;
+  sending = true;
+  const btn = $('pSave'); btn.disabled = true; $('pSend').disabled = true; $('pBack').disabled = true;
+  btn.textContent = 'Saving…';
+  hideErr('pErr');
+  try {
+    const row = await insertVoucher();
+    showToast(`Voucher ${row.voucher_no} saved, not sent yet. Open it in the list and press “Send email” when the payment arrives.`, 'success');
+    $('prevModal').classList.add('hidden');
+    draft = null;
+    await loadVouchers();
+  } catch (e) {
+    console.error(e);
+    showErr('pErr', 'Could not save the voucher: ' + e.message);
+    $('pSend').disabled = false; $('pBack').disabled = false; btn.disabled = false;
+  } finally { btn.textContent = 'Save without sending'; sending = false; }
 }
 
 // ============================================================
@@ -893,12 +930,13 @@ function openDetail(id) {
         : '<span class="vpill unsent">Not sent</span>'}${v.email_error ? `<br><span class="v-sub" style="color:#b91c1c;">Last error: ${esc(v.email_error)}</span>` : ''}</dd>`}
       ${v.status_changed_at ? `<dt>${s === 'void' ? 'Voided' : 'Redeemed'}</dt><dd>${esc(dmy(v.status_changed_at.slice(0, 10)))}${v.status_note ? ` — ${esc(v.status_note)}` : ''}</dd>` : ''}
     </dl>
-    ${v.message ? `<div class="form-label" style="margin-bottom:.35rem;">Personal message</div><div class="v-msg">${esc(v.message)}</div>` : ''}`;
+    ${v.message ? `<div class="form-label" style="margin-bottom:.35rem;">Personal message</div><div class="v-msg">${esc(v.message)}</div>` : ''}
+    ${s === 'prepared' ? `<div class="expiry-note" style="margin-top:.9rem;"><b>Prepared ahead.</b> Not emailed yet. Press <b>Send email</b> when the payment arrives; it then counts as Active. The dates are fixed once saved, so if the payment date changes a lot, void it and make a new one.</div>` : ''}`;
   const live = v.status === 'issued';
   $('dFoot').innerHTML = `
     <button class="btn btn-secondary btn-sm" onclick="viewPdf()">View / download PDF</button>
     ${live && s !== 'expired' ? `<button class="btn btn-secondary btn-sm" onclick="openResend()">${v.emailed_at ? 'Email again' : 'Send email'}</button>` : ''}
-    ${live ? `<button class="btn btn-primary btn-sm" onclick="openStatus('redeem')">Mark redeemed</button>
+    ${live ? `${s === 'prepared' ? '' : `<button class="btn btn-primary btn-sm" onclick="openStatus('redeem')">Mark redeemed</button>`}
               ${ord && ord.status === 'paid' ? `<button class="btn btn-danger btn-sm" onclick="openStatus('refund')">Mark refunded…</button>` : ''}
               <button class="btn btn-danger btn-sm" onclick="openStatus('void')">Void</button>` : ''}`;
   $('detModal').classList.remove('hidden');
@@ -946,7 +984,7 @@ async function viewPdf() {
     $('pTitle').textContent = v.voucher_no;
     setFrame(draftPdf.url);
     $('pSummary').innerHTML = `<b>File</b><span><a href="${draftPdf.url}" download="${esc(draftPdf.filename)}">Download ${esc(draftPdf.filename)}</a></span>`;
-    $('pBack').style.display = 'none'; $('pSend').style.display = 'none';
+    $('pBack').style.display = 'none'; $('pSend').style.display = 'none'; $('pSave').style.display = 'none';
     $('prevModal').classList.remove('hidden');
   } catch (e) { showToast('Could not build the PDF: ' + e.message, 'error'); }
 }

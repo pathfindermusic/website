@@ -140,6 +140,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
       Teachers utilisation
     </a>
+    <a class="nav-item hidden" href="teacher-billability.html" id="billLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Teachers billability
+    </a>
     <div class="sidebar-section">Manuals</div>
     <a class="nav-item" href="manuals/index.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -197,7 +201,7 @@ let runToken = 0;         // ignore a slow earlier run when a newer one has star
   currentProfile = await requireAuth(['superuser']);
   if (!currentProfile) return;
   renderTopNavUser(currentProfile);
-  ['superuserSection','studiosLink','adminsLink','utilLink']
+  ['superuserSection','studiosLink','adminsLink','utilLink','billLink']
     .forEach(id => document.getElementById(id).classList.remove('hidden'));
   if (window.innerWidth < 900) document.getElementById('menuToggle').style.display = '';
   resetDates(true);
