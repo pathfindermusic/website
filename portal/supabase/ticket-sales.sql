@@ -508,6 +508,3 @@ GRANT EXECUTE ON FUNCTION ticket_check_in(text, text) TO authenticated;
 -- DROP FUNCTION IF EXISTS tickets_guard();
 -- ALTER TABLE events DROP COLUMN IF EXISTS tickets_enabled, DROP COLUMN IF EXISTS ticket_price_cents, DROP COLUMN IF EXISTS ticket_info;
 -- ------------------------------------------------------------
-60CF3AcSU/bmmoPrHyPmdtwKJf+zh3isfpklfara3ei9XGYLYMLlgBZcLJRCx4jJi1Bh3i
-44DD7AD+00gR4JxoRF7rNcEj2kOCpmbEHH4RfchEjzTuKCfCkCCB9Z0Uw9/gKoLQlcw/Wc
-w2s9EoHn
