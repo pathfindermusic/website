@@ -2228,6 +2228,31 @@ shared code in `js/events-common.js`; database in `supabase/events.sql`.
   order ("smith alice"). Still lists only active and trial students of the
   event's studio. The box is no longer shown when editing an existing
   performance (it used to wipe the fixed student there). `events-common.js` only.
+- **Lessons: trial note on the grid, and clickable student names (Nov 2026).**
+  (1) Adding a **trial** lesson already fills the series note ("Trial lesson on 6
+  November 2026", or whatever the admin changed it to); the same text is now also
+  saved as the occurrence note, so it shows on the Lessons grid (📝). Makeup and
+  other one-off lessons are unchanged; trials added before this keep their blank
+  occurrence note. Because it is an occurrence note it also appears as the studio
+  note on the student's / teacher's dashboard, and in a cancellation email for that
+  lesson. The day agenda prints a note once when the series and occurrence notes
+  are identical. (2) In the lesson (occurrence) modal, the student's name — in
+  the student list and in the attendance list — is a link to
+  `students.html?student=<id>`, opened in a new tab so the open lesson is not lost;
+  the Students page opens that student's Edit window on arrival (`loadStudents()`).
+  `lessons.html` and `students.html` only, no SQL.
+- **Duplicate-name warning on new students and enquiries (Nov 2026).** Saving a
+  NEW enquiry (Enquiries → Add) or NEW student (Students → Add) now first checks
+  whether someone with exactly the same first and last name is already on file.
+  If so, a prompt lists them (status and instruments) and asks whether to add
+  another record anyway; Cancel keeps the form open so the admin can use the
+  existing record instead. Only the person's own full name counts: siblings
+  sharing an email or phone do not trigger it, editing an existing student never
+  does, and if the check itself fails the save simply goes ahead. It reuses
+  `findPossibleMatches()` in `js/person-match.js` (new `confirmNotDuplicate()`),
+  called from `enquiries.html` and `students.html`. No SQL. Background: in Oct
+  2026 a trial checklist sat on a mistaken guitar record while the piano lesson
+  was booked on a second record of the same student.
 - **Events: backing-track link on a performance (Nov 2026).** The teacher
   replies to their "Backing track for ..." task with a YouTube / Google Drive link;
   an admin or the superuser then records it on the performance: open the

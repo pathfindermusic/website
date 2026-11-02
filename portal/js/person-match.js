@@ -102,6 +102,55 @@ function matchBanner(matches) {
 
 
 // ------------------------------------------------------------
+// Duplicate check when a NEW student or enquiry is about to be saved.
+//
+// Two records for one person split their lessons, checklist and history
+// (a trial checklist sat on a guitar record while the piano lesson was on
+// a second "Elena" record, Oct 2026). Matches on the person's own full name
+// only: sharing an email or phone is normal for siblings, so those are NOT
+// treated as duplicates here. Never blocks on a failure — the admin decides.
+// ------------------------------------------------------------
+const DUP_STATUS = { active: 'currently enrolled', trial: 'on a trial', inactive: 'past student',
+                     lapsed: 'lapsed enquiry', prospective: 'open enquiry' };
+
+async function duplicateStudentMatches({ first, last, exclude } = {}) {
+  try {
+    const norm = s => String(s ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+    const want = norm(`${first ?? ''} ${last ?? ''}`);
+    if (!norm(first) || !norm(last)) return [];
+
+    const found = await findPossibleMatches({
+      id: exclude ?? null, first_name: first, last_name: last, email: '', phone: '',
+    });
+    const dups = found.filter(m => m.id !== exclude && norm(m.name) === want);
+    if (!dups.length) return [];
+
+    const { data: ins } = await db.from('student_instruments')
+      .select('student_id,instrument').in('student_id', dups.map(d => d.id));
+    return dups.map(d => ({
+      id: d.id, name: d.name, status: d.status,
+      instruments: (ins ?? []).filter(i => i.student_id === d.id).map(i => i.instrument),
+    }));
+  } catch (err) {
+    console.warn('duplicate check unavailable:', err?.message ?? err);
+    return [];
+  }
+}
+
+// true = go ahead and save. `what` is "student" or "enquiry".
+async function confirmNotDuplicate(person, what = 'student') {
+  const dups = await duplicateStudentMatches(person);
+  if (!dups.length) return true;
+  const lines = dups.map(d =>
+    `\u2022 ${d.name} \u2014 ${DUP_STATUS[d.status] ?? d.status}${d.instruments.length ? ' \u00b7 ' + d.instruments.join(', ') : ''}`).join('\n');
+  return confirm(
+    `\u26a0\ufe0f ${dups.length === 1 ? 'A student with this name already exists' : 'Students with this name already exist'}:\n\n${lines}\n\n` +
+    `If this is the same person (for example a second instrument, or another lesson), press Cancel and use the existing record: ` +
+    `two records for one person split their lessons and checklist.\n\nAdd a new ${what} anyway?`);
+}
+
+
+// ------------------------------------------------------------
 // Flags
 // ------------------------------------------------------------
 const FLAG_LEVEL_LABEL = { watch: 'Watch', block: 'Do not re-enrol' };

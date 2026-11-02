@@ -3452,6 +3452,14 @@ async function saveLesson() {
       }
     }
 
+    // A trial's series note ("Trial lesson on 6 November 2026") is written
+    // for the one occurrence too, so it shows on the Lessons grid.
+    if (isOneOff && oneOffKind === 'trial' && seriesNotes) {
+      const { error: nErr } = await db.from('lesson_occurrences')
+        .update({ occurrence_notes: seriesNotes }).eq('lesson_id', lessonId);
+      if (nErr) showToast('Lesson created, but its note could not be added to the grid: ' + nErr.message, 'warning');
+    }
+
     showToast('Lesson created successfully.', 'success');
     closeLessonModal();
     loadView();
@@ -3595,6 +3603,17 @@ async function openOccurrence(occId) {
   return openOccurrenceModal(occId);
 }
 
+// A student's name as a link to their record (Students page, new tab so
+// the open lesson and anything typed in it stay put).
+function studentLink(sid, name) {
+  const label = String(name ?? '—');
+  if (!sid || label === '—') return label;
+  const esc = label.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  return `<a href="students.html?student=${encodeURIComponent(sid)}" target="_blank" rel="noopener"
+             title="Open this student's record in a new tab"
+             style="color:inherit;text-decoration:underline dotted;text-underline-offset:3px;">${esc}</a>`;
+}
+
 async function openOccurrenceModal(occId) {
   const occ = allOccurrences.find(o => o.id === occId);
   if (!occ) return;
@@ -3644,7 +3663,7 @@ async function openOccurrenceModal(occId) {
         const isAdhoc = adhocIds.has(sid);
         return `
         <div class="student-tag"${isAdhoc ? ' style="background:rgba(232,73,30,0.08);"' : ''}>
-          <span class="student-tag-name">${sNames[i] ?? '—'}${isAdhoc ? ' <span class="text-muted" style="font-size:0.7rem;font-weight:500;">(this lesson only)</span>' : ''}</span>
+          <span class="student-tag-name">${studentLink(sid, sNames[i])}${isAdhoc ? ' <span class="text-muted" style="font-size:0.7rem;font-weight:500;">(this lesson only)</span>' : ''}</span>
           ${isAdhoc ? `<button class="student-tag-remove" onclick="removeStudentFromOccurrence('${l.id}','${sid}','${occId}')">✕</button>` : ''}
         </div>`;
       }).join('')
@@ -4550,7 +4569,7 @@ async function renderOccurrenceAttendance(occId, studentIds, studentNames) {
     const cur = byStudent[sid]?.status ?? '';
     return `<div style="display:grid;grid-template-columns:1fr auto;gap:0.75rem;align-items:center;
                         padding:0.45rem 0;border-bottom:1px solid var(--border);">
-      <div style="font-size:0.875rem;color:var(--charcoal);">${studentNames[i] ?? '—'}</div>
+      <div style="font-size:0.875rem;color:var(--charcoal);">${studentLink(sid, studentNames[i])}</div>
       <select class="filter-select" data-student="${sid}"
               onchange="markAttendanceAsAdmin('${occId}','${sid}',this.value)">
         ${OPTIONS.map(([v, l]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${l}</option>`).join('')}
@@ -5307,7 +5326,7 @@ async function previewAgenda() {
     const endMins   = startMins + (l.duration_mins ?? 30);
     const endTime   = `${String(Math.floor(endMins/60)).padStart(2,'0')}:${String(endMins%60).padStart(2,'0')}:00`;
 
-    const notes = [o.occurrence_notes, l.series_notes].filter(Boolean).join(' · ');
+    const notes = [...new Set([o.occurrence_notes, l.series_notes].filter(Boolean))].join(' · ');
     const isBlock = sIds.length === 0 && lType !== 'group';
     html += `<div class="agenda-item" style="grid-template-columns:90px 1fr 80px 1fr;">
       <div class="agenda-time">${formatTime(l.start_time)}–${formatTime(endTime)}</div>

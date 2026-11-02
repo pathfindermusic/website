@@ -508,6 +508,10 @@ async function saveEnquiry() {
     showToast('Please fill in the required fields.', 'error'); return;
   }
 
+  // Already on file under this name? Easy to end up with two records for
+  // one person, each holding half of their story.
+  if (!(await confirmNotDuplicate({ first, last }, 'enquiry'))) return;
+
   const btn = document.getElementById('addBtn');
   btn.textContent = 'Adding…'; btn.disabled = true;
 

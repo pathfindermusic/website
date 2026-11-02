@@ -801,6 +801,16 @@ async function loadStudents(prereq = null) {
     sessionStorage.removeItem('openProcessStudentId');
     if (procByStudent[wanted]) openProcess(wanted);
   }
+
+  // Arrived from a student's name in the Lessons page (students.html?student=<id>)
+  // — open that student's record, once.
+  const linked = new URLSearchParams(location.search).get('student');
+  if (linked) {
+    history.replaceState(null, '', location.pathname);
+    const idx = allStudents.findIndex(s => s.id === linked);
+    if (idx >= 0) openStudentByIndex(idx);
+    else showToast('That student could not be found.', 'warning');
+  }
 }
 
 async function refreshFlagInfo() {
@@ -2149,6 +2159,10 @@ async function saveStudent() {
       if (!confirm(`🚩 This looks like a flagged student:\n\n${lines}\n\nAdd this student anyway?`)) return;
     }
   }
+
+  // Already on file under this name? A second record for the same person
+  // splits their lessons, checklist and history between the two.
+  if (!editId && !(await confirmNotDuplicate({ first: firstName, last: lastName }, 'student'))) return;
 
   try {
     let userId    = editUserId;
