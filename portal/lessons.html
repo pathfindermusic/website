@@ -2827,8 +2827,26 @@ function onTeacherChange() {
   checkAvailability();
 }
 
+// The page reads every student's status once, when it loads, so a tab left
+// open while a student moved from Trial to Active still thinks they are on a
+// trial — and Add Lesson then locks to a single lesson. Ask the database for
+// the CURRENT status of just the students being booked (one tiny query when
+// one is picked, and again at save), rather than reloading the whole list.
+async function refreshStudentStatuses(ids) {
+  const list = [...new Set((ids ?? []).filter(Boolean))];
+  if (!list.length) return;
+  try {
+    const { data, error } = await db.from('students').select('id,status').in('id', list);
+    if (error) throw error;
+    (data ?? []).forEach(r => {
+      const s = allStudents.find(x => x.id === r.id);
+      if (s) s.status = r.status;
+    });
+  } catch (e) { console.warn('could not refresh student status:', e?.message ?? e); }
+}
+
 // Add student to lesson
-function addStudentToLesson() {
+async function addStudentToLesson() {
   const picker = document.getElementById('studentPicker');
   const sid    = picker.value;
   if (!sid) { showToast('Please select a student.', 'warning'); return; }
@@ -2845,9 +2863,10 @@ function addStudentToLesson() {
   }
 
   lessonStudents.push(sid);
-  renderLessonStudents();
-  updateRecurrenceForTrial();
   picker.value = '';
+  renderLessonStudents();
+  await refreshStudentStatuses([sid]);   // is their status still what this page loaded with?
+  updateRecurrenceForTrial();
 }
 
 function removeStudentFromLesson(sid) {
@@ -3159,6 +3178,20 @@ async function saveLesson() {
   }
   if (!noStudent && lType === 'private' && lessonStudents.length > 1) {
     showToast('Private lessons can only have one student.', 'error'); return;
+  }
+
+  // Statuses can change while this window is open (a trial enrolled in another
+  // tab). If that flips the trial lock, unlock/lock the form and let the admin
+  // check the pattern, rather than saving what the stale form was showing.
+  const hadTrial = lessonStudents.some(sid => allStudents.find(s => s.id === sid)?.status === 'trial');
+  await refreshStudentStatuses(lessonStudents);
+  if (hadTrial !== lessonStudents.some(sid => allStudents.find(s => s.id === sid)?.status === 'trial')) {
+    updateRecurrenceForTrial();
+    showToast(hadTrial
+      ? 'This student is no longer on a trial, so the lesson pattern has been unlocked. Please check it and save again.'
+      : 'This student is now on a trial, so the lesson has been set to a single lesson. Please check it and save again.',
+      'warning');
+    return;
   }
 
   // A trial is one lesson, whatever the form was left showing

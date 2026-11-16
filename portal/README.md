@@ -2228,6 +2228,33 @@ shared code in `js/events-common.js`; database in `supabase/events.sql`.
   order ("smith alice"). Still lists only active and trial students of the
   event's studio. The box is no longer shown when editing an existing
   performance (it used to wipe the fixed student there). `events-common.js` only.
+- **Farewell email names the last lesson (Nov 2026).** Starting the End enrolment
+  checklist (the *End enrolment* button on a checklist, *Start now* under the
+  student's ending option, or closing the planned *End enrolment* task) now first
+  asks **"When is the student's last lesson?"** (YYYY-MM-DD; pre-filled from the
+  planned task's date; blank = old behaviour, no date). The farewell then says in
+  a highlighted line that lessons go ahead as usual until their last lesson and
+  names it (instrument, teacher, weekday, date, time; one line per series if they
+  have several), using the last scheduled, not cancelled, occurrence on or before
+  that date. At the same moment the lessons after that date are cancelled, the
+  *Mark student inactive* task moves to a week later and the student's other open
+  tasks are closed, so the "End date set for lessons" step ticks straight away.
+  That ending is one shared function, `endLessonsOnDate()` in `js/processes.js`,
+  which the separate *End date set for lessons* button now also uses (same
+  behaviour as before). Students with no running lessons are not asked for a
+  date. If the lessons can't be ended after the email went out, a warning says so
+  and the checklist step can still be done by hand. Files: `js/processes.js`,
+  `students.html`, `tasks.html`. No SQL.
+- **Lessons: Add Lesson re-checks a student's current status (Nov 2026).** The
+  Lessons page reads every student's status once at load, so a tab left open
+  while a student went from Trial to Active still treated them as a trial and
+  locked Add Lesson to a single lesson. Now `refreshStudentStatuses()` asks the
+  database for the current status of just the students being booked: when one is
+  picked in Add Lesson, and again when the lesson is saved (if that flips the
+  trial lock, the form is unlocked/locked and the admin is asked to check the
+  pattern and save again). One small query each time; the page load is unchanged.
+  If the lookup fails the page falls back to the status it loaded with.
+  `lessons.html` only, no SQL.
 - **Lessons: trial note on the grid, and clickable student names (Nov 2026).**
   (1) Adding a **trial** lesson already fills the series note ("Trial lesson on 6
   November 2026", or whatever the admin changed it to); the same text is now also

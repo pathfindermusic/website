@@ -1877,7 +1877,15 @@ async function setStatus(id, status) {
     if (s?.status === 'active' && isEndEnrolment) {
       if (confirm(`Start the end-enrolment checklist for ${s.name}?\n\nThis sends the farewell email.`)) {
         try {
-          await startProcess(s.subject_id ?? t.subject_id, 'end_enrolment', me.id);
+          // The farewell names the last lesson; the plan task's date is the
+          // suggested answer.
+          const sid = s.subject_id ?? t.subject_id;
+          const lastLessonDate = await askLastLessonDate(sid, s.name, t.due_date ?? null);
+          if (lastLessonDate === null) {
+            showToast('Not started — the task is still open.', 'warning');
+            return;
+          }
+          await startProcess(sid, 'end_enrolment', me.id, lastLessonDate ? { lastLessonDate } : {});
           sessionStorage.setItem('openProcessStudentId', t.subject_id);
           await closeTaskNow(id);
           window.location.href = 'students.html';

@@ -45,7 +45,7 @@ const PROCESS_DEFS = {
 
 // Create a process and its items. Labels are copied in, so changing a
 // checklist later leaves completed processes as they were.
-async function startProcess(studentId, type, createdBy) {
+async function startProcess(studentId, type, createdBy, opts = {}) {
   const def = PROCESS_DEFS[type];
   if (!def) throw new Error('Unknown process type: ' + type);
 
@@ -85,10 +85,27 @@ async function startProcess(studentId, type, createdBy) {
   try { await createProcessTasks(studentId, type, createdBy, proc.started_at); }
   catch (err) { console.error('[processes] task creation failed', err); }
 
-  // The farewell goes out as soon as leaving is confirmed
+  // The farewell goes out as soon as leaving is confirmed. With a last
+  // lesson date (opts.lastLessonDate, asked for by the caller — see
+  // askLastLessonDate) it also names that last lesson, and the lessons
+  // after that date are ended at the same moment, so the "End date set
+  // for lessons" step ticks and the student keeps attending until then.
   if (type === 'end_enrolment') {
-    try { await sendFarewellEmail(studentId, createdBy); }
+    let lastLessons = [];
+    if (opts.lastLessonDate) {
+      try { lastLessons = await describeLastLessons(studentId, opts.lastLessonDate); }
+      catch (err) { console.error('[processes] could not work out the last lesson', err); }
+    }
+    try { await sendFarewellEmail(studentId, createdBy, lastLessons); }
     catch (err) { console.error('[processes] farewell failed', err); }
+    if (opts.lastLessonDate) {
+      try { await endLessonsOnDate(studentId, opts.lastLessonDate, createdBy); }
+      catch (err) {
+        console.error('[processes] could not end the lessons', err);
+        showToast('The farewell was sent, but the lessons could not be ended: ' + err.message +
+                  ' — use "End date set for lessons" on the checklist.', 'warning');
+      }
+    }
   }
 
   return proc.id;
@@ -808,13 +825,140 @@ async function sendFinanceFollowUp(studentId, sentBy, taskStudioId = null) {
   return 'sent';
 }
 
-// 4 — Farewell, when the End enrolment process starts
-async function sendFarewellEmail(studentId, sentBy) {
+// ------------------------------------------------------------
+// Last lesson of a leaving student
+// ------------------------------------------------------------
+
+// The lesson series a student permanently attends and that are still
+// running. (A guest place in one occurrence is not "their" series.)
+async function activeSeriesFor(studentId) {
+  const { data: ls, error: lErr } = await db.from('lesson_students')
+    .select('lesson_id').eq('student_id', studentId).is('added_for_occurrence_id', null);
+  if (lErr) throw new Error(lErr.message);
+  const ids = (ls ?? []).map(r => r.lesson_id);
+  if (!ids.length) return [];
+  const { data, error } = await db.from('lessons')
+    .select('id,instrument,day_of_week,start_time,teacher_id').in('id', ids).eq('status', 'active');
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+// Asks for the last lesson date, before a farewell is sent.
+//   returns null        — the admin cancelled: do nothing
+//   returns ''          — nothing to end, or left blank: carry on without a date
+//   returns 'YYYY-MM-DD' — the last lesson date
+async function askLastLessonDate(studentId, name, defaultDate = null) {
+  let series = [];
+  try { series = await activeSeriesFor(studentId); }
+  catch (err) { showToast('Could not look up the lessons: ' + err.message, 'error'); return null; }
+  if (!series.length) return '';            // no lessons to end
+
+  const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const list = series.map(l =>
+    `  · ${l.instrument}, ${DAYS[l.day_of_week]} ${formatTime(l.start_time)}`).join('\n');
+  const answer = prompt(
+    `When is ${name || 'the student'}'s last lesson?\n\n${list}\n\n` +
+    `The farewell email will say their lessons go ahead as usual until this date. ` +
+    `Lessons up to and including it are kept; everything after it is cancelled.\n\n` +
+    `Format: YYYY-MM-DD\n` +
+    `(Leave blank to send the farewell without a last lesson date — nothing is cancelled.)`,
+    defaultDate ?? '');
+  if (answer === null) return null;
+  const v = answer.trim();
+  if (!v) return '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || isNaN(parseLocalDate(v).getTime())) {
+    showToast('Enter a date as YYYY-MM-DD.', 'warning'); return null;
+  }
+  if (v < toISODate(new Date()) &&
+      !confirm(`${v} has already passed, so the lessons after it would all be cancelled. Continue?`)) return null;
+  return v;
+}
+
+// The lesson(s) the student still attends on or before `endDate`: one entry
+// per series — the last scheduled (not cancelled) occurrence from today up to
+// and including that date. Read BEFORE the lessons are ended.
+async function describeLastLessons(studentId, endDate) {
+  const series = await activeSeriesFor(studentId);
+  const today  = toISODate(new Date());
+  const out = [];
+  for (const l of series) {
+    const { data: occ } = await db.from('lesson_occurrences')
+      .select('date').eq('lesson_id', l.id).neq('status', 'cancelled')
+      .gte('date', today).lte('date', endDate)
+      .order('date', { ascending: false }).limit(1);
+    const date = occ?.[0]?.date;
+    if (!date) continue;                       // nothing left to attend by then
+
+    let teacher = '';
+    const { data: t } = await db.from('teachers').select('user_id').eq('id', l.teacher_id).maybeSingle();
+    if (t?.user_id) {
+      const { data: pr } = await db.from('profiles')
+        .select('first_name,last_name').eq('id', t.user_id).maybeSingle();
+      teacher = `${pr?.first_name ?? ''} ${pr?.last_name ?? ''}`.trim();
+    }
+    out.push({ date, instrument: l.instrument, teacher, time: formatTime(l.start_time) });
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// Ends every active series the student attends on `endDate`: occurrences up
+// to and including it stay, everything after is cancelled, past attendance and
+// notes are kept. Also moves the "Mark student inactive" task to a week after,
+// and closes the student's other open tasks (only while an end-enrolment
+// checklist is under way). Throws on a database error.
+async function endLessonsOnDate(studentId, endDate, loggedBy) {
+  const series = await activeSeriesFor(studentId);
+  if (!series.length) return { series: 0, taskDate: null, closed: { tasks: 0, rules: 0 } };
+  const lessonIds = series.map(l => l.id);
+
+  const { error: oErr } = await db.from('lesson_occurrences')
+    .update({ status: 'cancelled' }).in('lesson_id', lessonIds).gt('date', endDate);
+  if (oErr) throw new Error(oErr.message);
+
+  const { error: lErr } = await db.from('lessons')
+    .update({ status: 'cancelled' }).in('id', lessonIds);
+  if (lErr) throw new Error(lErr.message);
+
+  // That task is created when the process starts, before anyone has said
+  // when the last lesson is — so it falls back to a placeholder date.
+  const d = parseLocalDate(endDate);
+  d.setDate(d.getDate() + 7);
+  const taskDate = toISODate(d);
+  const { error: tErr } = await db.from('tasks')
+    .update({ due_date: taskDate })
+    .eq('subject_type', 'student').eq('subject_id', studentId)
+    .eq('status', 'open')
+    .ilike('title', 'Mark student inactive%');
+  if (tErr) console.error('[processes] could not re-date the inactive task', tErr);
+
+  const closed = await closeTasksForEndedStudent(studentId, loggedBy, endDate);
+  return { series: series.length, taskDate, closed };
+}
+
+// 4 — Farewell, when the End enrolment process starts.
+// `lastLessons` (from describeLastLessons) adds the last lesson(s) and says
+// lessons go ahead as usual until then.
+async function sendFarewellEmail(studentId, sentBy, lastLessons = []) {
+  const clean = s => String(s ?? '').replace(/\*\*/g, '').trim();
+  const longDate = ds => parseLocalDate(ds).toLocaleDateString('en-AU',
+    { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const lessonText = r =>
+    `${clean(r.instrument)}${r.teacher ? ' with ' + clean(r.teacher) : ''} — ${longDate(r.date)} at ${r.time}`;
+
+  let lastBlock = '';
+  if (lastLessons.length === 1) {
+    lastBlock = `**Your lessons will go ahead as usual until your last lesson: ${lessonText(lastLessons[0])}.**\n\n`;
+  } else if (lastLessons.length > 1) {
+    lastBlock = `**Your lessons will go ahead as usual until your last lessons:**\n\n` +
+                lastLessons.map(lessonText).join('\n') + `\n\n`;
+  }
+
   return sendStudentEmail(studentId,
     'Farewell for now, {{first_name}}!',
     `Until next time, {{first_name}}!\n\n` +
     `Sorry to hear that you're finishing up lessons with us soon! Hopefully it's not ` +
     `for too long :)\n\n` +
+    lastBlock +
     `Congratulations on your progress, and try to keep up the practice at least every ` +
     `few days, even if it's just to play easy, fun stuff!\n\n` +
     `You'll be able to see when your last lessons are booked for in the Student ` +

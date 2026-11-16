@@ -1112,8 +1112,19 @@ async function startNextProcess() {
   const label = PROCESS_DEFS[type].label;
   if (!confirm(`Start the ${label.toLowerCase()} checklist?`)) return;
 
+  // Leaving: the farewell email names the last lesson, so ask for its date
+  // (pre-filled from a planned ending) before anything is sent.
+  const opts = {};
+  if (type === 'end_enrolment') {
+    const sx = allStudents.find(x => x.id === studentId);
+    const nm = `${sx?.first_name ?? sx?.profilesx?.first_name ?? ''} ${sx?.last_name ?? sx?.profilesx?.last_name ?? ''}`.trim();
+    const when = await askLastLessonDate(studentId, nm, endPending[studentId]?.due_date ?? null);
+    if (when === null) return;
+    if (when) opts.lastLessonDate = when;
+  }
+
   try {
-    await startProcess(studentId, type, currentProfile.id);
+    await startProcess(studentId, type, currentProfile.id, opts);
     closeProcess();
     await loadStudents();
     if (procByStudent[studentId]) openProcess(studentId);
@@ -2361,8 +2372,12 @@ async function endEnrolmentFor(studentId) {
   if (answer.trim() !== '2') { showToast('Enter 1 or 2.', 'warning'); return; }
 
   if (!confirm(`Start the end-enrolment checklist for ${name}?\n\nThis sends the farewell email.`)) return;
+
+  // The farewell names the last lesson, and the lessons after it are ended.
+  const lastLessonDate = await askLastLessonDate(studentId, name);
+  if (lastLessonDate === null) return;
   try {
-    await startProcess(studentId, 'end_enrolment', currentProfile.id);
+    await startProcess(studentId, 'end_enrolment', currentProfile.id, lastLessonDate ? { lastLessonDate } : {});
     await loadStudents();
     if (procByStudent[studentId]) openProcess(studentId);
     showToast('End enrolment checklist started.', 'success');
@@ -2414,39 +2429,14 @@ async function endLessonsFor(studentId) {
     `notes are kept.`)) return;
 
   try {
-    const lessonIds = lessons.map(l => l.id);
-
-    const { error: oErr } = await db.from('lesson_occurrences')
-      .update({ status: 'cancelled' })
-      .in('lesson_id', lessonIds).gt('date', endDate);
-    if (oErr) throw new Error(oErr.message);
-
-    const { error: lErr } = await db.from('lessons')
-      .update({ status: 'cancelled' }).in('id', lessonIds);
-    if (lErr) throw new Error(lErr.message);
-
-    // The "Mark student inactive" task is created when the process
-    // starts, before anyone has said when the last lesson is — so it
-    // falls back to today. Now the date is known, move it.
-    const d = parseLocalDate(endDate);
-    d.setDate(d.getDate() + 7);
-    const { error: tErr } = await db.from('tasks')
-      .update({ due_date: toISODate(d) })
-      .eq('subject_type', 'student').eq('subject_id', studentId)
-      .eq('status', 'open')
-      .ilike('title', 'Mark student inactive%');
-    if (tErr) console.error('[students] could not re-date the inactive task', tErr);
-
-    // The student's other open tasks (check-ins, payment follow-ups,
-    // recurring ones) have no point now — close them quietly. Does
-    // nothing unless an end-enrolment checklist is under way.
-    const closed = await closeTasksForEndedStudent(studentId, currentProfile.id, endDate);
-    const closedNote = closed.tasks
-      ? ` ${closed.tasks} other open task${closed.tasks !== 1 ? 's were' : ' was'} closed.` : '';
+    // The same ending the farewell step performs (js/processes.js)
+    const res = await endLessonsOnDate(studentId, endDate, currentProfile.id);
+    const closedNote = res.closed.tasks
+      ? ` ${res.closed.tasks} other open task${res.closed.tasks !== 1 ? 's were' : ' was'} closed.` : '';
 
     showToast(
-      `${lessons.length} series ended. Last lesson ${formatShortDate(parseLocalDate(endDate))}, ` +
-      `and the follow-up task moves to ${formatShortDate(d)}.` + closedNote,
+      `${res.series} series ended. Last lesson ${formatShortDate(parseLocalDate(endDate))}, ` +
+      `and the follow-up task moves to ${formatShortDate(parseLocalDate(res.taskDate))}.` + closedNote,
       'success');
     await loadStudents();
     if (procByStudent[studentId]) openProcess(studentId);
